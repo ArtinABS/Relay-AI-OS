@@ -130,3 +130,9 @@ export const toolAuditLogs = pgTable(
     userToolIdx: index("tool_audit_user_tool_idx").on(table.userId, table.toolName),
   }),
 );
+
+export const relayKvStore = pgTable("relay_kv_store", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});

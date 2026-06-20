@@ -62,6 +62,23 @@ GOOGLE_CLIENT_SECRET=
 
 More detail is in `README_AGENT_SETUP.md`.
 
+## Configure Vercel Postgres
+
+Create a Postgres database from Vercel Storage or the Vercel Marketplace
+Neon integration, connect it to this project, then redeploy. Vercel injects
+`DATABASE_URL` automatically. Local password users, tasks, notes, task columns,
+and scheduled-email metadata persist through Postgres when that variable is set.
+
+For local development, pull Vercel env vars or set your own connection string:
+
+```bash
+vercel env pull .env.local
+```
+
+```bash
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/daily_work_agent
+```
+
 ## Verify
 
 ```bash

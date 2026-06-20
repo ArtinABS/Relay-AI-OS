@@ -156,6 +156,7 @@ type PasswordAuthStatus = {
     name?: string | null;
     emailVerified: boolean;
   } | null;
+  persistence?: "postgres" | "local-json";
 };
 
 type CalendarEvent = {
@@ -5899,6 +5900,7 @@ function ProfileView({
   const user = passwordAuth?.user;
   const displayEmail = user?.email ?? oauthStatus?.googleEmail ?? oauthStatus?.github?.email ?? "No email connected";
   const displayName = user?.name || oauthStatus?.github?.name || oauthStatus?.github?.login || "Relay user";
+  const usingPostgres = passwordAuth?.persistence === "postgres";
   const initials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -5985,16 +5987,21 @@ function ProfileView({
             </div>
           </div>
           <div className="grid gap-3">
-            <SettingRow label="Email/password users" value="Local JSON file store" />
+            <SettingRow label="Email/password users" value={usingPostgres ? "Postgres database" : "Local JSON file store"} />
             <SettingRow label="Session type" value="Signed HTTP-only cookie" />
-            <SettingRow label="Vercel database" value="Not connected yet" />
+            <SettingRow label="Vercel database" value={usingPostgres ? "Connected through DATABASE_URL" : "Not connected yet"} />
             <SettingRow label="Production recommendation" value="Postgres + Auth adapter" />
           </div>
-          <p className="mt-4 rounded-xl border border-[var(--warning)]/30 bg-[var(--warning-soft)] p-4 text-sm leading-6 text-[var(--warning)]">
-            On Vercel, this app does not currently persist password users in a managed database.
-            Serverless filesystem data can disappear between deployments or instances. Use this
-            for demos, then move users, sessions, tasks, and memory into Postgres before inviting
-            real users.
+          <p
+            className={`mt-4 rounded-xl border p-4 text-sm leading-6 ${
+              usingPostgres
+                ? "border-[var(--success)]/30 bg-[var(--success-soft)] text-[var(--success)]"
+                : "border-[var(--warning)]/30 bg-[var(--warning-soft)] text-[var(--warning)]"
+            }`}
+          >
+            {usingPostgres
+              ? "Password users, local tasks, memories, task columns, and scheduled-email metadata are now persisted through Postgres when DATABASE_URL is available."
+              : "On Vercel, local filesystem data can disappear between deployments or instances. Connect a Postgres database and set DATABASE_URL before inviting real users."}
           </p>
         </div>
       </section>
