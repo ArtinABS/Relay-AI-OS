@@ -23,12 +23,14 @@ import {
   FolderOpen,
   GitBranch,
   Globe,
+  KeyRound,
   LayoutDashboard,
   Link2,
   ListTodo,
   Loader2,
   LockKeyhole,
   LogIn,
+  LogOut,
   Mail,
   Menu,
   MessageSquare,
@@ -68,6 +70,7 @@ type ViewId =
   | "github"
   | "memory"
   | "integrations"
+  | "profile"
   | "settings";
 
 type RelayTaskPriority = "low" | "medium" | "high" | "urgent";
@@ -374,6 +377,7 @@ const navItems: NavItem[] = [
   { id: "github", label: "GitHub", icon: GitBranch },
   { id: "memory", label: "Memory", icon: Brain },
   { id: "integrations", label: "Integrations", icon: Cloud },
+  { id: "profile", label: "Profile", icon: User },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -831,6 +835,18 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
     addToast("Signed in", detail ?? "Email session is active.", "success");
   }
 
+  async function handleSignOut() {
+    try {
+      await fetch("/api/auth/password/logout", { method: "POST" });
+      await refreshWorkspace();
+      setStage("auth");
+      setAuthMode("login");
+      addToast("Signed out", "Email/password session was cleared on this device.", "info");
+    } catch {
+      addToast("Sign out failed", "Try again from Profile.", "warning");
+    }
+  }
+
   const commandActions = [
     {
       label: "Open dashboard",
@@ -866,6 +882,11 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
       label: "Open integrations",
       icon: Cloud,
       run: () => setActiveView("integrations"),
+    },
+    {
+      label: "Open profile",
+      icon: User,
+      run: () => setActiveView("profile"),
     },
   ];
 
@@ -929,7 +950,9 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
           messages={messages}
           notes={notes}
           oauthStatus={oauthStatus}
+          onSignOut={handleSignOut}
           openTasks={openTasks}
+          passwordAuth={passwordAuth}
           refreshWorkspace={refreshWorkspace}
           runPrompt={runPrompt}
           setActiveView={setActiveView}
@@ -1530,7 +1553,9 @@ function WorkspaceExperience({
   messages,
   notes,
   oauthStatus,
+  onSignOut,
   openTasks,
+  passwordAuth,
   refreshWorkspace,
   runPrompt,
   setActiveView,
@@ -1565,7 +1590,9 @@ function WorkspaceExperience({
   messages: Message[];
   notes: RelayNote[];
   oauthStatus: OAuthStatus | null;
+  onSignOut: () => Promise<void>;
   openTasks: RelayTask[];
+  passwordAuth: PasswordAuthStatus | null;
   refreshWorkspace: () => Promise<void>;
   runPrompt: (prompt: string) => void;
   setActiveView: (view: ViewId) => void;
@@ -1693,6 +1720,23 @@ function WorkspaceExperience({
               githubConfigured={githubConfigured}
               googleConfigured={googleConfigured}
               oauthStatus={oauthStatus}
+              signedInToGithub={signedInToGithub}
+              signedInToGoogle={signedInToGoogle}
+            />
+          ) : null}
+
+          {activeView === "profile" ? (
+            <ProfileView
+              connectGithub={connectGithub}
+              connectGoogle={connectGoogle}
+              disconnectGithub={disconnectGithub}
+              disconnectGoogle={disconnectGoogle}
+              googleConfigured={googleConfigured}
+              githubConfigured={githubConfigured}
+              oauthStatus={oauthStatus}
+              onSignOut={onSignOut}
+              passwordAuth={passwordAuth}
+              refreshWorkspace={refreshWorkspace}
               signedInToGithub={signedInToGithub}
               signedInToGoogle={signedInToGoogle}
             />
@@ -5776,6 +5820,315 @@ function IntegrationConnectPanel({
         </div>
       </div>
     </section>
+  );
+}
+
+function ProfileView({
+  connectGithub,
+  connectGoogle,
+  disconnectGithub,
+  disconnectGoogle,
+  githubConfigured,
+  googleConfigured,
+  oauthStatus,
+  onSignOut,
+  passwordAuth,
+  refreshWorkspace,
+  signedInToGithub,
+  signedInToGoogle,
+}: {
+  connectGithub: () => void;
+  connectGoogle: () => void;
+  disconnectGithub: () => void;
+  disconnectGoogle: () => void;
+  githubConfigured: boolean;
+  googleConfigured: boolean;
+  oauthStatus: OAuthStatus | null;
+  onSignOut: () => Promise<void>;
+  passwordAuth: PasswordAuthStatus | null;
+  refreshWorkspace: () => Promise<void>;
+  signedInToGithub: boolean;
+  signedInToGoogle: boolean;
+}) {
+  const user = passwordAuth?.user;
+  const displayEmail = user?.email ?? oauthStatus?.googleEmail ?? oauthStatus?.github?.email ?? "No email connected";
+  const displayName = user?.name || oauthStatus?.github?.name || oauthStatus?.github?.login || "Relay user";
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "R";
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className={`${panelClass} overflow-hidden`}>
+          <div className="profile-identity-band p-6 sm:p-7">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex min-w-0 items-center gap-4">
+                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/90 text-xl font-semibold text-[var(--accent)] shadow-lg shadow-black/10">
+                  {initials}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">Profile</p>
+                  <h2 className="mt-2 truncate text-2xl font-semibold text-white sm:text-3xl">{displayName}</h2>
+                  <p className="mt-1 truncate text-sm text-white/75">{displayEmail}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge ready={Boolean(user?.emailVerified)} label={user?.emailVerified ? "Email verified" : "Email not verified"} />
+                <StatusBadge ready={Boolean(signedInToGoogle || signedInToGithub)} label={signedInToGoogle || signedInToGithub ? "OAuth linked" : "No OAuth"} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 p-5 sm:grid-cols-3">
+            <MiniControl label="Password session" value={passwordAuth?.authenticated ? "Active" : "Not signed in"} />
+            <MiniControl label="Google" value={signedInToGoogle ? oauthStatus?.googleEmail ?? "Connected" : "Not connected"} />
+            <MiniControl label="GitHub" value={signedInToGithub ? oauthStatus?.github?.login ?? "Connected" : "Not connected"} />
+          </div>
+        </div>
+
+        <ProfilePasswordPanel
+          canChangePassword={Boolean(passwordAuth?.authenticated)}
+          onPasswordChanged={refreshWorkspace}
+          onSignOut={onSignOut}
+        />
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className={`${panelClass} p-5`}>
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold">Connected identities</h3>
+              <p className="mt-1 text-sm text-[var(--muted)]">Manage the accounts this assistant can use.</p>
+            </div>
+            <Link2 className="h-5 w-5 text-[var(--accent)]" />
+          </div>
+          <div className="space-y-3">
+            <ProfileConnectionRow
+              configured={googleConfigured}
+              detail={signedInToGoogle ? oauthStatus?.googleEmail ?? "Google Workspace connected" : "Calendar, Gmail, Drive, and Tasks access"}
+              icon={Globe}
+              name="Google Workspace"
+              onConnect={connectGoogle}
+              onDisconnect={disconnectGoogle}
+              signedIn={signedInToGoogle}
+            />
+            <ProfileConnectionRow
+              configured={githubConfigured}
+              detail={signedInToGithub ? oauthStatus?.github?.login ?? "GitHub connected" : "Repositories, issues, and pull requests"}
+              icon={GitBranch}
+              name="GitHub"
+              onConnect={connectGithub}
+              onDisconnect={disconnectGithub}
+              signedIn={signedInToGithub}
+            />
+          </div>
+        </div>
+
+        <div className={`${panelClass} p-5`}>
+          <div className="mb-5 flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--warning-soft)] text-[var(--warning)]">
+              <Database className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="text-lg font-semibold">Account persistence</h3>
+              <p className="mt-1 text-sm text-[var(--muted)]">What is real in this deployment.</p>
+            </div>
+          </div>
+          <div className="grid gap-3">
+            <SettingRow label="Email/password users" value="Local JSON file store" />
+            <SettingRow label="Session type" value="Signed HTTP-only cookie" />
+            <SettingRow label="Vercel database" value="Not connected yet" />
+            <SettingRow label="Production recommendation" value="Postgres + Auth adapter" />
+          </div>
+          <p className="mt-4 rounded-xl border border-[var(--warning)]/30 bg-[var(--warning-soft)] p-4 text-sm leading-6 text-[var(--warning)]">
+            On Vercel, this app does not currently persist password users in a managed database.
+            Serverless filesystem data can disappear between deployments or instances. Use this
+            for demos, then move users, sessions, tasks, and memory into Postgres before inviting
+            real users.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ProfilePasswordPanel({
+  canChangePassword,
+  onPasswordChanged,
+  onSignOut,
+}: {
+  canChangePassword: boolean;
+  onPasswordChanged: () => Promise<void>;
+  onSignOut: () => Promise<void>;
+}) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState<{ tone: "success" | "warning"; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+
+    if (newPassword !== confirmPassword) {
+      setMessage({ tone: "warning", text: "New passwords do not match." });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/auth/password/change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = (await response.json()) as { ok: boolean; reason?: string };
+
+      if (!response.ok || !data.ok) {
+        setMessage({ tone: "warning", text: data.reason ?? "Unable to change password." });
+        return;
+      }
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage({ tone: "success", text: "Password updated. Your session remains active." });
+      await onPasswordChanged();
+    } catch {
+      setMessage({ tone: "warning", text: "Password update failed. Try again." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await onSignOut();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  return (
+    <section className={`${panelClass} p-5`}>
+      <div className="mb-5 flex items-center gap-3">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <KeyRound className="h-5 w-5" />
+        </span>
+        <div>
+          <h3 className="text-lg font-semibold">Security</h3>
+          <p className="mt-1 text-sm text-[var(--muted)]">Change password or end this browser session.</p>
+        </div>
+      </div>
+
+      <form className="space-y-4" onSubmit={submit}>
+        <Field
+          autoComplete="current-password"
+          label="Current password"
+          name="currentPassword"
+          onChange={setCurrentPassword}
+          placeholder="Current password"
+          type="password"
+          value={currentPassword}
+        />
+        <Field
+          autoComplete="new-password"
+          label="New password"
+          name="newPassword"
+          onChange={setNewPassword}
+          placeholder="8+ characters"
+          type="password"
+          value={newPassword}
+        />
+        <Field
+          autoComplete="new-password"
+          label="Confirm new password"
+          name="confirmPassword"
+          onChange={setConfirmPassword}
+          placeholder="Repeat new password"
+          type="password"
+          value={confirmPassword}
+        />
+        {message ? (
+          <p className={`rounded-lg p-3 text-sm font-medium ${message.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--warning-soft)] text-[var(--warning)]"}`}>
+            {message.text}
+          </p>
+        ) : null}
+        <button className={primaryButtonClass + " w-full"} disabled={!canChangePassword || saving} type="submit">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+          Change password
+        </button>
+      </form>
+
+      <div className="mt-4 border-t border-[var(--line)] pt-4">
+        <button className={secondaryButtonClass + " w-full"} disabled={signingOut} onClick={signOut} type="button">
+          {signingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+          Sign out
+        </button>
+        {!canChangePassword ? (
+          <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+            Password changes require an active email/password session. OAuth-only users can manage
+            connected accounts below.
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function ProfileConnectionRow({
+  configured,
+  detail,
+  icon: Icon,
+  name,
+  onConnect,
+  onDisconnect,
+  signedIn,
+}: {
+  configured: boolean;
+  detail: string;
+  icon: LucideIcon;
+  name: string;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  signedIn: boolean;
+}) {
+  return (
+    <div className="hover-lift rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-4 transition">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+            <Icon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-semibold">{name}</p>
+            <p className="mt-1 truncate text-sm text-[var(--muted)]">{detail}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <button
+            className={signedIn ? secondaryButtonClass : primaryButtonClass}
+            disabled={!configured && !signedIn}
+            onClick={onConnect}
+            type="button"
+          >
+            {signedIn ? "Reconnect" : "Connect"}
+          </button>
+          {signedIn ? (
+            <button className={secondaryButtonClass} onClick={onDisconnect} type="button">
+              Disconnect
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 

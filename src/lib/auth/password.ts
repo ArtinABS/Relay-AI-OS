@@ -290,6 +290,29 @@ export async function resetPassword(email: string, code: string, password: strin
   return publicUser(user);
 }
 
+export async function changePassword(email: string, currentPassword: string, newPassword: string) {
+  const users = await listPasswordUsers();
+  const currentUser = users.find((user) => user.email === normalizeEmail(email));
+
+  if (!currentUser || !(await verifyPassword(currentPassword, currentUser))) {
+    throw new Error("Current password is incorrect.");
+  }
+
+  const passwordResult = await hashPassword(newPassword);
+  const user = await updateUser(email, (current) => ({
+    ...current,
+    passwordHash: passwordResult.hash,
+    passwordSalt: passwordResult.salt,
+    updatedAt: new Date().toISOString(),
+  }));
+
+  if (!user) {
+    throw new Error("Unable to update password.");
+  }
+
+  return publicUser(user);
+}
+
 export function createPasswordSessionToken(user: PublicPasswordUser, remember = true) {
   const maxAgeSeconds = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
   const payload: SessionPayload = {

@@ -498,6 +498,25 @@ select:focus-visible {
     repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 36px);
 }
 
+.profile-identity-band {
+  background:
+    linear-gradient(135deg, rgba(21, 30, 54, 0.94), rgba(38, 82, 139, 0.92) 52%, rgba(15, 118, 110, 0.9)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 30px);
+  position: relative;
+}
+
+.profile-identity-band::after {
+  background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  content: "";
+  height: 180%;
+  pointer-events: none;
+  position: absolute;
+  right: 12%;
+  top: -40%;
+  transform: rotate(12deg);
+  width: 16%;
+}
+
 .resize-rail::after {
   background: var(--accent);
   border-radius: 999px;
