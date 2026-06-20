@@ -52,6 +52,11 @@ Origin: http://localhost:3000
 Redirect URI: http://localhost:3000/api/auth/callback/google
 ```
 
+Enable the Google APIs used by the workspace in the same Cloud project:
+Calendar API, Gmail API, Drive API, Tasks API, and People API. The Contacts
+features use the People API with the `https://www.googleapis.com/auth/contacts`
+scope, so existing Google sessions should reconnect after this scope changes.
+
 Then set:
 
 ```bash

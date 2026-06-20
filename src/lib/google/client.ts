@@ -57,4 +57,5 @@ export const googleServices = {
   sheets: () => google.sheets({ version: "v4", auth: createGoogleOAuthClient() }),
   gmail: () => google.gmail({ version: "v1", auth: createGoogleOAuthClient() }),
   tasks: () => google.tasks({ version: "v1", auth: createGoogleOAuthClient() }),
+  people: () => google.people({ version: "v1", auth: createGoogleOAuthClient() }),
 };

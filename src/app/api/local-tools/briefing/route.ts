@@ -11,6 +11,7 @@ import { getDirectGoogleTokens } from "@/lib/google/direct-session";
 import { getGoogleSetupStatus } from "@/lib/google/client";
 import {
   getUpcomingCalendarEventsForUser,
+  listGoogleContactsForUser,
   listGmailDraftsForUser,
   listGmailMessagesForUser,
   listGoogleTasksForUser,
@@ -33,7 +34,7 @@ export async function GET() {
   const openTasks = tasks.filter((task) => !task.completed);
   const connected = Boolean(directTokens?.accessToken || directTokens?.refreshToken);
   const githubConnected = Boolean(githubTokens?.accessToken);
-  const [calendar, drive, googleTasks, gmail, gmailDrafts] = directTokens && connected
+  const [calendar, drive, googleTasks, gmail, gmailDrafts, contacts] = directTokens && connected
     ? await Promise.all([
         getUpcomingCalendarEventsForUser(directTokens, 10).catch((error) => ({
           ok: false,
@@ -79,6 +80,14 @@ export async function GET() {
               : "Unable to read Gmail drafts.",
           drafts: [],
         })),
+        listGoogleContactsForUser(directTokens, { maxResults: 20 }).catch((error) => ({
+          ok: false,
+          reason:
+            error instanceof Error
+              ? error.message
+              : "Unable to read Google Contacts.",
+          contacts: [],
+        })),
       ])
     : [
         {
@@ -106,6 +115,11 @@ export async function GET() {
           ok: false,
           reason: "Gmail is not connected.",
           drafts: [],
+        },
+        {
+          ok: false,
+          reason: "Google Contacts is not connected.",
+          contacts: [],
         },
       ];
   const [githubRepositories, githubIssues, githubPullRequests] = githubTokens && githubConnected
@@ -181,6 +195,7 @@ export async function GET() {
     googleTasks,
     gmail,
     gmailDrafts,
+    contacts,
     githubRepositories,
     githubIssues,
     githubPullRequests,

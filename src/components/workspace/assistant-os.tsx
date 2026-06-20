@@ -232,6 +232,22 @@ type GmailDraft = {
   snippet?: string | null;
 };
 
+type GoogleContact = {
+  resourceName?: string | null;
+  etag?: string | null;
+  displayName: string;
+  givenName?: string | null;
+  familyName?: string | null;
+  emails: string[];
+  phoneNumbers: string[];
+  organization?: string | null;
+  jobTitle?: string | null;
+  birthday?: string | null;
+  notes?: string | null;
+  address?: string | null;
+  photoUrl?: string | null;
+};
+
 type GithubRepository = {
   id: number;
   name: string;
@@ -317,6 +333,11 @@ type Briefing = {
     reason?: string;
     drafts: GmailDraft[];
   };
+  contacts?: {
+    ok: boolean;
+    reason?: string;
+    contacts: GoogleContact[];
+  };
   scheduledEmails?: ScheduledEmail[];
   githubRepositories?: {
     ok: boolean;
@@ -343,6 +364,7 @@ type ContextWorkspaceMode =
   | "files"
   | "github"
   | "memory"
+  | "contacts"
   | "email";
 
 type Message = {
@@ -411,7 +433,7 @@ const integrationRows = [
   { name: "Gmail", icon: Mail, provider: "Google", implemented: true },
   { name: "Google Drive", icon: FolderOpen, provider: "Google", implemented: true },
   { name: "Google Tasks", icon: ListTodo, provider: "Google", implemented: true },
-  { name: "Contacts", icon: Users, provider: "Google", implemented: false },
+  { name: "Contacts", icon: Users, provider: "Google", implemented: true },
   { name: "GitHub", icon: GitBranch, provider: "GitHub", implemented: true },
   { name: "Slack", icon: MessageSquare, provider: "Not installed", implemented: false },
   { name: "OpenWeather", icon: Globe, provider: "Not installed", implemented: false },
@@ -1474,10 +1496,10 @@ function OnboardingExperience({
     },
     {
       label: "Tasks and Contacts",
-      detail: "Local tasks and Google Tasks are implemented. Contacts are read-scope only for now.",
+      detail: "Google Tasks plus saved Contacts search, birthdays, and confirmed contact edits.",
       icon: Users,
       ready: signedInToGoogle,
-      status: signedInToGoogle ? "Tasks ready" : "Pending",
+      status: signedInToGoogle ? "Ready" : "Pending",
     },
     {
       label: "AI provider",
@@ -3158,7 +3180,7 @@ function ContextWorkspace({
           <Icon className="h-5 w-5" />
         </span>
         <div className="h-px w-full bg-[var(--line)]" />
-        {(["focus", "calendar", "tasks", "files", "github", "memory", "email"] as ContextWorkspaceMode[]).map((item) => {
+        {(["focus", "calendar", "tasks", "files", "github", "memory", "contacts", "email"] as ContextWorkspaceMode[]).map((item) => {
           const ItemIcon = contextWorkspaceMeta(item).icon;
           return (
             <span
@@ -3253,6 +3275,7 @@ function ContextWorkspace({
         {mode === "files" ? <FilesWorkspace briefing={briefing} runPrompt={runPrompt} /> : null}
         {mode === "github" ? <GithubWorkspace briefing={briefing} runPrompt={runPrompt} /> : null}
         {mode === "memory" ? <MemoryWorkspace notes={notes} runPrompt={runPrompt} /> : null}
+        {mode === "contacts" ? <ContactsWorkspace briefing={briefing} runPrompt={runPrompt} /> : null}
         {mode === "email" ? <EmailWorkspace briefing={briefing} runPrompt={runPrompt} /> : null}
       </div>
 
@@ -3288,6 +3311,7 @@ function FocusWorkspace({
   const nextEvent = briefing?.calendar.events[0];
   const recentFile = briefing?.drive.files[0];
   const googleTasks = briefing?.googleTasks?.tasks.filter((task) => task.status !== "completed") ?? [];
+  const contacts = briefing?.contacts?.contacts ?? [];
   const actions = [
     {
       title: nextEvent ? nextEvent.title : "Plan my day",
@@ -3329,6 +3353,7 @@ function FocusWorkspace({
           <MiniControl label="Calendar" value={briefing?.calendar.ok ? `${briefing.calendar.events.length} events` : "Not connected"} />
           <MiniControl label="Tasks" value={`${openTasks.length + googleTasks.length} open`} />
           <MiniControl label="Files" value={briefing?.drive.ok ? `${briefing.drive.files.length} recent` : "Not connected"} />
+          <MiniControl label="Contacts" value={briefing?.contacts?.ok ? `${contacts.length} people` : "Not connected"} />
         </div>
       </section>
 
@@ -4147,6 +4172,116 @@ function MemoryWorkspace({
         <Brain className="h-4 w-4" />
         Add memory
       </button>
+    </div>
+  );
+}
+
+function ContactsWorkspace({
+  briefing,
+  runPrompt,
+}: {
+  briefing: Briefing | null;
+  runPrompt: (prompt: string) => void;
+}) {
+  const contacts = briefing?.contacts?.contacts ?? [];
+  const birthdayContacts = contacts.filter((contact) => contact.birthday).slice(0, 4);
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <section className={softPanelClass + " p-4"}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">Google Contacts</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              {briefing?.contacts?.ok
+                ? "Saved contacts, birthdays, emails, phones, and organizations."
+                : briefing?.contacts?.reason ?? "Reconnect Google to grant Contacts access."}
+            </p>
+          </div>
+          <StatusBadge
+            ready={Boolean(briefing?.contacts?.ok)}
+            label={briefing?.contacts?.ok ? `${contacts.length} loaded` : "Scope needed"}
+          />
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <button
+            className={secondaryButtonClass}
+            onClick={() => runPrompt("Find a contact")}
+            type="button"
+          >
+            <Search className="h-4 w-4" />
+            Find contact
+          </button>
+          <button
+            className={secondaryButtonClass}
+            onClick={() => runPrompt("Show upcoming contact birthdays")}
+            type="button"
+          >
+            <CalendarDays className="h-4 w-4" />
+            Birthdays
+          </button>
+        </div>
+      </section>
+
+      {birthdayContacts.length > 0 ? (
+        <section className={softPanelClass + " p-4"}>
+          <h3 className="mb-3 font-semibold">Birthdays</h3>
+          <div className="space-y-2">
+            {birthdayContacts.map((contact) => (
+              <button
+                className="interactive-row flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--accent-soft)]"
+                key={`${contact.resourceName}-birthday`}
+                onClick={() => runPrompt(`Prepare a birthday reminder for ${contact.displayName}`)}
+                type="button"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{contact.displayName}</span>
+                  <span className="mt-1 block text-xs text-[var(--muted)]">{contact.birthday}</span>
+                </span>
+                <Bell className="h-4 w-4 text-[var(--muted)]" />
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className={softPanelClass + " p-4"}>
+        <h3 className="mb-3 font-semibold">Recent contacts</h3>
+        <div className="space-y-2">
+          {contacts.slice(0, 8).map((contact) => (
+            <button
+              className="interactive-row grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--accent-soft)]"
+              key={contact.resourceName ?? contact.displayName}
+              onClick={() => runPrompt(`Open contact ${contact.displayName}`)}
+              type="button"
+            >
+              <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent)]">
+                {contact.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img alt="" className="h-full w-full object-cover" src={contact.photoUrl} />
+                ) : (
+                  contact.displayName.slice(0, 1).toUpperCase()
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">{contact.displayName}</span>
+                <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                  {contact.emails[0] ?? contact.phoneNumbers[0] ?? contact.organization ?? "No contact method"}
+                </span>
+              </span>
+              <ArrowRight className="h-4 w-4 text-[var(--muted)]" />
+            </button>
+          ))}
+        </div>
+        {contacts.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title={briefing?.contacts?.ok ? "No contacts loaded" : "Contacts not connected"}
+            detail={briefing?.contacts?.reason ?? "Reconnect Google to grant the Contacts scope."}
+          />
+        ) : null}
+      </section>
     </div>
   );
 }
@@ -5741,7 +5876,7 @@ function IntegrationsView({
         <IntegrationConnectPanel
           connectedLabel={oauthStatus?.googleEmail ?? "Google user"}
           configured={googleConfigured}
-          description="Calendar, Gmail, Drive, Tasks, Contacts read scope, and Meet creation."
+          description="Calendar, Gmail, Drive, Tasks, Contacts management, and Meet creation."
           disconnectedLabel="OAuth credentials missing"
           icon={Globe}
           name="Google Workspace"
@@ -6988,7 +7123,10 @@ function inferExecutionTrace(messages: Message[]) {
   if (/(github|repo|repository|issue|pull request|pr )/.test(latest)) {
     return ["Checking GitHub context", "Selecting repo tools", "Preparing issue workspace"];
   }
-  if (/(calendar|meeting|schedule|availability|birthday)/.test(latest)) {
+  if (/(contact|contacts|person|people|phone|birthday|birthdays)/.test(latest)) {
+    return ["Reading Google Contacts", "Checking birthdays", "Preparing contact actions"];
+  }
+  if (/(calendar|meeting|schedule|availability)/.test(latest)) {
     return ["Fetching calendar events", "Checking task deadlines", "Building scheduling UI"];
   }
   if (/(email|gmail|inbox|draft|reply)/.test(latest)) {
@@ -7068,7 +7206,7 @@ function inferContextWorkspaceMode(messages: Message[]): ContextWorkspaceMode {
     text.includes("birthday") ||
     text.includes("birthdays")
   ) {
-    return "calendar";
+    return text.includes("birthday") || text.includes("birthdays") ? "contacts" : "calendar";
   }
   if (text.includes("task") || text.includes("todo") || text.includes("deadline") || text.includes("remind me")) {
     return "tasks";
@@ -7088,6 +7226,15 @@ function inferContextWorkspaceMode(messages: Message[]): ContextWorkspaceMode {
   }
   if (text.includes("remember") || text.includes("memory") || text.includes("preference")) {
     return "memory";
+  }
+  if (
+    text.includes("contact") ||
+    text.includes("contacts") ||
+    text.includes("person") ||
+    text.includes("people") ||
+    text.includes("phone")
+  ) {
+    return "contacts";
   }
   if (text.includes("email") || text.includes("gmail") || text.includes("draft") || text.includes("inbox")) {
     return "email";
@@ -7136,6 +7283,12 @@ function contextWorkspaceMeta(mode: ContextWorkspaceMode) {
       icon: Brain,
       label: "Memory",
       signal: "Memory",
+    },
+    contacts: {
+      detail: "Saved people, birthdays, and invitee context",
+      icon: Users,
+      label: "Contacts",
+      signal: "People",
     },
     email: {
       detail: "Drafting and approval workflow",

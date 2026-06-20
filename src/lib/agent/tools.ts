@@ -16,13 +16,17 @@ import { getDirectGoogleTokens } from "@/lib/google/direct-session";
 import {
   archiveGmailMessageForUser,
   completeGoogleTaskForUser,
+  createGoogleContactForUser,
   createGoogleTaskForUser,
   createGmailDraftForUser,
+  deleteGoogleContactForUser,
   deleteGmailMessageForUser,
   deleteGoogleTaskForUser,
+  getGoogleContactForUser,
   getUpcomingCalendarEvents,
   labelGmailMessageForUser,
   listGmailMessagesForUser,
+  listGoogleContactsForUser,
   listGoogleTasksForUser,
   readSpreadsheetRange,
   replyToGmailMessageForUser,
@@ -30,6 +34,7 @@ import {
   starGmailMessageForUser,
   trashGmailMessageForUser,
   searchDriveFiles,
+  updateGoogleContactForUser,
   updateGoogleTaskForUser,
 } from "@/lib/google/workspace";
 import { toolCatalog } from "@/lib/tools/catalog";
@@ -198,6 +203,107 @@ export const agentTools = [
       }
 
       return deleteGoogleTaskForUser(tokens, task);
+    },
+  }),
+  defineTool({
+    name: "list_google_contacts",
+    description: "List or search saved Google Contacts for the connected browser user.",
+    parameters: z.object({
+      query: z.string().optional(),
+      maxResults: z.number().int().min(1).max(100).default(25),
+    }),
+    execute: async ({ query, maxResults }) => {
+      const tokens = await getDirectGoogleTokens();
+      if (!tokens?.accessToken && !tokens?.refreshToken) {
+        return { ok: false, reason: "Google Contacts is not connected in this browser session." };
+      }
+
+      return listGoogleContactsForUser(tokens, { query, maxResults });
+    },
+  }),
+  defineTool({
+    name: "read_google_contact",
+    description: "Read a single saved Google Contact by resourceName.",
+    parameters: z.object({
+      resourceName: z.string().min(1),
+    }),
+    execute: async ({ resourceName }) => {
+      const tokens = await getDirectGoogleTokens();
+      if (!tokens?.accessToken && !tokens?.refreshToken) {
+        return { ok: false, reason: "Google Contacts is not connected in this browser session." };
+      }
+
+      return getGoogleContactForUser(tokens, resourceName);
+    },
+  }),
+  defineTool({
+    name: "create_google_contact",
+    description: "Create a Google Contact only after explicit user confirmation.",
+    parameters: z.object({
+      displayName: z.string().optional(),
+      givenName: z.string().optional(),
+      familyName: z.string().optional(),
+      email: z.string().email().optional(),
+      phoneNumber: z.string().optional(),
+      organization: z.string().optional(),
+      jobTitle: z.string().optional(),
+      birthday: z.string().regex(/^(\d{4}-)?\d{2}-\d{2}$/).optional(),
+      notes: z.string().optional(),
+      address: z.string().optional(),
+      confirmed: z.boolean().default(false),
+    }),
+    execute: async ({ confirmed, ...contact }) => {
+      if (!confirmed) return { ok: false, reason: "Creating a Google Contact requires confirmation." };
+      const tokens = await getDirectGoogleTokens();
+      if (!tokens?.accessToken && !tokens?.refreshToken) {
+        return { ok: false, reason: "Google Contacts is not connected in this browser session." };
+      }
+
+      return createGoogleContactForUser(tokens, contact);
+    },
+  }),
+  defineTool({
+    name: "update_google_contact",
+    description: "Edit a Google Contact only after explicit user confirmation.",
+    parameters: z.object({
+      resourceName: z.string().min(1),
+      displayName: z.string().optional(),
+      givenName: z.string().optional(),
+      familyName: z.string().optional(),
+      email: z.string().email().optional(),
+      phoneNumber: z.string().optional(),
+      organization: z.string().optional(),
+      jobTitle: z.string().optional(),
+      birthday: z.string().regex(/^(\d{4}-)?\d{2}-\d{2}$/).optional(),
+      notes: z.string().optional(),
+      address: z.string().optional(),
+      confirmed: z.boolean().default(false),
+    }),
+    execute: async ({ confirmed, ...contact }) => {
+      if (!confirmed) return { ok: false, reason: "Editing a Google Contact requires confirmation." };
+      const tokens = await getDirectGoogleTokens();
+      if (!tokens?.accessToken && !tokens?.refreshToken) {
+        return { ok: false, reason: "Google Contacts is not connected in this browser session." };
+      }
+
+      return updateGoogleContactForUser(tokens, contact);
+    },
+  }),
+  defineTool({
+    name: "delete_google_contact",
+    description: "Delete a Google Contact only after explicit user confirmation.",
+    parameters: z.object({
+      resourceName: z.string().min(1),
+      confirmed: z.boolean().default(false),
+    }),
+    execute: async ({ resourceName, confirmed }) => {
+      if (!confirmed) return { ok: false, reason: "Deleting a Google Contact requires confirmation." };
+      const tokens = await getDirectGoogleTokens();
+      if (!tokens?.accessToken && !tokens?.refreshToken) {
+        return { ok: false, reason: "Google Contacts is not connected in this browser session." };
+      }
+
+      return deleteGoogleContactForUser(tokens, resourceName);
     },
   }),
   defineTool({

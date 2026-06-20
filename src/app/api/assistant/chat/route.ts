@@ -19,13 +19,17 @@ import { getDirectGoogleTokens } from "@/lib/google/direct-session";
 import {
   archiveGmailMessageForUser,
   completeGoogleTaskForUser,
+  createGoogleContactForUser,
   createGoogleTaskForUser,
   createGmailDraftForUser,
+  deleteGoogleContactForUser,
   deleteGmailMessageForUser,
   deleteGoogleTaskForUser,
+  getGoogleContactForUser,
   getUpcomingCalendarEventsForUser,
   labelGmailMessageForUser,
   listGmailMessagesForUser,
+  listGoogleContactsForUser,
   listGoogleTasksForUser,
   listRecentDriveFilesForUser,
   readGmailMessageForUser,
@@ -33,6 +37,7 @@ import {
   sendGmailMessageForUser,
   starGmailMessageForUser,
   trashGmailMessageForUser,
+  updateGoogleContactForUser,
   updateGoogleTaskForUser,
 } from "@/lib/google/workspace";
 import { calculateExpression } from "@/lib/local-tools/calculator";
@@ -142,7 +147,8 @@ export async function POST(request: Request) {
         "Format final assistant responses as GitHub-flavored Markdown. Use short headings, bullet lists, checklists, tables, code spans, and links when they improve scanability. Do not return raw plain-text paragraphs for multi-part answers.",
         "Keep Markdown compact and professional. Avoid over-formatting simple one-sentence confirmations.",
         "If a user asks for tomorrow's schedule, call the calendar tool. If Google Calendar is unavailable, say exactly what permission or OAuth step is missing.",
-        "Never pretend to complete Google, Gmail, Calendar, Drive, or destructive actions if the tool result says they are blocked.",
+        "For contacts, use Google Contacts tools to find people, emails, phone numbers, organizations, and birthdays. Creating, editing, or deleting contacts requires explicit confirmation.",
+        "Never pretend to complete Google, Gmail, Calendar, Drive, Contacts, or destructive actions if the tool result says they are blocked.",
         "For GitHub, reading repositories/issues/pull requests is allowed when connected. Creating issues or comments requires explicit confirmation.",
         "For long-term memory, ask for permission before storing unless the user explicitly says to remember/save it.",
         "",
@@ -415,6 +421,157 @@ export async function POST(request: Request) {
                 refreshToken: directTokens.refreshToken,
               },
               task,
+            );
+          },
+        }),
+        list_google_contacts: tool({
+          description:
+            "List or search saved Google Contacts for the connected user. Use for contacts, people, invitees, phone numbers, organizations, or birthdays.",
+          inputSchema: z.object({
+            query: z.string().optional(),
+            maxResults: z.number().int().min(1).max(100).default(25),
+          }),
+          execute: async ({ query, maxResults }) => {
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return listGoogleContactsForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              { query, maxResults },
+            );
+          },
+        }),
+        read_google_contact: tool({
+          description: "Read one Google Contact by resourceName.",
+          inputSchema: z.object({
+            resourceName: z.string().min(1),
+          }),
+          execute: async ({ resourceName }) => {
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return getGoogleContactForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              resourceName,
+            );
+          },
+        }),
+        create_google_contact: tool({
+          description:
+            "Create a saved Google Contact only after explicit user confirmation.",
+          inputSchema: z.object({
+            displayName: z.string().optional(),
+            givenName: z.string().optional(),
+            familyName: z.string().optional(),
+            email: z.string().email().optional(),
+            phoneNumber: z.string().optional(),
+            organization: z.string().optional(),
+            jobTitle: z.string().optional(),
+            birthday: z.string().regex(/^(\d{4}-)?\d{2}-\d{2}$/).optional(),
+            notes: z.string().optional(),
+            address: z.string().optional(),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...contact }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Creating a Google Contact requires explicit confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return createGoogleContactForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              contact,
+            );
+          },
+        }),
+        update_google_contact: tool({
+          description:
+            "Edit a saved Google Contact only after explicit user confirmation.",
+          inputSchema: z.object({
+            resourceName: z.string().min(1),
+            displayName: z.string().optional(),
+            givenName: z.string().optional(),
+            familyName: z.string().optional(),
+            email: z.string().email().optional(),
+            phoneNumber: z.string().optional(),
+            organization: z.string().optional(),
+            jobTitle: z.string().optional(),
+            birthday: z.string().regex(/^(\d{4}-)?\d{2}-\d{2}$/).optional(),
+            notes: z.string().optional(),
+            address: z.string().optional(),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...contact }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Editing a Google Contact requires explicit confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return updateGoogleContactForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              contact,
+            );
+          },
+        }),
+        delete_google_contact: tool({
+          description:
+            "Delete a saved Google Contact only after explicit user confirmation.",
+          inputSchema: z.object({
+            resourceName: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, resourceName }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Deleting a Google Contact requires explicit confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return deleteGoogleContactForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              resourceName,
             );
           },
         }),

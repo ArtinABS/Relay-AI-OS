@@ -4,6 +4,362 @@ import {
   googleServices,
   type GoogleTokenSet,
 } from "./client";
+import type { people_v1 } from "googleapis";
+
+const contactPersonFields =
+  "metadata,names,emailAddresses,phoneNumbers,organizations,birthdays,biographies,addresses,photos";
+
+export type GoogleContact = {
+  resourceName?: string | null;
+  etag?: string | null;
+  displayName: string;
+  givenName?: string | null;
+  familyName?: string | null;
+  emails: string[];
+  phoneNumbers: string[];
+  organization?: string | null;
+  jobTitle?: string | null;
+  birthday?: string | null;
+  notes?: string | null;
+  address?: string | null;
+  photoUrl?: string | null;
+};
+
+export type GoogleContactInput = {
+  displayName?: string;
+  givenName?: string;
+  familyName?: string;
+  email?: string;
+  phoneNumber?: string;
+  organization?: string;
+  jobTitle?: string;
+  birthday?: string;
+  notes?: string;
+  address?: string;
+};
+
+function compactStrings(values: Array<string | null | undefined>) {
+  return values.map((value) => value?.trim()).filter((value): value is string => Boolean(value));
+}
+
+function formatGoogleDate(date?: people_v1.Schema$Date | null) {
+  if (!date) return null;
+  const year = date.year && date.year > 0 ? String(date.year).padStart(4, "0") : null;
+  const month = date.month && date.month > 0 ? String(date.month).padStart(2, "0") : null;
+  const day = date.day && date.day > 0 ? String(date.day).padStart(2, "0") : null;
+
+  if (year && month && day) return `${year}-${month}-${day}`;
+  if (month && day) return `${month}-${day}`;
+  return year ?? null;
+}
+
+function parseBirthday(value?: string) {
+  if (!value) return undefined;
+  const parts = value.split("-").map((part) => Number(part));
+
+  if (parts.length === 3 && parts.every((part) => Number.isFinite(part))) {
+    return { year: parts[0], month: parts[1], day: parts[2] };
+  }
+
+  if (parts.length === 2 && parts.every((part) => Number.isFinite(part))) {
+    return { month: parts[0], day: parts[1] };
+  }
+
+  return undefined;
+}
+
+function contactSource(person: people_v1.Schema$Person) {
+  return person.metadata?.sources?.find((source) => source.type === "CONTACT");
+}
+
+function mapGoogleContact(person: people_v1.Schema$Person): GoogleContact {
+  const name = person.names?.[0];
+  const organization = person.organizations?.[0];
+  const birthday = person.birthdays?.find((item) => item.date)?.date;
+  const biography = person.biographies?.[0];
+  const address = person.addresses?.[0];
+  const nameFromParts = compactStrings([name?.givenName, name?.familyName]).join(" ");
+
+  return {
+    resourceName: person.resourceName ?? null,
+    etag: contactSource(person)?.etag ?? person.etag ?? null,
+    displayName: name?.displayName ?? (
+      nameFromParts ||
+      person.emailAddresses?.[0]?.value ||
+      person.phoneNumbers?.[0]?.value ||
+      "Unnamed contact"
+    ),
+    givenName: name?.givenName ?? null,
+    familyName: name?.familyName ?? null,
+    emails: compactStrings(person.emailAddresses?.map((email) => email.value) ?? []),
+    phoneNumbers: compactStrings(person.phoneNumbers?.map((phone) => phone.value) ?? []),
+    organization: organization?.name ?? null,
+    jobTitle: organization?.title ?? null,
+    birthday: formatGoogleDate(birthday),
+    notes: biography?.value ?? null,
+    address: address?.formattedValue ?? null,
+    photoUrl: person.photos?.find((photo) => photo.default)?.url ?? person.photos?.[0]?.url ?? null,
+  };
+}
+
+function buildContactPerson(input: GoogleContactInput): people_v1.Schema$Person {
+  const displayParts = compactStrings([input.displayName]);
+  const nameParts = compactStrings([input.givenName, input.familyName]);
+  const fallbackName = displayParts[0] ?? nameParts.join(" ");
+  const birthday = parseBirthday(input.birthday);
+
+  return {
+    names: fallbackName || input.givenName || input.familyName
+      ? [
+          {
+            displayName: input.displayName,
+            givenName: input.givenName ?? input.displayName,
+            familyName: input.familyName,
+          },
+        ]
+      : undefined,
+    emailAddresses: input.email ? [{ value: input.email }] : undefined,
+    phoneNumbers: input.phoneNumber ? [{ value: input.phoneNumber }] : undefined,
+    organizations:
+      input.organization || input.jobTitle
+        ? [{ name: input.organization, title: input.jobTitle }]
+        : undefined,
+    birthdays: birthday ? [{ date: birthday }] : undefined,
+    biographies: input.notes ? [{ value: input.notes, contentType: "TEXT_PLAIN" }] : undefined,
+    addresses: input.address ? [{ formattedValue: input.address }] : undefined,
+  };
+}
+
+function buildContactUpdatePerson(
+  existing: people_v1.Schema$Person,
+  input: GoogleContactInput,
+): { person: people_v1.Schema$Person; updatePersonFields: string } {
+  const updatePersonFields = new Set<string>();
+  const next: people_v1.Schema$Person = {
+    resourceName: existing.resourceName,
+    etag: existing.etag,
+    metadata: existing.metadata,
+  };
+
+  if (
+    input.displayName !== undefined ||
+    input.givenName !== undefined ||
+    input.familyName !== undefined
+  ) {
+    updatePersonFields.add("names");
+    const existingName = existing.names?.[0] ?? {};
+    next.names = [
+      {
+        ...existingName,
+        displayName: input.displayName ?? existingName.displayName,
+        givenName: input.givenName ?? input.displayName ?? existingName.givenName,
+        familyName: input.familyName ?? existingName.familyName,
+      },
+    ];
+  }
+
+  if (input.email !== undefined) {
+    updatePersonFields.add("emailAddresses");
+    next.emailAddresses = input.email ? [{ value: input.email }] : [];
+  }
+
+  if (input.phoneNumber !== undefined) {
+    updatePersonFields.add("phoneNumbers");
+    next.phoneNumbers = input.phoneNumber ? [{ value: input.phoneNumber }] : [];
+  }
+
+  if (input.organization !== undefined || input.jobTitle !== undefined) {
+    updatePersonFields.add("organizations");
+    const existingOrganization = existing.organizations?.[0] ?? {};
+    next.organizations =
+      input.organization || input.jobTitle
+        ? [
+            {
+              ...existingOrganization,
+              name: input.organization ?? existingOrganization.name,
+              title: input.jobTitle ?? existingOrganization.title,
+            },
+          ]
+        : [];
+  }
+
+  if (input.birthday !== undefined) {
+    updatePersonFields.add("birthdays");
+    const birthday = parseBirthday(input.birthday);
+    next.birthdays = birthday ? [{ date: birthday }] : [];
+  }
+
+  if (input.notes !== undefined) {
+    updatePersonFields.add("biographies");
+    next.biographies = input.notes
+      ? [{ value: input.notes, contentType: "TEXT_PLAIN" }]
+      : [];
+  }
+
+  if (input.address !== undefined) {
+    updatePersonFields.add("addresses");
+    next.addresses = input.address ? [{ formattedValue: input.address }] : [];
+  }
+
+  return {
+    person: next,
+    updatePersonFields: [...updatePersonFields].join(","),
+  };
+}
+
+export async function listGoogleContactsForUser(
+  tokens: GoogleTokenSet,
+  options: { maxResults?: number; query?: string } = {},
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Contacts is not connected in this browser session. Connect Google before reading contacts.",
+      contacts: [],
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.people().people.connections.list({
+    auth,
+    resourceName: "people/me",
+    pageSize: Math.min(Math.max(options.maxResults ?? 25, 1), 100),
+    personFields: contactPersonFields,
+    sortOrder: "LAST_MODIFIED_DESCENDING",
+  });
+  const contacts = (response.data.connections ?? []).map(mapGoogleContact);
+  const query = options.query?.trim().toLowerCase();
+  const filteredContacts = query
+    ? contacts.filter((contact) =>
+        [
+          contact.displayName,
+          contact.givenName,
+          contact.familyName,
+          contact.organization,
+          contact.jobTitle,
+          contact.notes,
+          contact.address,
+          ...contact.emails,
+          ...contact.phoneNumbers,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query),
+      )
+    : contacts;
+
+  return { ok: true, contacts: filteredContacts };
+}
+
+export async function getGoogleContactForUser(
+  tokens: GoogleTokenSet,
+  resourceName: string,
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Contacts is not connected in this browser session. Connect Google before reading contacts.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.people().people.get({
+    auth,
+    resourceName,
+    personFields: contactPersonFields,
+  });
+
+  return { ok: true, contact: mapGoogleContact(response.data), raw: response.data };
+}
+
+export async function createGoogleContactForUser(
+  tokens: GoogleTokenSet,
+  input: GoogleContactInput,
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Contacts is not connected in this browser session. Connect Google before creating contacts.",
+    };
+  }
+
+  const body = buildContactPerson(input);
+  if (!body.names && !body.emailAddresses && !body.phoneNumbers) {
+    return {
+      ok: false,
+      reason: "A contact needs at least a name, email, or phone number.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.people().people.createContact({
+    auth,
+    personFields: contactPersonFields,
+    requestBody: body,
+  });
+
+  return { ok: true, contact: mapGoogleContact(response.data) };
+}
+
+export async function updateGoogleContactForUser(
+  tokens: GoogleTokenSet,
+  input: GoogleContactInput & { resourceName: string },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Contacts is not connected in this browser session. Connect Google before editing contacts.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const existing = await googleServices.people().people.get({
+    auth,
+    resourceName: input.resourceName,
+    personFields: contactPersonFields,
+  });
+  const { person, updatePersonFields } = buildContactUpdatePerson(existing.data, input);
+
+  if (!updatePersonFields) {
+    return { ok: false, reason: "No contact fields were provided to update." };
+  }
+
+  const response = await googleServices.people().people.updateContact({
+    auth,
+    resourceName: input.resourceName,
+    personFields: contactPersonFields,
+    updatePersonFields,
+    requestBody: person,
+  });
+
+  return { ok: true, contact: mapGoogleContact(response.data) };
+}
+
+export async function deleteGoogleContactForUser(
+  tokens: GoogleTokenSet,
+  resourceName: string,
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Contacts is not connected in this browser session. Connect Google before deleting contacts.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  await googleServices.people().people.deleteContact({
+    auth,
+    resourceName,
+  });
+
+  return { ok: true, resourceName };
+}
 
 export async function getUpcomingCalendarEvents(maxResults = 10) {
   const readiness = assertGoogleToolReady();
