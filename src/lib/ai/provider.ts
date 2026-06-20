@@ -35,6 +35,21 @@ function stripProviderPrefix(modelId: string) {
   return modelId.includes("/") ? modelId.split("/").slice(1).join("/") : modelId;
 }
 
+function normalizeOpenAICompatibleBaseUrl(value: string | undefined, fallback: string) {
+  const raw = (value ?? fallback).trim();
+  const withProtocol = raw.startsWith("//")
+    ? `https:${raw}`
+    : /^https?:\/\//i.test(raw)
+      ? raw
+      : `https://${raw}`;
+
+  try {
+    return new URL(withProtocol).toString().replace(/\/$/, "");
+  } catch {
+    return fallback;
+  }
+}
+
 export function getAssistantModelConfig(): AssistantModelConfig {
   const provider = normalizeProvider(process.env.AI_PROVIDER);
 
@@ -42,9 +57,14 @@ export function getAssistantModelConfig(): AssistantModelConfig {
     const apiKey = process.env.OPENROUTER_API_KEY ?? process.env.AI_API_KEY;
     const modelId =
       process.env.OPENROUTER_MODEL ?? process.env.AI_MODEL ?? "openrouter/free";
+    const baseURL = normalizeOpenAICompatibleBaseUrl(
+      process.env.OPENROUTER_BASE_URL,
+      "https://openrouter.ai/api/v1",
+    );
     const openrouter = createOpenAI({
       apiKey,
-      baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+      baseURL,
+      name: "openrouter",
       headers: {
         "HTTP-Referer": process.env.NEXTAUTH_URL ?? "http://localhost:3000",
         "X-OpenRouter-Title": "Daily Work Agent",
@@ -55,7 +75,7 @@ export function getAssistantModelConfig(): AssistantModelConfig {
     return {
       provider,
       modelId,
-      model: openrouter(modelId),
+      model: openrouter.chat(modelId),
       apiKey,
       configured: Boolean(apiKey),
       label: "OpenRouter",
