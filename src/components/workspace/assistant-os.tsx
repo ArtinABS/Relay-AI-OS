@@ -2133,6 +2133,7 @@ function WeeklyCommandCalendar({
   const events = briefing?.calendar.events ?? [];
   const googleTasks = briefing?.googleTasks?.tasks.filter((task) => task.status !== "completed") ?? [];
   const githubIssues = briefing?.githubIssues?.issues ?? [];
+  const [activeInspectorDay, setActiveInspectorDay] = useState<string | null>(null);
 
   return (
     <section className={`${panelClass} overflow-visible p-5 sm:p-6`}>
@@ -2170,16 +2171,22 @@ function WeeklyCommandCalendar({
           const dayIssues = githubIssues.filter((issue) => sameCalendarDay(parseEventDate(issue.updatedAt), day));
           const count = dayEvents.length + dayTasks.length + dayGoogleTasks.length + dayNotes.length + dayIssues.length;
           const isToday = sameCalendarDay(day, new Date());
+          const dayKey = day.toISOString();
+          const inspectorActive = activeInspectorDay === dayKey;
 
           return (
-            <div className="day-inspector group relative" key={day.toISOString()}>
+            <div className="day-inspector relative" key={dayKey}>
               <button
                 className={`min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 hover:-translate-y-1 hover:shadow-[var(--shadow)] ${
                   isToday
                     ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                     : "border-[var(--line)] bg-[var(--surface-soft)] hover:border-[var(--line-strong)]"
                 }`}
+                onBlur={() => setActiveInspectorDay(null)}
                 onClick={() => runPrompt(`Inspect my schedule and deadlines for ${day.toDateString()}`)}
+                onFocus={() => setActiveInspectorDay(dayKey)}
+                onPointerEnter={() => setActiveInspectorDay(dayKey)}
+                onPointerLeave={() => setActiveInspectorDay(null)}
                 type="button"
               >
                 <span className="block text-[11px] font-semibold uppercase text-[var(--muted)]">
@@ -2213,6 +2220,7 @@ function WeeklyCommandCalendar({
               </button>
 
               <DayInspector
+                active={inspectorActive}
                 completeTask={completeTask}
                 date={day}
                 events={dayEvents}
@@ -2231,6 +2239,7 @@ function WeeklyCommandCalendar({
 }
 
 function DayInspector({
+  active,
   completeTask,
   date,
   events,
@@ -2240,6 +2249,7 @@ function DayInspector({
   runPrompt,
   tasks,
 }: {
+  active: boolean;
   completeTask: (task: RelayTask) => Promise<void>;
   date: Date;
   events: CalendarEvent[];
@@ -2250,7 +2260,12 @@ function DayInspector({
   tasks: RelayTask[];
 }) {
   return (
-    <div className="day-inspector-panel pointer-events-none absolute left-0 top-[calc(100%+10px)] z-40 w-[min(380px,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 opacity-0 shadow-[var(--shadow-strong)] transition duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 md:left-auto md:right-0">
+    <div
+      aria-hidden={!active}
+      className={`day-inspector-panel pointer-events-none absolute left-0 top-[calc(100%+10px)] z-40 w-[min(380px,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-strong)] transition duration-200 md:left-auto md:right-0 ${
+        active ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+      }`}
+    >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold">
