@@ -46,7 +46,7 @@ type ChatResponse = {
 };
 
 export async function POST(request: Request) {
-  const body = requestSchema.safeParse(await request.json());
+  const body = requestSchema.safeParse(await request.json().catch(() => null));
 
   if (!body.success) {
     return NextResponse.json<ChatResponse>(
@@ -58,6 +58,7 @@ export async function POST(request: Request) {
     );
   }
 
+  try {
   const directTokens = await getDirectGoogleTokens();
   const text = body.data.message.toLowerCase();
   const originalMessage = body.data.message.trim();
@@ -443,4 +444,16 @@ export async function POST(request: Request) {
     content:
       "I am Relay's no-key local agent. Try: help, add task review notes, list tasks, remember that meeting is Monday, list notes, calculate 24*7, or OAuth status.",
   });
+  } catch (error) {
+    return NextResponse.json<ChatResponse>(
+      {
+        role: "assistant",
+        content:
+          error instanceof Error
+            ? `Local fallback hit a server issue: ${error.message}`
+            : "Local fallback hit a server issue.",
+      },
+      { status: 500 },
+    );
+  }
 }

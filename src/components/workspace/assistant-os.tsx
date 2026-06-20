@@ -355,6 +355,12 @@ type Message = {
   toolLink?: string | null;
 };
 
+type AssistantEndpointResponse = {
+  role?: "assistant";
+  content?: string;
+  aiUsed?: boolean;
+};
+
 type Toast = {
   id: string;
   title: string;
@@ -468,6 +474,17 @@ function driveFileType(mimeType: string) {
   if (mimeType.includes("image")) return "Image";
   if (mimeType.includes("folder")) return "Folder";
   return "File";
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T | null> {
+  const text = await response.text();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
 }
 
 function DriveFileGlyph({
@@ -690,38 +707,54 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
     const surface = inferGeneratedSurface(message);
 
     try {
-      const response = await fetch("/api/assistant/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          history: [
-            ...messages.slice(-14).map((item) => ({
-              role: item.role,
-              content: item.toolSummary
-                ? `${item.content} ${item.toolSummary}`.trim()
-                : item.content,
-            })),
-            { role: "user", content: message },
-          ],
-        }),
-      });
-      const data = (await response.json()) as {
-        role: "assistant";
-        content: string;
-        aiUsed?: boolean;
-      };
+      let responseOk = false;
+      let responseStatus = 0;
+      let data: AssistantEndpointResponse | null = null;
 
-      if (!response.ok || data.aiUsed === false) {
+      try {
+        const response = await fetch("/api/assistant/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            history: [
+              ...messages.slice(-14).map((item) => ({
+                role: item.role,
+                content: item.toolSummary
+                  ? `${item.content} ${item.toolSummary}`.trim()
+                  : item.content,
+              })),
+              { role: "user", content: message },
+            ],
+          }),
+        });
+        responseOk = response.ok;
+        responseStatus = response.status;
+        data = await readJsonResponse<AssistantEndpointResponse>(response);
+      } catch (error) {
+        data = {
+          content:
+            error instanceof Error
+              ? `AI endpoint request failed: ${error.message}`
+              : "AI endpoint request failed before it returned a response.",
+          aiUsed: false,
+        };
+      }
+
+      if (!responseOk || data?.aiUsed === false || !data) {
         const fallbackResponse = await fetch("/api/local-agent/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message }),
         });
-        const fallbackData = (await fallbackResponse.json()) as {
-          role: "assistant";
-          content: string;
-        };
+        const fallbackData = await readJsonResponse<AssistantEndpointResponse>(fallbackResponse);
+
+        if (!fallbackResponse.ok || !fallbackData?.content) {
+          throw new Error(
+            fallbackData?.content ??
+              `Local fallback failed with HTTP ${fallbackResponse.status}.`,
+          );
+        }
 
         setMessages((current) => [
           ...current,
@@ -729,7 +762,11 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
             id: createId("assistant"),
             role: "assistant",
             content: [
-              data.content ? `Provider status: ${data.content}` : null,
+              data?.content
+                ? `Provider status: ${data.content}`
+                : responseStatus
+                  ? `Provider status: AI endpoint returned HTTP ${responseStatus} without JSON.`
+                  : "Provider status: AI endpoint did not respond.",
               `Local fallback: ${fallbackData.content}`,
             ]
               .filter(Boolean)
@@ -753,6 +790,15 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
         return;
       }
 
+      if (!data?.content) {
+        throw new Error(
+          responseStatus
+            ? `AI endpoint returned HTTP ${responseStatus} without content.`
+            : "AI endpoint returned no content.",
+        );
+      }
+      const assistantContent = data.content;
+
       setMessages((current) => [
         ...current,
         ...(surface
@@ -761,7 +807,7 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
               {
                 id: createId("assistant"),
                 role: "assistant" as const,
-                content: data.content,
+                content: assistantContent,
                 timestamp: nowLabel(),
               },
             ]),
