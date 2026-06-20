@@ -6,6 +6,20 @@ import { pool } from "@/lib/db";
 const dataDir = path.join(process.cwd(), ".relay-data");
 let kvStoreReady: Promise<void> | null = null;
 
+function isVercelRuntime() {
+  return Boolean(process.env.VERCEL);
+}
+
+function databaseRequiredError(cause?: unknown) {
+  const detail =
+    cause instanceof Error && cause.message.trim()
+      ? ` ${cause.message}`
+      : "";
+  return new Error(
+    `Postgres persistence is required on Vercel. Connect a Vercel Postgres/Neon database so DATABASE_URL is available, then redeploy.${detail}`,
+  );
+}
+
 export function hasDatabaseStore() {
   return Boolean(pool);
 }
@@ -59,10 +73,17 @@ export async function writeJsonFile<T>(filename: string, data: T) {
         [filename, JSON.stringify(data)],
       );
       return;
-    } catch {
+    } catch (error) {
+      if (isVercelRuntime()) {
+        throw databaseRequiredError(error);
+      }
       // Fall through to local JSON so local development keeps working even if
       // DATABASE_URL points at an unavailable database.
     }
+  }
+
+  if (isVercelRuntime()) {
+    throw databaseRequiredError();
   }
 
   await mkdir(dataDir, { recursive: true });
