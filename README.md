@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Relay AI Assistant
 
-## Getting Started
+Relay is an enterprise-style personal AI assistant workspace built with Next.js 16, React 19, Tailwind CSS, CopilotKit, Google Workspace OAuth, and local no-key tools.
 
-First, run the development server:
+The app includes:
+
+- Auth, sign-up, reset, verification, and Google OAuth entry screens
+- Google onboarding for Calendar, Drive, Gmail, Tasks, and Contacts permissions
+- Dashboard, chat, calendar, tasks, files, memory, integrations, and settings views
+- Generated UI surfaces for scheduling, tasks, email approval, file intelligence, and memory consent
+- Local no-key task, note, briefing, calculator, and export routes
+- Provider abstraction for Gemini, OpenRouter, OpenAI, and Anthropic
+
+## Run
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configure AI
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Start free development with OpenRouter:
 
-## Learn More
+```bash
+AI_PROVIDER=openrouter
+AI_MODEL=openrouter/free
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=openrouter/free
+NEXT_PUBLIC_ENABLE_COPILOTKIT=true
+```
 
-To learn more about Next.js, take a look at the following resources:
+Gemini is still supported when it is available for your region/account:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+AI_PROVIDER=gemini
+AI_MODEL=google/gemini-2.5-flash
+GEMINI_API_KEY=
+NEXT_PUBLIC_ENABLE_COPILOTKIT=true
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Provider switching lives in `src/lib/ai/provider.ts`.
 
-## Deploy on Vercel
+## Configure Google OAuth
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Create a Google Cloud OAuth web client:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+Origin: http://localhost:3000
+Redirect URI: http://localhost:3000/api/auth/callback/google
+```
+
+Then set:
+
+```bash
+NEXTAUTH_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+```
+
+More detail is in `README_AGENT_SETUP.md`.
+
+## Verify
+
+```bash
+npm run lint
+npm run build
+```
