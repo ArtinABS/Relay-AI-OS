@@ -163,6 +163,7 @@ export async function POST(request: Request) {
         "If the user says they finished/did/completed something, search/list matching tasks before creating follow-up work. Ask for confirmation before marking, deleting, moving, or otherwise changing the existing object.",
         "Use the available tools when the user asks about tasks, notes, schedule, calendar, OAuth, Gmail, Drive, Contacts, GitHub, repositories, issues, pull requests, or calculations.",
         "When missing details can be collected through generated UI, acknowledge briefly and rely on the UI instead of asking a numbered plain-text questionnaire.",
+        "Never output XML-like control tags such as <need-more-info> or <ui-component>. Use Markdown only; the client renders any needed interactive UI.",
         "For scheduling, task, reminder, file, memory, and email workflows, be concise and let the application surface collect structured details.",
         "Format final assistant responses as GitHub-flavored Markdown. Use short headings, bullet lists, checklists, tables, code spans, and links when they improve scanability. Do not return raw plain-text paragraphs for multi-part answers.",
         "Keep Markdown compact and professional. Avoid over-formatting simple one-sentence confirmations.",

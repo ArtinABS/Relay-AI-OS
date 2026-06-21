@@ -367,6 +367,13 @@ type TaskSurfaceContext = {
 type GeneratedSurfaceContext = {
   task?: TaskSurfaceContext;
 };
+type AssistantUiRequest = {
+  id: string;
+  kind: "need_more_info";
+  detail: string;
+  action: "shift_task_due" | "select_task" | "generic";
+  daysDelta?: number;
+};
 type ContextWorkspaceMode =
   | "focus"
   | "calendar"
@@ -814,6 +821,7 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
             : []),
         ]);
 
+        await refreshWorkspace();
         return;
       }
 
@@ -849,9 +857,7 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
           : []),
       ]);
 
-      if (message.toLowerCase().startsWith("add task ")) {
-        await refreshWorkspace();
-      }
+      await refreshWorkspace();
     } catch {
       setMessages((current) => [
         ...current,
@@ -2816,6 +2822,7 @@ function ChatView({
         input={input}
         loading={loading}
         messages={messages}
+        openTasks={openTasks}
         refreshWorkspace={refreshWorkspace}
         runPrompt={runPrompt}
         setInput={setInput}
@@ -2849,6 +2856,7 @@ function AgentConsole({
   input,
   loading,
   messages,
+  openTasks,
   refreshWorkspace,
   runPrompt,
   setInput,
@@ -2860,6 +2868,7 @@ function AgentConsole({
   input: string;
   loading: boolean;
   messages: Message[];
+  openTasks: RelayTask[];
   refreshWorkspace: () => Promise<void>;
   runPrompt: (prompt: string) => void;
   setInput: (value: string) => void;
@@ -2956,6 +2965,7 @@ function AgentConsole({
             completeSurfaceMessage={completeSurfaceMessage}
             key={message.id}
             message={message}
+            openTasks={openTasks}
             refreshWorkspace={refreshWorkspace}
             runPrompt={runPrompt}
           />
@@ -3040,6 +3050,7 @@ function ChatMessage({
   addTask,
   completeSurfaceMessage,
   message,
+  openTasks,
   refreshWorkspace,
   runPrompt,
 }: {
@@ -3047,16 +3058,21 @@ function ChatMessage({
   addTask: (input: AddTaskInput) => Promise<void>;
   completeSurfaceMessage: (messageId: string, summary: string, link?: string | null) => void;
   message: Message;
+  openTasks: RelayTask[];
   refreshWorkspace: () => Promise<void>;
   runPrompt: (prompt: string) => void;
 }) {
   const fromUser = message.role === "user";
+  const parsedContent = fromUser
+    ? { markdown: message.content, requests: [] as AssistantUiRequest[] }
+    : parseAssistantUiRequests(message.content);
+  const visibleContent = fromUser ? message.content : parsedContent.markdown;
 
   return (
     <div className={fromUser ? "ml-auto flex max-w-[88%] flex-row-reverse gap-3" : "mr-auto flex max-w-[92%] gap-3"}>
       <AvatarIcon role={message.role} />
       <div className="min-w-0">
-        {message.content ? (
+        {visibleContent ? (
           <div
             className={
               fromUser
@@ -3065,9 +3081,9 @@ function ChatMessage({
             }
           >
             {fromUser ? (
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              <p className="whitespace-pre-wrap">{visibleContent}</p>
             ) : (
-              <MarkdownMessage content={message.content} />
+              <MarkdownMessage content={visibleContent} />
             )}
           </div>
         ) : null}
@@ -3085,6 +3101,20 @@ function ChatMessage({
             surfaceContext={message.surfaceContext}
           />
         ) : null}
+        {!fromUser && parsedContent.requests.length > 0 ? (
+          <div className="mt-3 grid gap-3">
+            {parsedContent.requests.map((request) => (
+              <AssistantUiRequestCard
+                key={request.id}
+                onComplete={(summary) => completeSurfaceMessage(message.id, summary)}
+                openTasks={openTasks}
+                refreshWorkspace={refreshWorkspace}
+                request={request}
+                runPrompt={runPrompt}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -3094,6 +3124,167 @@ function MarkdownMessage({ content }: { content: string }) {
   return (
     <div className="markdown-content">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
+  );
+}
+
+function AssistantUiRequestCard({
+  onComplete,
+  openTasks,
+  refreshWorkspace,
+  request,
+  runPrompt,
+}: {
+  onComplete: (summary: string) => void;
+  openTasks: RelayTask[];
+  refreshWorkspace: () => Promise<void>;
+  request: AssistantUiRequest;
+  runPrompt: (prompt: string) => void;
+}) {
+  const candidateTasks = sortTasksByUrgency(openTasks).slice(0, 8);
+  const [selectedTaskId, setSelectedTaskId] = useState(candidateTasks[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<{ tone: "success" | "warning"; text: string } | null>(null);
+  const effectiveSelectedTaskId = candidateTasks.some((task) => task.id === selectedTaskId)
+    ? selectedTaskId
+    : candidateTasks[0]?.id ?? "";
+  const selectedTask = candidateTasks.find((task) => task.id === effectiveSelectedTaskId) ?? null;
+  const shiftedDue =
+    request.action === "shift_task_due" && selectedTask?.due && request.daysDelta
+      ? addDays(new Date(selectedTask.due), request.daysDelta)
+      : null;
+
+  async function applyTaskDueShift() {
+    if (!selectedTask || !shiftedDue || busy) return;
+
+    setBusy(true);
+    setStatus(null);
+
+    try {
+      const response = await fetch("/api/local-tools/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          id: selectedTask.id,
+          due: shiftedDue.toISOString(),
+        }),
+      });
+      const data = (await response.json()) as { task?: RelayTask | null; error?: string };
+
+      if (!response.ok || !data.task) {
+        setStatus({
+          tone: "warning",
+          text: data.error ?? "I could not update that task.",
+        });
+        return;
+      }
+
+      await refreshWorkspace();
+      onComplete(`Updated "${data.task.title}" due date to ${formatDateShort(data.task.due)}.`);
+      setStatus({ tone: "success", text: "Task updated." });
+    } catch (error) {
+      setStatus({
+        tone: "warning",
+        text: error instanceof Error ? error.message : "Task update failed.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="surface-pop max-w-2xl rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow)]">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <Wand2 className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold">Choose the missing detail</h3>
+              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{request.detail}</p>
+            </div>
+            <StatusBadge ready={false} label="Needs selection" />
+          </div>
+
+          {request.action === "shift_task_due" ? (
+            <div className="mt-4 grid gap-3">
+              {candidateTasks.length > 0 ? (
+                <>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-semibold uppercase text-[var(--muted)]">Task</span>
+                    <select
+                      className="h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none transition focus:border-[var(--accent)]"
+                      onChange={(event) => setSelectedTaskId(event.target.value)}
+                      value={effectiveSelectedTaskId}
+                    >
+                      {candidateTasks.map((task) => (
+                        <option key={task.id} value={task.id}>
+                          {task.title}
+                          {task.due ? ` - due ${formatDateShort(task.due)}` : " - no due date"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-sm sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                    <MiniControl label="Current due date" value={formatDateShort(selectedTask?.due)} />
+                    <ArrowRight className="hidden h-4 w-4 text-[var(--muted)] sm:block" />
+                    <MiniControl
+                      label="New due date"
+                      value={shiftedDue ? formatDateShort(shiftedDue.toISOString()) : "Pick a task with a due date"}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      className={primaryButtonClass}
+                      disabled={!shiftedDue || busy}
+                      onClick={() => void applyTaskDueShift()}
+                      type="button"
+                    >
+                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Apply change
+                    </button>
+                    <button
+                      className={secondaryButtonClass}
+                      onClick={() => runPrompt(`Use this task for the change: ${selectedTask?.id ?? effectiveSelectedTaskId}`)}
+                      type="button"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Ask assistant
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <EmptyState
+                  icon={ListTodo}
+                  title="No open local tasks"
+                  detail="Create or sync tasks first, then I can attach this action to the right item."
+                />
+              )}
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button className={primaryButtonClass} onClick={() => runPrompt(request.detail)} type="button">
+                <Sparkles className="h-4 w-4" />
+                Continue in chat
+              </button>
+            </div>
+          )}
+
+          {status ? (
+            <p
+              className={`mt-3 rounded-xl px-3 py-2 text-sm font-medium ${
+                status.tone === "success"
+                  ? "bg-[var(--success-soft)] text-[var(--success)]"
+                  : "bg-[var(--warning-soft)] text-[var(--warning)]"
+              }`}
+            >
+              {status.text}
+            </p>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -7029,6 +7220,17 @@ function formatDueDate(value?: string | null) {
   });
 }
 
+function formatDateShort(value?: string | null) {
+  const date = parseEventDate(value);
+  if (!date) return "No due date";
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function isOverdue(value?: string | null) {
   const date = parseEventDate(value);
   if (!date) return false;
@@ -7228,6 +7430,93 @@ function cleanTaskTitle(value: string) {
       .replace(/[.?!]\s*$/g, "")
       .trim(),
   );
+}
+
+function parseAssistantUiRequests(content: string): {
+  markdown: string;
+  requests: AssistantUiRequest[];
+} {
+  const requests: AssistantUiRequest[] = [];
+  const markdown = content
+    .replace(/<need-more-info>([\s\S]*?)<\/need-more-info>/gi, (_match, detail: string) => {
+      const normalized = normalizeWhitespace(detail);
+      requests.push(inferAssistantUiRequest(normalized));
+      return "";
+    })
+    .replace(/<ui-component(?:\s+[^>]*)?>([\s\S]*?)<\/ui-component>/gi, (_match, detail: string) => {
+      const normalized = normalizeWhitespace(detail);
+      requests.push(inferAssistantUiRequest(normalized || "Choose the missing details to continue."));
+      return "";
+    })
+    .replace(/<\/?(?:need-more-info|ui-component)(?:\s+[^>]*)?>/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return { markdown, requests };
+}
+
+function inferAssistantUiRequest(detail: string): AssistantUiRequest {
+  const lower = detail.toLowerCase();
+  const isTask = /\b(task|todo|to-do)\b/.test(lower);
+  const asksForIdentifier = /\b(id|identifier|which|select|specific)\b/.test(lower);
+  const mentionsDueDate = /\b(due date|deadline|due)\b/.test(lower);
+  const shiftMatch = lower.match(/\b(\d+|one|two|three|a)\s+day[s]?\s+(earlier|sooner|before|later|after)\b/);
+  const shiftAmount = shiftMatch?.[1] ? wordNumberToInteger(shiftMatch[1]) : 1;
+  const direction = shiftMatch?.[2];
+  const daysDelta =
+    direction === "earlier" || direction === "sooner" || direction === "before"
+      ? -shiftAmount
+      : direction === "later" || direction === "after"
+        ? shiftAmount
+        : undefined;
+
+  if (isTask && mentionsDueDate && daysDelta) {
+    return {
+      id: stableUiRequestId(detail, "shift_task_due"),
+      kind: "need_more_info",
+      detail,
+      action: "shift_task_due",
+      daysDelta,
+    };
+  }
+
+  if (isTask && asksForIdentifier) {
+    return {
+      id: stableUiRequestId(detail, "select_task"),
+      kind: "need_more_info",
+      detail,
+      action: "select_task",
+    };
+  }
+
+  return {
+    id: stableUiRequestId(detail, "generic"),
+    kind: "need_more_info",
+    detail,
+    action: "generic",
+  };
+}
+
+function stableUiRequestId(detail: string, action: AssistantUiRequest["action"]) {
+  let hash = 0;
+  const input = `${action}:${detail}`;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) >>> 0;
+  }
+  return `ui-request-${hash.toString(36)}`;
+}
+
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function wordNumberToInteger(value: string) {
+  const normalized = value.toLowerCase();
+  if (normalized === "one" || normalized === "a") return 1;
+  if (normalized === "two") return 2;
+  if (normalized === "three") return 3;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 function inferTaskSurfaceContext(message: string): TaskSurfaceContext {
