@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDirectGoogleTokens } from "@/lib/google/direct-session";
 import {
   createCalendarEventForUser,
+  deleteCalendarEventForUser,
   getUpcomingCalendarEventsForUser,
   updateCalendarEventForUser,
 } from "@/lib/google/workspace";
@@ -30,6 +31,11 @@ const updateEventSchema = z.object({
   location: z.string().optional(),
   attendees: z.array(z.string().email()).optional(),
   reminderMinutes: z.number().int().min(0).max(40320).nullable().optional(),
+});
+
+const deleteEventSchema = z.object({
+  id: z.string().min(1),
+  confirmed: z.boolean().default(false),
 });
 
 export async function GET() {
@@ -142,6 +148,55 @@ export async function PATCH(request: Request) {
           error instanceof Error
             ? error.message
             : "Unable to update the Google Calendar event.",
+      },
+      { status: 502 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  const tokens = await getDirectGoogleTokens();
+  const parsed = deleteEventSchema.safeParse(await request.json().catch(() => null));
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "Calendar event delete details are incomplete or invalid.",
+        issues: parsed.error.flatten().fieldErrors,
+      },
+      { status: 400 },
+    );
+  }
+
+  if (!parsed.data.confirmed) {
+    return NextResponse.json(
+      { ok: false, reason: "Deleting a calendar event requires confirmation." },
+      { status: 409 },
+    );
+  }
+
+  if (!tokens?.accessToken && !tokens?.refreshToken) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "Google Calendar is not connected.",
+      },
+      { status: 412 },
+    );
+  }
+
+  try {
+    const result = await deleteCalendarEventForUser(tokens, parsed.data);
+    return NextResponse.json(result, { status: result.ok ? 200 : 412 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason:
+          error instanceof Error
+            ? error.message
+            : "Unable to delete the Google Calendar event.",
       },
       { status: 502 },
     );

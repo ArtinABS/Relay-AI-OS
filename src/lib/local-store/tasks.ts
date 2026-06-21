@@ -151,6 +151,29 @@ export async function completeTask(identifier: string): Promise<RelayTask | null
   return completed;
 }
 
+export async function deleteTask(identifier: string): Promise<RelayTask | null> {
+  const tasks = await listTasks();
+  const indexFromNumber = Number(identifier);
+  const targetIndex = Number.isInteger(indexFromNumber)
+    ? indexFromNumber - 1
+    : -1;
+  const deleted = tasks.find((task, index) => {
+    return (
+      task.id === identifier ||
+      index === targetIndex ||
+      task.title.toLowerCase().includes(identifier.toLowerCase())
+    );
+  });
+
+  if (!deleted) return null;
+
+  await writeJsonFile(
+    tasksFile,
+    tasks.filter((task) => task.id !== deleted.id),
+  );
+  return deleted;
+}
+
 export async function clearCompletedTasks() {
   const tasks = await listTasks();
   const openTasks = tasks.filter((task) => !task.completed);

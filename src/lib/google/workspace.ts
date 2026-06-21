@@ -565,6 +565,52 @@ export async function updateCalendarEventForUser(
   };
 }
 
+export async function deleteCalendarEventForUser(
+  tokens: GoogleTokenSet,
+  event: { id: string },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Calendar is not connected in this browser session. Connect Google before deleting calendar events.",
+    };
+  }
+
+  const calendar = googleServices.calendar();
+  const auth = createGoogleOAuthClient(tokens);
+  await calendar.events.delete({
+    auth,
+    calendarId: "primary",
+    eventId: event.id,
+  });
+
+  return { ok: true, id: event.id };
+}
+
+function mapDriveFile(file: {
+  id?: string | null;
+  name?: string | null;
+  mimeType?: string | null;
+  webViewLink?: string | null;
+  modifiedTime?: string | null;
+  owners?: Array<{ displayName?: string | null; emailAddress?: string | null }> | null;
+  parents?: string[] | null;
+}) {
+  return {
+    id: file.id,
+    name: file.name ?? "Untitled file",
+    mimeType: file.mimeType ?? "application/octet-stream",
+    webViewLink: file.webViewLink ?? null,
+    modifiedTime: file.modifiedTime ?? null,
+    owner:
+      file.owners?.[0]?.displayName ??
+      file.owners?.[0]?.emailAddress ??
+      "Unknown owner",
+    parents: file.parents ?? [],
+  };
+}
+
 export async function listRecentDriveFilesForUser(
   tokens: GoogleTokenSet,
   maxResults = 10,
@@ -590,23 +636,246 @@ export async function listRecentDriveFilesForUser(
       .filter(Boolean)
       .join(" and "),
     orderBy: "modifiedTime desc",
-    fields: "files(id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress))",
+    fields: "files(id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents)",
   });
 
   return {
     ok: true,
-    files:
-      response.data.files?.map((file) => ({
-        id: file.id,
-        name: file.name ?? "Untitled file",
-        mimeType: file.mimeType ?? "application/octet-stream",
-        webViewLink: file.webViewLink ?? null,
-        modifiedTime: file.modifiedTime ?? null,
-        owner:
-          file.owners?.[0]?.displayName ??
-          file.owners?.[0]?.emailAddress ??
-          "Unknown owner",
-      })) ?? [],
+    files: response.data.files?.map(mapDriveFile) ?? [],
+  };
+}
+
+export async function getDriveFileForUser(tokens: GoogleTokenSet, id: string) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Drive is not connected in this browser session. Connect Google before reading files.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.drive().files.get({
+    auth,
+    fileId: id,
+    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+  });
+
+  return { ok: true, file: mapDriveFile(response.data) };
+}
+
+export async function renameDriveFileForUser(
+  tokens: GoogleTokenSet,
+  input: { id: string; name: string },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Drive is not connected in this browser session. Connect Google before renaming files.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.drive().files.update({
+    auth,
+    fileId: input.id,
+    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    requestBody: { name: input.name },
+  });
+
+  return { ok: true, file: mapDriveFile(response.data) };
+}
+
+export async function moveDriveFileForUser(
+  tokens: GoogleTokenSet,
+  input: { id: string; folderId: string },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Drive is not connected in this browser session. Connect Google before moving files.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const current = await googleServices.drive().files.get({
+    auth,
+    fileId: input.id,
+    fields: "parents",
+  });
+  const previousParents = (current.data.parents ?? []).join(",");
+  const response = await googleServices.drive().files.update({
+    auth,
+    fileId: input.id,
+    addParents: input.folderId,
+    removeParents: previousParents || undefined,
+    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+  });
+
+  return { ok: true, file: mapDriveFile(response.data) };
+}
+
+export async function copyDriveFileForUser(
+  tokens: GoogleTokenSet,
+  input: { id: string; name?: string; folderId?: string | null },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Drive is not connected in this browser session. Connect Google before duplicating files.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.drive().files.copy({
+    auth,
+    fileId: input.id,
+    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    requestBody: {
+      name: input.name,
+      parents: input.folderId ? [input.folderId] : undefined,
+    },
+  });
+
+  return { ok: true, file: mapDriveFile(response.data) };
+}
+
+export async function setDriveFileTrashedForUser(
+  tokens: GoogleTokenSet,
+  input: { id: string; trashed: boolean },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Drive is not connected in this browser session. Connect Google before changing trash state.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.drive().files.update({
+    auth,
+    fileId: input.id,
+    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    requestBody: { trashed: input.trashed },
+  });
+
+  return { ok: true, file: mapDriveFile(response.data) };
+}
+
+export async function deleteDriveFileForUser(tokens: GoogleTokenSet, id: string) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Drive is not connected in this browser session. Connect Google before deleting files.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  await googleServices.drive().files.delete({ auth, fileId: id });
+
+  return { ok: true, id };
+}
+
+export async function shareDriveFileForUser(
+  tokens: GoogleTokenSet,
+  input: {
+    id: string;
+    role: "reader" | "commenter" | "writer";
+    type: "user" | "group" | "domain" | "anyone";
+    emailAddress?: string;
+    domain?: string;
+    allowFileDiscovery?: boolean;
+  },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Drive is not connected in this browser session. Connect Google before sharing files.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.drive().permissions.create({
+    auth,
+    fileId: input.id,
+    fields: "id,type,role,emailAddress,domain",
+    requestBody: {
+      role: input.role,
+      type: input.type,
+      emailAddress: input.emailAddress,
+      domain: input.domain,
+      allowFileDiscovery: input.allowFileDiscovery,
+    },
+    sendNotificationEmail: input.type === "user" || input.type === "group",
+  });
+
+  return { ok: true, permission: response.data };
+}
+
+export async function readDriveFileTextForUser(
+  tokens: GoogleTokenSet,
+  input: { id: string; maxCharacters?: number },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Google Drive is not connected in this browser session. Connect Google before reading files.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const drive = googleServices.drive();
+  const metadata = await drive.files.get({
+    auth,
+    fileId: input.id,
+    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+  });
+  const mimeType = metadata.data.mimeType ?? "";
+  const maxCharacters = Math.min(Math.max(input.maxCharacters ?? 6000, 500), 20000);
+  let text = "";
+
+  if (mimeType.startsWith("application/vnd.google-apps.")) {
+    const exportResponse = await drive.files.export(
+      {
+        auth,
+        fileId: input.id,
+        mimeType:
+          mimeType === "application/vnd.google-apps.spreadsheet"
+            ? "text/csv"
+            : "text/plain",
+      },
+      { responseType: "text" },
+    );
+    text = typeof exportResponse.data === "string"
+      ? exportResponse.data
+      : JSON.stringify(exportResponse.data);
+  } else if (mimeType.startsWith("text/") || mimeType.includes("json") || mimeType.includes("csv")) {
+    const response = await drive.files.get(
+      { auth, fileId: input.id, alt: "media" },
+      { responseType: "text" },
+    );
+    text = typeof response.data === "string" ? response.data : JSON.stringify(response.data);
+  } else {
+    return {
+      ok: false,
+      reason:
+        "This Drive file is not a text-compatible document. Open it in Drive or connect a document parser for binary files.",
+      file: mapDriveFile(metadata.data),
+    };
+  }
+
+  return {
+    ok: true,
+    file: mapDriveFile(metadata.data),
+    text: text.slice(0, maxCharacters),
+    truncated: text.length > maxCharacters,
   };
 }
 
@@ -1199,6 +1468,16 @@ export async function archiveGmailMessageForUser(
   });
 }
 
+export async function unarchiveGmailMessageForUser(
+  tokens: GoogleTokenSet,
+  id: string,
+) {
+  return modifyGmailMessageForUser(tokens, {
+    id,
+    addLabelIds: ["INBOX"],
+  });
+}
+
 export async function starGmailMessageForUser(
   tokens: GoogleTokenSet,
   id: string,
@@ -1225,6 +1504,28 @@ export async function trashGmailMessageForUser(
 
   const auth = createGoogleOAuthClient(tokens);
   const response = await googleServices.gmail().users.messages.trash({
+    auth,
+    userId: "me",
+    id,
+  });
+
+  return { ok: true, message: mapGmailMessage(response.data) };
+}
+
+export async function restoreGmailMessageForUser(
+  tokens: GoogleTokenSet,
+  id: string,
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return {
+      ok: false,
+      reason:
+        "Gmail is not connected in this browser session. Connect Google before restoring email.",
+    };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.gmail().users.messages.untrash({
     auth,
     userId: "me",
     id,

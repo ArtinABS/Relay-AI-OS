@@ -10,9 +10,11 @@ import {
   listGmailMessagesForUser,
   readGmailMessageForUser,
   replyToGmailMessageForUser,
+  restoreGmailMessageForUser,
   sendGmailMessageForUser,
   starGmailMessageForUser,
   trashGmailMessageForUser,
+  unarchiveGmailMessageForUser,
 } from "@/lib/google/workspace";
 import { addScheduledEmail } from "@/lib/local-store/scheduled-emails";
 
@@ -53,6 +55,11 @@ const requestSchema = z.discriminatedUnion("action", [
     confirmed: z.boolean().default(false),
   }),
   z.object({
+    action: z.literal("unarchive"),
+    id: z.string().min(1),
+    confirmed: z.boolean().default(false),
+  }),
+  z.object({
     action: z.literal("label"),
     id: z.string().min(1),
     label: z.string().min(1),
@@ -64,6 +71,11 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("trash"),
+    id: z.string().min(1),
+    confirmed: z.boolean().default(false),
+  }),
+  z.object({
+    action: z.literal("restore"),
     id: z.string().min(1),
     confirmed: z.boolean().default(false),
   }),
@@ -181,6 +193,16 @@ export async function POST(request: Request) {
       return NextResponse.json(await archiveGmailMessageForUser(tokens, parsed.data.id));
     }
 
+    if (parsed.data.action === "unarchive") {
+      if (!parsed.data.confirmed) {
+        return NextResponse.json(
+          { ok: false, reason: "Restoring email to inbox requires explicit confirmation." },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(await unarchiveGmailMessageForUser(tokens, parsed.data.id));
+    }
+
     if (parsed.data.action === "label") {
       return NextResponse.json(
         await labelGmailMessageForUser(tokens, {
@@ -204,6 +226,16 @@ export async function POST(request: Request) {
         );
       }
       return NextResponse.json(await trashGmailMessageForUser(tokens, parsed.data.id));
+    }
+
+    if (parsed.data.action === "restore") {
+      if (!parsed.data.confirmed) {
+        return NextResponse.json(
+          { ok: false, reason: "Restoring email from trash requires explicit confirmation." },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(await restoreGmailMessageForUser(tokens, parsed.data.id));
     }
 
     if (parsed.data.action === "delete") {

@@ -6,6 +6,7 @@ import {
   createGithubIssueForRepository,
   listGithubIssuesForRepository,
   listGithubIssuesForUser,
+  updateGithubIssueForRepository,
 } from "@/lib/github/workspace";
 
 const createIssueSchema = z.object({
@@ -14,6 +15,17 @@ const createIssueSchema = z.object({
   title: z.string().min(1),
   body: z.string().optional(),
   labels: z.array(z.string()).optional(),
+  confirmed: z.boolean().default(false),
+});
+
+const updateIssueSchema = z.object({
+  owner: z.string().min(1),
+  repo: z.string().min(1),
+  issueNumber: z.number().int().min(1),
+  title: z.string().min(1).optional(),
+  body: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+  state: z.enum(["open", "closed"]).optional(),
   confirmed: z.boolean().default(false),
 });
 
@@ -102,6 +114,45 @@ export async function POST(request: Request) {
         ok: false,
         reason:
           error instanceof Error ? error.message : "Unable to create GitHub issue.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  const tokens = await getDirectGithubTokens();
+
+  if (!tokens?.accessToken) {
+    return NextResponse.json(
+      { ok: false, reason: "GitHub is not connected." },
+      { status: 401 },
+    );
+  }
+
+  const parsed = updateIssueSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json(
+      { ok: false, reason: "Send owner, repo, issueNumber, and confirmed." },
+      { status: 400 },
+    );
+  }
+
+  if (!parsed.data.confirmed) {
+    return NextResponse.json(
+      { ok: false, reason: "Editing a GitHub issue requires confirmation." },
+      { status: 409 },
+    );
+  }
+
+  try {
+    return NextResponse.json(await updateGithubIssueForRepository(tokens, parsed.data));
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason:
+          error instanceof Error ? error.message : "Unable to edit GitHub issue.",
       },
       { status: 500 },
     );

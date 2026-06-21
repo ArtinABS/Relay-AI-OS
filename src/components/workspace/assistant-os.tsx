@@ -357,6 +357,16 @@ type Briefing = {
 };
 
 type GeneratedSurface = "schedule" | "task" | "files" | "memory" | "email";
+type TaskSurfaceContext = {
+  title?: string;
+  due?: string;
+  notes?: string;
+  priority?: RelayTaskPriority;
+  relatedCompletionHint?: string;
+};
+type GeneratedSurfaceContext = {
+  task?: TaskSurfaceContext;
+};
 type ContextWorkspaceMode =
   | "focus"
   | "calendar"
@@ -373,6 +383,7 @@ type Message = {
   content: string;
   timestamp: string;
   surface?: GeneratedSurface;
+  surfaceContext?: GeneratedSurfaceContext;
   surfaceStatus?: "active" | "done";
   toolSummary?: string;
   toolLink?: string | null;
@@ -418,14 +429,6 @@ const starterMessages: Message[] = [
       "Good evening. I am connected to your configured AI provider when available, with local tools for tasks, notes, OAuth status, calendar checks, and generated work surfaces.",
     timestamp: "Now",
   },
-];
-
-const quickPrompts = [
-  "Plan my day",
-  "Schedule a meeting",
-  "Draft a follow-up email",
-  "List recent Drive files",
-  "Remember a preference",
 ];
 
 const integrationRows = [
@@ -727,7 +730,7 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
       },
     ]);
 
-    const surface = inferGeneratedSurface(message);
+    const generatedSurface = inferGeneratedSurface(message);
 
     try {
       let responseOk = false;
@@ -796,14 +799,15 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
               .join("\n\n"),
             timestamp: nowLabel(),
           },
-          ...(surface
+          ...(generatedSurface
             ? [
                 {
                   id: createId("surface"),
                   role: "assistant" as const,
                   content: "",
                   timestamp: nowLabel(),
-                  surface,
+                  surface: generatedSurface.surface,
+                  surfaceContext: generatedSurface.context,
                   surfaceStatus: "active" as const,
                 },
               ]
@@ -824,24 +828,21 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
 
       setMessages((current) => [
         ...current,
-        ...(surface
-          ? []
-          : [
-              {
-                id: createId("assistant"),
-                role: "assistant" as const,
-                content: assistantContent,
-                timestamp: nowLabel(),
-              },
-            ]),
-        ...(surface
+        {
+          id: createId("assistant"),
+          role: "assistant" as const,
+          content: assistantContent,
+          timestamp: nowLabel(),
+        },
+        ...(generatedSurface
           ? [
               {
                 id: createId("surface"),
                 role: "assistant" as const,
                 content: "",
                 timestamp: nowLabel(),
-                surface,
+                surface: generatedSurface.surface,
+                surfaceContext: generatedSurface.context,
                 surfaceStatus: "active" as const,
               },
             ]
@@ -2801,7 +2802,7 @@ function ChatView({
 
   return (
     <div
-      className="flex h-[calc(100vh-96px)] min-h-0 flex-col gap-4 overflow-hidden transition-all duration-300 xl:grid"
+      className="flex h-[calc(100vh-96px)] min-h-0 flex-col gap-4 overflow-hidden transition-[grid-template-columns] duration-300 ease-out xl:grid"
       style={{
         gridTemplateColumns: workspaceCollapsed
           ? "minmax(0,1fr) 64px"
@@ -2947,20 +2948,6 @@ function AgentConsole({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-[var(--line)] px-5 py-3">
-        {quickPrompts.map((prompt) => (
-          <button
-            className="interactive-control inline-flex h-8 items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--muted)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
-            key={prompt}
-            onClick={() => runPrompt(prompt)}
-            type="button"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            {prompt}
-          </button>
-        ))}
-      </div>
-
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5" ref={scrollRef}>
         {messages.map((message) => (
           <ChatMessage
@@ -2970,6 +2957,7 @@ function AgentConsole({
             key={message.id}
             message={message}
             refreshWorkspace={refreshWorkspace}
+            runPrompt={runPrompt}
           />
         ))}
         {loading ? <AssistantThinkingCard messages={messages} /> : null}
@@ -3053,12 +3041,14 @@ function ChatMessage({
   completeSurfaceMessage,
   message,
   refreshWorkspace,
+  runPrompt,
 }: {
   addMemory: (body: string) => Promise<void>;
   addTask: (input: AddTaskInput) => Promise<void>;
   completeSurfaceMessage: (messageId: string, summary: string, link?: string | null) => void;
   message: Message;
   refreshWorkspace: () => Promise<void>;
+  runPrompt: (prompt: string) => void;
 }) {
   const fromUser = message.role === "user";
 
@@ -3090,7 +3080,9 @@ function ChatMessage({
             addTask={addTask}
             onComplete={(summary, link) => completeSurfaceMessage(message.id, summary, link)}
             refreshWorkspace={refreshWorkspace}
+            runPrompt={runPrompt}
             surface={message.surface}
+            surfaceContext={message.surfaceContext}
           />
         ) : null}
       </div>
@@ -3111,16 +3103,30 @@ function GeneratedMessageSurface({
   addTask,
   onComplete,
   refreshWorkspace,
+  runPrompt,
   surface,
+  surfaceContext,
 }: {
   addMemory: (body: string) => Promise<void>;
   addTask: (input: AddTaskInput) => Promise<void>;
   onComplete: (summary: string, link?: string | null) => void;
   refreshWorkspace: () => Promise<void>;
+  runPrompt: (prompt: string) => void;
   surface: GeneratedSurface;
+  surfaceContext?: GeneratedSurfaceContext;
 }) {
   if (surface === "schedule") return <ScheduleComposer onComplete={onComplete} refreshWorkspace={refreshWorkspace} />;
-  if (surface === "task") return <TaskComposer addTask={addTask} onComplete={onComplete} refreshWorkspace={refreshWorkspace} />;
+  if (surface === "task") {
+    return (
+      <TaskComposer
+        addTask={addTask}
+        initialContext={surfaceContext?.task}
+        onComplete={onComplete}
+        refreshWorkspace={refreshWorkspace}
+        runPrompt={runPrompt}
+      />
+    );
+  }
   if (surface === "files") return <FileGeneratedSurface />;
   if (surface === "memory") return <MemoryPermissionSurface addMemory={addMemory} onComplete={onComplete} />;
   return <EmailApprovalSurface onComplete={onComplete} />;
@@ -3182,7 +3188,7 @@ function ContextWorkspace({
 
   if (collapsed) {
     return (
-      <aside className={`${panelClass} hidden h-full min-h-0 flex-col items-center gap-3 p-3 xl:flex`}>
+      <aside className={`${panelClass} surface-pop hidden h-full min-h-0 flex-col items-center gap-3 p-3 transition-all duration-300 ease-out xl:flex`}>
         <button
           className={iconButtonClass}
           onClick={onToggleCollapsed}
@@ -3216,7 +3222,7 @@ function ContextWorkspace({
   }
 
   return (
-    <aside className={`${panelClass} relative hidden h-full min-h-0 flex-col overflow-hidden xl:flex`}>
+    <aside className={`${panelClass} surface-pop relative hidden h-full min-h-0 flex-col overflow-hidden transition-all duration-300 ease-out xl:flex`}>
       <div
         aria-label="Resize contextual workspace"
         className="resize-rail absolute bottom-0 left-0 top-0 z-10 w-2 cursor-ew-resize"
@@ -3261,7 +3267,7 @@ function ContextWorkspace({
         <span className="text-xs font-semibold text-[var(--accent)]">{meta.signal}</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 animate-fade-in" key={mode}>
         {mode === "focus" ? (
           <FocusWorkspace
             briefing={briefing}
@@ -4492,17 +4498,21 @@ function ScheduleComposer({
 
 function TaskComposer({
   addTask,
+  initialContext,
   onComplete,
   refreshWorkspace,
+  runPrompt,
 }: {
   addTask: (input: AddTaskInput) => Promise<void>;
+  initialContext?: TaskSurfaceContext;
   onComplete?: (summary: string, link?: string | null) => void;
   refreshWorkspace?: () => Promise<void>;
+  runPrompt?: (prompt: string) => void;
 }) {
-  const [title, setTitle] = useState("");
-  const [priority, setPriority] = useState<RelayTaskPriority>("high");
-  const [due, setDue] = useState("");
-  const [notes, setNotes] = useState("");
+  const [title, setTitle] = useState(initialContext?.title ?? "");
+  const [priority, setPriority] = useState<RelayTaskPriority>(initialContext?.priority ?? "medium");
+  const [due, setDue] = useState(initialContext?.due ?? "");
+  const [notes, setNotes] = useState(initialContext?.notes ?? "");
   const [syncGoogle, setSyncGoogle] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
@@ -4578,9 +4588,27 @@ function TaskComposer({
         </span>
         <div>
           <h3 className="font-semibold">Task builder</h3>
-          <p className="text-sm text-[var(--muted)]">Saves locally and can sync to Google Tasks.</p>
+          <p className="text-sm text-[var(--muted)]">Prefilled from your request. Adjust only what changed.</p>
         </div>
       </div>
+      {initialContext?.relatedCompletionHint ? (
+        <div className="mb-4 rounded-xl border border-[var(--warning)] bg-[var(--warning-soft)] p-3">
+          <p className="text-sm font-semibold text-[var(--warning)]">Existing task reference</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Possible completed task: {initialContext.relatedCompletionHint}. Confirm before I modify it.
+          </p>
+          {runPrompt ? (
+            <button
+              className={`${secondaryButtonClass} mt-3 h-9 px-3`}
+              onClick={() => runPrompt(`Confirm and mark the matching task complete: ${initialContext.relatedCompletionHint}`)}
+              type="button"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Confirm completion
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
         <label className="space-y-1">
           <span className="text-xs font-semibold uppercase text-[var(--muted)]">Task</span>
@@ -7179,7 +7207,73 @@ function authActionLabel(mode: AuthMode) {
   return "Sign in";
 }
 
-function inferGeneratedSurface(message: string): GeneratedSurface | undefined {
+function dateInputValue(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function titleCaseFirst(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return `${trimmed[0]?.toUpperCase() ?? ""}${trimmed.slice(1)}`;
+}
+
+function cleanTaskTitle(value: string) {
+  return titleCaseFirst(
+    value
+      .replace(/\b(due|by)\s+(today|tomorrow|next\s+\w+|on\s+\w+).*$/i, "")
+      .replace(/[.?!]\s*$/g, "")
+      .trim(),
+  );
+}
+
+function inferTaskSurfaceContext(message: string): TaskSurfaceContext {
+  const text = message.trim();
+  const lower = text.toLowerCase();
+  const context: TaskSurfaceContext = {};
+  const reminderMatch =
+    text.match(/(?:remind(?:ing)? me to|reminder to|task (?:due .*? )?(?:to|for))\s+(.+)$/i) ??
+    text.match(/(?:create|add|make|save)\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?task(?:\s+due\s+\w+)?\s+(?:to|for)\s+(.+)$/i);
+  const completionMatch = text.match(/\b(?:i\s+)?(?:finished|completed|did)\s+(?:my\s+)?(.+?)\s+task\b/i);
+
+  if (reminderMatch?.[1]) {
+    context.title = cleanTaskTitle(reminderMatch[1]);
+  }
+
+  if (!context.title) {
+    const taskMatch = text.match(/\b(?:create|add|make|save)\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?task\s+(.+)$/i);
+    if (taskMatch?.[1]) context.title = cleanTaskTitle(taskMatch[1]);
+  }
+
+  if (lower.includes("tomorrow")) {
+    context.due = dateInputValue(addDays(new Date(), 1));
+  } else if (lower.includes("today")) {
+    context.due = dateInputValue(new Date());
+  }
+
+  if (/\burgent\b/.test(lower)) context.priority = "urgent";
+  else if (/\bhigh\b/.test(lower)) context.priority = "high";
+  else if (/\blow\b/.test(lower)) context.priority = "low";
+
+  if (completionMatch?.[1]) {
+    context.relatedCompletionHint = cleanTaskTitle(completionMatch[1]);
+    context.notes = [
+      context.notes,
+      `Follow-up after finishing ${context.relatedCompletionHint}.`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return context;
+}
+
+function inferGeneratedSurface(
+  message: string,
+): { surface: GeneratedSurface; context?: GeneratedSurfaceContext } | undefined {
   const text = message.toLowerCase();
   const wantsCalendarWrite =
     /\b(schedule|book|create|add|set up|set|plan)\b/.test(text) &&
@@ -7192,19 +7286,19 @@ function inferGeneratedSurface(message: string): GeneratedSurface | undefined {
     /\b(email|gmail|message)\b/.test(text);
 
   if (wantsCalendarWrite) {
-    return "schedule";
+    return { surface: "schedule" };
   }
   if (wantsTaskWrite) {
-    return "task";
+    return { surface: "task", context: { task: inferTaskSurfaceContext(message) } };
   }
   if (text.includes("drive") || text.includes("file") || text.includes("document")) {
-    return "files";
+    return { surface: "files" };
   }
   if (text.includes("remember") || text.includes("memory") || text.includes("preference")) {
-    return "memory";
+    return { surface: "memory" };
   }
   if (wantsEmailDraft) {
-    return "email";
+    return { surface: "email" };
   }
   return undefined;
 }

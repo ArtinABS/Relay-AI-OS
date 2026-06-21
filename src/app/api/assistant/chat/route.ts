@@ -13,18 +13,24 @@ import {
   listGithubPullRequestsForRepository,
   listGithubRepositoriesForUser,
   listRecentGithubPullRequests,
+  updateGithubIssueForRepository,
 } from "@/lib/github/workspace";
 import { getGoogleSetupStatus } from "@/lib/google/client";
 import { getDirectGoogleTokens } from "@/lib/google/direct-session";
 import {
   archiveGmailMessageForUser,
   completeGoogleTaskForUser,
+  copyDriveFileForUser,
+  createCalendarEventForUser,
   createGoogleContactForUser,
   createGoogleTaskForUser,
   createGmailDraftForUser,
+  deleteCalendarEventForUser,
+  deleteDriveFileForUser,
   deleteGoogleContactForUser,
   deleteGmailMessageForUser,
   deleteGoogleTaskForUser,
+  getDriveFileForUser,
   getGoogleContactForUser,
   getUpcomingCalendarEventsForUser,
   labelGmailMessageForUser,
@@ -32,11 +38,19 @@ import {
   listGoogleContactsForUser,
   listGoogleTasksForUser,
   listRecentDriveFilesForUser,
+  moveDriveFileForUser,
+  readDriveFileTextForUser,
   readGmailMessageForUser,
+  renameDriveFileForUser,
   replyToGmailMessageForUser,
+  restoreGmailMessageForUser,
   sendGmailMessageForUser,
+  setDriveFileTrashedForUser,
+  shareDriveFileForUser,
   starGmailMessageForUser,
   trashGmailMessageForUser,
+  unarchiveGmailMessageForUser,
+  updateCalendarEventForUser,
   updateGoogleContactForUser,
   updateGoogleTaskForUser,
 } from "@/lib/google/workspace";
@@ -46,7 +60,9 @@ import {
   addTask,
   clearCompletedTasks,
   completeTask,
+  deleteTask,
   listTasks,
+  updateTask,
 } from "@/lib/local-store/tasks";
 
 const requestSchema = z.object({
@@ -141,14 +157,18 @@ export async function POST(request: Request) {
         "",
         "You are currently running inside Relay's main chat surface, not a demo.",
         "For every new user message, start from a neutral intent analysis. Do not stay locked into the previous toolset; choose tools, panels, and generated UI from the current request plus recent conversation context.",
-        "Use the available tools when the user asks about tasks, notes, schedule, calendar, OAuth, Gmail, Drive, GitHub, repositories, issues, pull requests, or calculations.",
+        "Before choosing UI, analyze the request as a workflow: identify existing objects referenced, extract provided fields, decide which read/search tools are needed, execute safe reads first, and only then ask for missing fields.",
+        "Use lifecycle tools, not just creation tools. For any supported object, prefer read/search before update/delete/move/share when identity is ambiguous.",
+        "Do not ask for information the user already provided. If generated UI appears, it is for missing or confirmation-only fields and should be prefilled from the user's request.",
+        "If the user says they finished/did/completed something, search/list matching tasks before creating follow-up work. Ask for confirmation before marking, deleting, moving, or otherwise changing the existing object.",
+        "Use the available tools when the user asks about tasks, notes, schedule, calendar, OAuth, Gmail, Drive, Contacts, GitHub, repositories, issues, pull requests, or calculations.",
         "When missing details can be collected through generated UI, acknowledge briefly and rely on the UI instead of asking a numbered plain-text questionnaire.",
         "For scheduling, task, reminder, file, memory, and email workflows, be concise and let the application surface collect structured details.",
         "Format final assistant responses as GitHub-flavored Markdown. Use short headings, bullet lists, checklists, tables, code spans, and links when they improve scanability. Do not return raw plain-text paragraphs for multi-part answers.",
         "Keep Markdown compact and professional. Avoid over-formatting simple one-sentence confirmations.",
         "If a user asks for tomorrow's schedule, call the calendar tool. If Google Calendar is unavailable, say exactly what permission or OAuth step is missing.",
         "For contacts, use Google Contacts tools to find people, emails, phone numbers, organizations, and birthdays. Creating, editing, or deleting contacts requires explicit confirmation.",
-        "Never pretend to complete Google, Gmail, Calendar, Drive, Contacts, or destructive actions if the tool result says they are blocked.",
+        "Never pretend to complete Google, Gmail, Calendar, Drive, Contacts, GitHub, or destructive actions if the tool result says they are blocked.",
         "For GitHub, reading repositories/issues/pull requests is allowed when connected. Creating issues or comments requires explicit confirmation.",
         "For long-term memory, ask for permission before storing unless the user explicitly says to remember/save it.",
         "",
@@ -165,7 +185,7 @@ export async function POST(request: Request) {
       ].join("\n"),
       prompt: parsed.data.message,
       temperature: 0.35,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(8),
       tools: {
         get_workspace_setup_status: tool({
           description:
@@ -207,21 +227,83 @@ export async function POST(request: Request) {
           description: "Create a local Relay task.",
           inputSchema: z.object({
             title: z.string().min(1),
+            notes: z.string().optional(),
+            due: z.string().datetime().nullable().optional(),
+            priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
           }),
-          execute: async ({ title }) => addTask(title),
+          execute: async (task) => addTask(task),
         }),
         complete_task: tool({
           description:
-            "Complete a local Relay task by id, list number, or title fragment.",
+            "Complete a local Relay task by id, list number, or title fragment only after explicit confirmation.",
           inputSchema: z.object({
             identifier: z.string().min(1),
+            confirmed: z.boolean().default(false),
           }),
-          execute: async ({ identifier }) => completeTask(identifier),
+          execute: async ({ identifier, confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Completing a task requires confirmation." };
+            }
+
+            const task = await completeTask(identifier);
+            return task
+              ? { ok: true, task }
+              : { ok: false, reason: "No matching local task was found." };
+          },
+        }),
+        update_task: tool({
+          description:
+            "Edit a local Relay task title, notes, due date, priority, or column after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            title: z.string().min(1).optional(),
+            notes: z.string().nullable().optional(),
+            due: z.string().datetime().nullable().optional(),
+            priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+            columnId: z.string().nullable().optional(),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, id, ...patch }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Editing a task requires confirmation." };
+            }
+
+            const task = await updateTask(id, patch);
+            return task
+              ? { ok: true, task }
+              : { ok: false, reason: "No matching local task was found." };
+          },
+        }),
+        delete_task: tool({
+          description:
+            "Delete a local Relay task by id, list number, or title fragment after explicit confirmation.",
+          inputSchema: z.object({
+            identifier: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ identifier, confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Deleting a task requires confirmation." };
+            }
+
+            const task = await deleteTask(identifier);
+            return task
+              ? { ok: true, task }
+              : { ok: false, reason: "No matching local task was found." };
+          },
         }),
         clear_completed_tasks: tool({
-          description: "Clear completed local Relay tasks.",
-          inputSchema: z.object({}),
-          execute: async () => clearCompletedTasks(),
+          description: "Clear completed local Relay tasks after explicit confirmation.",
+          inputSchema: z.object({
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Clearing completed tasks requires confirmation." };
+            }
+
+            return { ok: true, ...(await clearCompletedTasks()) };
+          },
         }),
         list_notes: tool({
           description: "List recent local Relay notes and memories.",
@@ -271,6 +353,102 @@ export async function POST(request: Request) {
             );
           },
         }),
+        create_calendar_event: tool({
+          description:
+            "Create a Google Calendar event when the details are clear or generated UI has collected them.",
+          inputSchema: z.object({
+            summary: z.string().min(1),
+            startDateTime: z.string().datetime(),
+            endDateTime: z.string().datetime(),
+            timeZone: z.string().min(1),
+            description: z.string().optional(),
+            location: z.string().optional(),
+            attendees: z.array(z.string().email()).optional(),
+            conferenceData: z.boolean().default(false),
+            reminderMinutes: z.number().int().min(0).max(40320).nullable().optional(),
+          }),
+          execute: async (event) => {
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return createCalendarEventForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              event,
+            );
+          },
+        }),
+        update_calendar_event: tool({
+          description:
+            "Edit a Google Calendar event after explicit user confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            summary: z.string().min(1).optional(),
+            startDateTime: z.string().datetime().optional(),
+            endDateTime: z.string().datetime().optional(),
+            timeZone: z.string().min(1).optional(),
+            description: z.string().optional(),
+            location: z.string().optional(),
+            attendees: z.array(z.string().email()).optional(),
+            reminderMinutes: z.number().int().min(0).max(40320).nullable().optional(),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...event }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Editing a calendar event requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return updateCalendarEventForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              event,
+            );
+          },
+        }),
+        delete_calendar_event: tool({
+          description:
+            "Delete a Google Calendar event only after explicit user confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ id, confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Deleting a calendar event requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return deleteCalendarEventForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              { id },
+            );
+          },
+        }),
         list_recent_drive_files: tool({
           description:
             "List recent Google Drive files for the connected user.",
@@ -292,6 +470,252 @@ export async function POST(request: Request) {
                 refreshToken: directTokens.refreshToken,
               },
               maxResults,
+            );
+          },
+        }),
+        read_drive_file: tool({
+          description: "Read Google Drive file metadata by file id.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+          }),
+          execute: async ({ id }) => {
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return getDriveFileForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              id,
+            );
+          },
+        }),
+        read_drive_file_text: tool({
+          description:
+            "Extract text from a Google Drive document or text-compatible file for summarization or Q&A.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            maxCharacters: z.number().int().min(500).max(20000).default(6000),
+          }),
+          execute: async (input) => {
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return readDriveFileTextForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              input,
+            );
+          },
+        }),
+        rename_drive_file: tool({
+          description: "Rename a Google Drive file after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            name: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...input }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Renaming a Drive file requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return renameDriveFileForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              input,
+            );
+          },
+        }),
+        move_drive_file: tool({
+          description: "Move a Google Drive file into another folder after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            folderId: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...input }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Moving a Drive file requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return moveDriveFileForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              input,
+            );
+          },
+        }),
+        duplicate_drive_file: tool({
+          description: "Duplicate a Google Drive file after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            name: z.string().optional(),
+            folderId: z.string().nullable().optional(),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...input }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Duplicating a Drive file requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return copyDriveFileForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              input,
+            );
+          },
+        }),
+        trash_drive_file: tool({
+          description: "Move a Google Drive file to trash after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ id, confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Trashing a Drive file requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return setDriveFileTrashedForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              { id, trashed: true },
+            );
+          },
+        }),
+        restore_drive_file: tool({
+          description: "Restore a Google Drive file from trash after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ id, confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Restoring a Drive file requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return setDriveFileTrashedForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              { id, trashed: false },
+            );
+          },
+        }),
+        delete_drive_file: tool({
+          description: "Permanently delete a Google Drive file only after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ id, confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Permanent Drive deletion requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return deleteDriveFileForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              id,
+            );
+          },
+        }),
+        share_drive_file: tool({
+          description: "Share a Google Drive file after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            role: z.enum(["reader", "commenter", "writer"]),
+            type: z.enum(["user", "group", "domain", "anyone"]),
+            emailAddress: z.string().email().optional(),
+            domain: z.string().optional(),
+            allowFileDiscovery: z.boolean().optional(),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...input }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Sharing a Drive file requires confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return shareDriveFileForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              input,
             );
           },
         }),
@@ -728,6 +1152,33 @@ export async function POST(request: Request) {
             );
           },
         }),
+        unarchive_gmail_message: tool({
+          description: "Restore an archived Gmail message to the inbox after explicit user confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ id, confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Restoring email to inbox requires explicit confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return unarchiveGmailMessageForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              id,
+            );
+          },
+        }),
         label_gmail_message: tool({
           description: "Apply a Gmail label to a message.",
           inputSchema: z.object({
@@ -796,6 +1247,33 @@ export async function POST(request: Request) {
             }
 
             return trashGmailMessageForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              id,
+            );
+          },
+        }),
+        restore_gmail_message: tool({
+          description: "Restore a Gmail message from trash after explicit confirmation.",
+          inputSchema: z.object({
+            id: z.string().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ id, confirmed }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Restoring email from trash requires explicit confirmation." };
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google is not connected in this browser session. Ask the user to connect Google first.",
+              };
+            }
+
+            return restoreGmailMessageForUser(
               {
                 accessToken: directTokens.accessToken,
                 refreshToken: directTokens.refreshToken,
@@ -924,6 +1402,86 @@ export async function POST(request: Request) {
             }
 
             return createGithubIssueForRepository(githubTokens, issue);
+          },
+        }),
+        update_github_issue: tool({
+          description:
+            "Edit a GitHub issue title, body, labels, or state only after explicit user confirmation.",
+          inputSchema: z.object({
+            owner: z.string().min(1),
+            repo: z.string().min(1),
+            issueNumber: z.number().int().min(1),
+            title: z.string().min(1).optional(),
+            body: z.string().optional(),
+            labels: z.array(z.string()).optional(),
+            state: z.enum(["open", "closed"]).optional(),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...issue }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Editing a GitHub issue requires explicit confirmation." };
+            }
+            if (!githubTokens?.accessToken) {
+              return {
+                ok: false,
+                reason:
+                  "GitHub is not connected in this browser session. Ask the user to connect GitHub first.",
+              };
+            }
+
+            return updateGithubIssueForRepository(githubTokens, issue);
+          },
+        }),
+        close_github_issue: tool({
+          description: "Close a GitHub issue only after explicit user confirmation.",
+          inputSchema: z.object({
+            owner: z.string().min(1),
+            repo: z.string().min(1),
+            issueNumber: z.number().int().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...issue }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Closing a GitHub issue requires explicit confirmation." };
+            }
+            if (!githubTokens?.accessToken) {
+              return {
+                ok: false,
+                reason:
+                  "GitHub is not connected in this browser session. Ask the user to connect GitHub first.",
+              };
+            }
+
+            return updateGithubIssueForRepository(githubTokens, {
+              ...issue,
+              state: "closed",
+            });
+          },
+        }),
+        reopen_github_issue: tool({
+          description: "Reopen a GitHub issue only after explicit user confirmation.",
+          inputSchema: z.object({
+            owner: z.string().min(1),
+            repo: z.string().min(1),
+            issueNumber: z.number().int().min(1),
+            confirmed: z.boolean().default(false),
+          }),
+          execute: async ({ confirmed, ...issue }) => {
+            if (!confirmed) {
+              return { ok: false, reason: "Reopening a GitHub issue requires explicit confirmation." };
+            }
+            if (!githubTokens?.accessToken) {
+              return {
+                ok: false,
+                reason:
+                  "GitHub is not connected in this browser session. Ask the user to connect GitHub first.",
+              };
+            }
+
+            return updateGithubIssueForRepository(githubTokens, {
+              ...issue,
+              state: "open",
+            });
           },
         }),
         comment_github_issue: tool({

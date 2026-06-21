@@ -342,6 +342,41 @@ export async function createGithubIssueForRepository(
   };
 }
 
+export async function updateGithubIssueForRepository(
+  tokens: DirectGithubTokens,
+  input: {
+    owner: string;
+    repo: string;
+    issueNumber: number;
+    title?: string;
+    body?: string;
+    labels?: string[];
+    state?: "open" | "closed";
+  },
+) {
+  const issue = await githubApi<GithubIssueResponse>(
+    tokens,
+    `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}/issues/${input.issueNumber}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        title: input.title,
+        body: input.body,
+        labels: input.labels,
+        state: input.state,
+      }),
+    },
+  );
+
+  return {
+    ok: true,
+    issue: {
+      ...toIssue(issue),
+      repositoryFullName: `${input.owner}/${input.repo}`,
+    },
+  };
+}
+
 export async function commentOnGithubIssue(
   tokens: DirectGithubTokens,
   input: {
