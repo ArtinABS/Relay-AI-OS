@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@heroui/styles";
 @import "@copilotkit/react-ui/styles.css";
 
 :root {

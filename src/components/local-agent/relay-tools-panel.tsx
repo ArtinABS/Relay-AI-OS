@@ -1,7 +1,15 @@
 "use client";
 
-import { Check, Download, ListTodo, RefreshCcw, StickyNote } from "lucide-react";
+import {
+  Check,
+  Download,
+  ListTodo,
+  RefreshCcw,
+  StickyNote,
+} from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
+import { Card, Link } from "@heroui/react";
+import { Button, Input } from "@/components/ui/relay-ui";
 
 type RelayTask = {
   id: string;
@@ -43,11 +51,11 @@ export function RelayToolsPanel() {
   async function refresh() {
     const [tasksResponse, notesResponse, oauthResponse, briefingResponse] =
       await Promise.all([
-      fetch("/api/local-tools/tasks"),
-      fetch("/api/local-tools/notes"),
-      fetch("/api/oauth/status"),
-      fetch("/api/local-tools/briefing"),
-    ]);
+        fetch("/api/local-tools/tasks"),
+        fetch("/api/local-tools/notes"),
+        fetch("/api/oauth/status"),
+        fetch("/api/local-tools/briefing"),
+      ]);
 
     const tasksData = (await tasksResponse.json()) as { tasks: RelayTask[] };
     const notesData = (await notesResponse.json()) as { notes: RelayNote[] };
@@ -133,7 +141,7 @@ export function RelayToolsPanel() {
 
   return (
     <section className="grid gap-5 lg:grid-cols-3">
-      <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <Card className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">Relay Status</h2>
@@ -141,14 +149,14 @@ export function RelayToolsPanel() {
               Local tools are active. OAuth is optional for no-key tools.
             </p>
           </div>
-          <button
+          <Button
             className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 text-stone-600 transition hover:bg-stone-50"
             onClick={() => refresh()}
             title="Refresh"
             type="button"
           >
             <RefreshCcw className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="mt-5 grid gap-3 text-sm">
@@ -156,7 +164,7 @@ export function RelayToolsPanel() {
             label="Google OAuth"
             value={
               oauthStatus?.hasDirectGoogleToken
-                ? oauthStatus.googleEmail ?? "connected"
+                ? (oauthStatus.googleEmail ?? "connected")
                 : oauthStatus?.hasGoogleOAuthConfig
                   ? "configured"
                   : "missing credentials"
@@ -164,35 +172,32 @@ export function RelayToolsPanel() {
           />
           <StatusRow label="Open tasks" value={String(openTasks.length)} />
           <StatusRow label="Notes" value={String(notes.length)} />
-          <StatusRow
-            label="Focus"
-            value={briefing?.focus?.title ?? "none"}
-          />
+          <StatusRow label="Focus" value={briefing?.focus?.title ?? "none"} />
         </div>
-        <a
+        <Link
           className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-md border border-stone-200 px-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
           href="/api/local-tools/export"
         >
           <Download className="h-4 w-4" />
           Export JSON
-        </a>
-      </div>
+        </Link>
+      </Card>
 
-      <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <Card className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2">
           <ListTodo className="h-5 w-5 text-emerald-700" />
           <h2 className="text-lg font-semibold">Tasks</h2>
         </div>
         <form className="mt-4 flex gap-2" onSubmit={addTaskFromForm}>
-          <input
+          <Input
             className="h-10 min-w-0 flex-1 rounded-md border border-stone-300 px-3 text-sm outline-none focus:ring-2 focus:ring-stone-950"
             onChange={(event) => setTaskTitle(event.target.value)}
             placeholder="Add a task..."
             value={taskTitle}
           />
-          <button className="h-10 rounded-md bg-stone-950 px-3 text-sm font-medium text-white">
+          <Button className="h-10 rounded-md bg-stone-950 px-3 text-sm font-medium text-white">
             Add
-          </button>
+          </Button>
         </form>
         <div className="mt-4 space-y-2">
           {openTasks.slice(0, 5).map((task) => (
@@ -201,37 +206,37 @@ export function RelayToolsPanel() {
               key={task.id}
             >
               <span className="line-clamp-2">{task.title}</span>
-              <button
+              <Button
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800"
                 onClick={() => markDone(task)}
                 title="Complete task"
                 type="button"
               >
                 <Check className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           ))}
           {openTasks.length === 0 ? (
             <p className="text-sm text-stone-500">No open tasks.</p>
           ) : null}
         </div>
-      </div>
+      </Card>
 
-      <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <Card className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-2">
           <StickyNote className="h-5 w-5 text-sky-700" />
           <h2 className="text-lg font-semibold">Notes</h2>
         </div>
         <form className="mt-4 flex gap-2" onSubmit={addNoteFromForm}>
-          <input
+          <Input
             className="h-10 min-w-0 flex-1 rounded-md border border-stone-300 px-3 text-sm outline-none focus:ring-2 focus:ring-stone-950"
             onChange={(event) => setNoteBody(event.target.value)}
             placeholder="Remember something..."
             value={noteBody}
           />
-          <button className="h-10 rounded-md bg-stone-950 px-3 text-sm font-medium text-white">
+          <Button className="h-10 rounded-md bg-stone-950 px-3 text-sm font-medium text-white">
             Add
-          </button>
+          </Button>
         </form>
         <div className="mt-4 space-y-2">
           {notes.slice(0, 5).map((note) => (
@@ -246,7 +251,7 @@ export function RelayToolsPanel() {
             <p className="text-sm text-stone-500">No notes yet.</p>
           ) : null}
         </div>
-      </div>
+      </Card>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Chip } from "@heroui/react";
 
 const statusStyles = {
   ready: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -9,13 +10,13 @@ const statusStyles = {
 
 export function StatusPill({ status }: { status: keyof typeof statusStyles }) {
   return (
-    <span
+    <Chip
       className={cn(
         "inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium",
         statusStyles[status],
       )}
     >
       {status}
-    </span>
+    </Chip>
   );
 }

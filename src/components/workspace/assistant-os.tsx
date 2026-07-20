@@ -1,6 +1,14 @@
 "use client";
 
-import type { FormEvent, KeyboardEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type {
+  FormEvent,
+  KeyboardEvent,
+  MouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from "react";
+import { Card, Checkbox, Chip, Link, Modal, Switch } from "@heroui/react";
+import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
 import {
   Activity,
   AlertCircle,
@@ -439,14 +447,39 @@ const starterMessages: Message[] = [
 ];
 
 const integrationRows = [
-  { name: "Google Calendar", icon: CalendarDays, provider: "Google", implemented: true },
+  {
+    name: "Google Calendar",
+    icon: CalendarDays,
+    provider: "Google",
+    implemented: true,
+  },
   { name: "Gmail", icon: Mail, provider: "Google", implemented: true },
-  { name: "Google Drive", icon: FolderOpen, provider: "Google", implemented: true },
-  { name: "Google Tasks", icon: ListTodo, provider: "Google", implemented: true },
+  {
+    name: "Google Drive",
+    icon: FolderOpen,
+    provider: "Google",
+    implemented: true,
+  },
+  {
+    name: "Google Tasks",
+    icon: ListTodo,
+    provider: "Google",
+    implemented: true,
+  },
   { name: "Contacts", icon: Users, provider: "Google", implemented: true },
   { name: "GitHub", icon: GitBranch, provider: "GitHub", implemented: true },
-  { name: "Slack", icon: MessageSquare, provider: "Not installed", implemented: false },
-  { name: "OpenWeather", icon: Globe, provider: "Not installed", implemented: false },
+  {
+    name: "Slack",
+    icon: MessageSquare,
+    provider: "Not installed",
+    implemented: false,
+  },
+  {
+    name: "OpenWeather",
+    icon: Globe,
+    provider: "Not installed",
+    implemented: false,
+  },
 ];
 
 const panelClass =
@@ -527,8 +560,10 @@ function DriveFileGlyph({
   className: string;
   mimeType: string;
 }) {
-  if (mimeType.includes("spreadsheet")) return <FileSpreadsheet className={className} />;
-  if (mimeType.includes("presentation")) return <Columns3 className={className} />;
+  if (mimeType.includes("spreadsheet"))
+    return <FileSpreadsheet className={className} />;
+  if (mimeType.includes("presentation"))
+    return <Columns3 className={className} />;
   if (mimeType.includes("folder")) return <FolderOpen className={className} />;
   return <FileText className={className} />;
 }
@@ -546,7 +581,9 @@ export function AssistantOS() {
   const [notes, setNotes] = useState<RelayNote[]>([]);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [oauthStatus, setOauthStatus] = useState<OAuthStatus | null>(null);
-  const [passwordAuth, setPasswordAuth] = useState<PasswordAuthStatus | null>(null);
+  const [passwordAuth, setPasswordAuth] = useState<PasswordAuthStatus | null>(
+    null,
+  );
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -573,7 +610,11 @@ export function AssistantOS() {
     if (params.get("googleOAuth") === "connected") {
       window.setTimeout(() => {
         setStage("workspace");
-        addToast("Google connected", "Workspace permissions are ready.", "success");
+        addToast(
+          "Google connected",
+          "Workspace permissions are ready.",
+          "success",
+        );
       }, 0);
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -621,7 +662,11 @@ export function AssistantOS() {
     return () => window.removeEventListener("keydown", handleKeydown);
   }, []);
 
-  function addToast(title: string, detail: string | undefined, tone: Toast["tone"]) {
+  function addToast(
+    title: string,
+    detail: string | undefined,
+    tone: Toast["tone"],
+  ) {
     const id = createId("toast");
     setToasts((current) => [...current, { id, title, detail, tone }]);
     window.setTimeout(() => {
@@ -630,15 +675,21 @@ export function AssistantOS() {
   }
 
   async function refreshWorkspace() {
-    const [tasksResponse, notesResponse, oauthResponse, passwordResponse, briefingResponse, aiResponse] =
-      await Promise.all([
-        fetch("/api/local-tools/tasks"),
-        fetch("/api/local-tools/notes"),
-        fetch("/api/oauth/status"),
-        fetch("/api/auth/password/status"),
-        fetch("/api/local-tools/briefing"),
-        fetch("/api/ai/status"),
-      ]);
+    const [
+      tasksResponse,
+      notesResponse,
+      oauthResponse,
+      passwordResponse,
+      briefingResponse,
+      aiResponse,
+    ] = await Promise.all([
+      fetch("/api/local-tools/tasks"),
+      fetch("/api/local-tools/notes"),
+      fetch("/api/oauth/status"),
+      fetch("/api/auth/password/status"),
+      fetch("/api/local-tools/briefing"),
+      fetch("/api/ai/status"),
+    ]);
 
     const tasksData = (await tasksResponse.json()) as {
       tasks: RelayTask[];
@@ -703,7 +754,11 @@ export function AssistantOS() {
     addToast("Memory saved", "Stored in local notes.", "success");
   }
 
-function completeSurfaceMessage(messageId: string, summary: string, link?: string | null) {
+  function completeSurfaceMessage(
+    messageId: string,
+    summary: string,
+    link?: string | null,
+  ) {
     setMessages((current) =>
       current.map((message) =>
         message.id === messageId
@@ -719,7 +774,10 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
     );
   }
 
-  async function submitMessage(event?: FormEvent<HTMLFormElement>, overrideMessage?: string) {
+  async function submitMessage(
+    event?: FormEvent<HTMLFormElement>,
+    overrideMessage?: string,
+  ) {
     event?.preventDefault();
     const message = (overrideMessage ?? input).trim();
     if (!message || agentLoading) return;
@@ -780,7 +838,8 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message }),
         });
-        const fallbackData = await readJsonResponse<AssistantEndpointResponse>(fallbackResponse);
+        const fallbackData =
+          await readJsonResponse<AssistantEndpointResponse>(fallbackResponse);
 
         if (!fallbackResponse.ok || !fallbackData?.content) {
           throw new Error(
@@ -890,8 +949,16 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
   function disconnectGoogle() {
     fetch("/api/google/oauth/disconnect", { method: "POST" })
       .then(() => refreshWorkspace())
-      .then(() => addToast("Google disconnected", "OAuth tokens were removed.", "info"))
-      .catch(() => addToast("Disconnect failed", "Try again from Integrations.", "warning"));
+      .then(() =>
+        addToast("Google disconnected", "OAuth tokens were removed.", "info"),
+      )
+      .catch(() =>
+        addToast(
+          "Disconnect failed",
+          "Try again from Integrations.",
+          "warning",
+        ),
+      );
   }
 
   function connectGithub() {
@@ -901,8 +968,16 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
   function disconnectGithub() {
     fetch("/api/github/oauth/disconnect", { method: "POST" })
       .then(() => refreshWorkspace())
-      .then(() => addToast("GitHub disconnected", "OAuth tokens were removed.", "info"))
-      .catch(() => addToast("Disconnect failed", "Try again from Integrations.", "warning"));
+      .then(() =>
+        addToast("GitHub disconnected", "OAuth tokens were removed.", "info"),
+      )
+      .catch(() =>
+        addToast(
+          "Disconnect failed",
+          "Try again from Integrations.",
+          "warning",
+        ),
+      );
   }
 
   async function handlePasswordAuthenticated(detail?: string) {
@@ -917,7 +992,11 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
       await refreshWorkspace();
       setStage("auth");
       setAuthMode("login");
-      addToast("Signed out", "Email/password session was cleared on this device.", "info");
+      addToast(
+        "Signed out",
+        "Email/password session was cleared on this device.",
+        "info",
+      );
     } catch {
       addToast("Sign out failed", "Try again from Profile.", "warning");
     }
@@ -952,7 +1031,10 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
     {
       label: "Review GitHub",
       icon: GitBranch,
-      run: () => runPrompt("Summarize my GitHub repositories, issues, and pull requests"),
+      run: () =>
+        runPrompt(
+          "Summarize my GitHub repositories, issues, and pull requests",
+        ),
     },
     {
       label: "Open integrations",
@@ -987,7 +1069,7 @@ function completeSurfaceMessage(messageId: string, summary: string, link?: strin
 
   return (
     <div
-      className="assistant-shell min-h-screen bg-[var(--app-bg)] text-[var(--text)] transition-colors duration-300"
+      className={`assistant-shell ${theme} min-h-screen bg-[var(--app-bg)] text-[var(--text)] transition-colors duration-300`}
       data-theme={theme}
       onClick={() => setContextMenu(null)}
     >
@@ -1072,8 +1154,6 @@ function AuthExperience({
   setAuthMode,
   setTheme,
   theme,
-  aiStatus,
-  oauthStatus,
   googleConfigured,
   passwordAuth,
   signedInToGoogle,
@@ -1086,8 +1166,6 @@ function AuthExperience({
   setAuthMode: (mode: AuthMode) => void;
   setTheme: (theme: ThemeMode) => void;
   theme: ThemeMode;
-  aiStatus: AiStatus | null;
-  oauthStatus: OAuthStatus | null;
   googleConfigured: boolean;
   passwordAuth: PasswordAuthStatus | null;
   signedInToGoogle: boolean;
@@ -1136,7 +1214,12 @@ function AuthExperience({
             ? { email: formEmail, password: formPassword, name: formName }
             : authMode === "forgot"
               ? formCode && formPassword
-                ? { email: formEmail, code: formCode, password: formPassword, remember }
+                ? {
+                    email: formEmail,
+                    code: formCode,
+                    password: formPassword,
+                    remember,
+                  }
                 : { email: formEmail }
               : { email: formEmail, code: formCode, remember };
       const response = await fetch(endpoint, {
@@ -1154,20 +1237,26 @@ function AuthExperience({
       };
 
       if (response.ok && data.ok && authMode === "login") {
-        await onPasswordAuthenticated(`Signed in as ${data.user?.email ?? formEmail}.`);
+        await onPasswordAuthenticated(
+          `Signed in as ${data.user?.email ?? formEmail}.`,
+        );
         return;
       }
 
       if (response.ok && data.ok && authMode === "signup") {
         setAuthMode("verify");
         setDevCode(data.devVerificationCode ?? null);
-        setAuthNotice("Account created. Enter the verification code to activate it.");
+        setAuthNotice(
+          "Account created. Enter the verification code to activate it.",
+        );
         return;
       }
 
       if (response.ok && data.ok && authMode === "forgot") {
         if (data.user) {
-          await onPasswordAuthenticated(`Password reset for ${data.user.email ?? formEmail}.`);
+          await onPasswordAuthenticated(
+            `Password reset for ${data.user.email ?? formEmail}.`,
+          );
           return;
         }
         setDevCode(data.devResetCode ?? null);
@@ -1180,7 +1269,9 @@ function AuthExperience({
       }
 
       if (response.ok && data.ok && authMode === "verify") {
-        await onPasswordAuthenticated(`Verified and signed in as ${data.user?.email ?? formEmail}.`);
+        await onPasswordAuthenticated(
+          `Verified and signed in as ${data.user?.email ?? formEmail}.`,
+        );
         return;
       }
 
@@ -1190,263 +1281,227 @@ function AuthExperience({
       }
       setAuthNotice(data.reason ?? "Authentication failed.");
     } catch (error) {
-      setAuthNotice(error instanceof Error ? error.message : "Authentication failed.");
+      setAuthNotice(
+        error instanceof Error ? error.message : "Authentication failed.",
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
+  const isPrimaryMode = authMode === "login" || authMode === "signup";
+  const heading =
+    authMode === "signup"
+      ? "Create your account"
+      : authMode === "forgot"
+        ? "Reset your password"
+        : authMode === "verify"
+          ? "Verify your email"
+          : "Welcome back";
+  const description =
+    authMode === "signup"
+      ? "Set up your Relay workspace in a moment."
+      : authMode === "forgot"
+        ? "Request a code, then enter it with your new password."
+        : authMode === "verify"
+          ? "Enter the code created for your account."
+          : "Sign in to continue to your personal workspace.";
+
   return (
-    <main className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(420px,0.85fr)_1.15fr]">
-      <section className="flex min-h-screen flex-col justify-between px-5 py-5 sm:px-8 lg:px-10">
-        <div className="flex items-center justify-between">
+    <main className="relative flex min-h-screen items-center justify-center px-4 py-12">
+      <Button
+        aria-label="Toggle color theme"
+        className="absolute right-5 top-5"
+        isIconOnly
+        onPress={() => setTheme(theme === "dark" ? "light" : "dark")}
+        title="Toggle theme"
+        variant="ghost"
+      >
+        {theme === "dark" ? (
+          <Sun className="h-4 w-4" />
+        ) : (
+          <Moon className="h-4 w-4" />
+        )}
+      </Button>
+
+      <Card className="w-full max-w-[420px] overflow-hidden border border-[var(--line)] bg-[var(--surface)] p-0 shadow-[var(--shadow-strong)]">
+        <Card.Header className="flex flex-col items-start gap-5 border-b border-[var(--line)] px-6 py-6">
           <BrandMark />
-          <button
-            className={iconButtonClass}
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            type="button"
-            title="Toggle theme"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-        </div>
-
-        <div className="mx-auto flex w-full max-w-md flex-col gap-6 py-10">
           <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold uppercase text-[var(--muted)]">
-              <ShieldCheck className="h-3.5 w-3.5 text-[var(--success)]" />
-              Executive workspace
-            </div>
-            <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">
-              Sign in to your AI operating system.
-            </h1>
-            <p className="mt-4 text-base leading-7 text-[var(--muted)]">
-              One secure workspace for chat, scheduling, memory, files, tasks, and
-              approvals.
-            </p>
+            <Card.Title className="text-2xl font-semibold tracking-tight">
+              {heading}
+            </Card.Title>
+            <Card.Description className="mt-1.5 text-sm leading-6 text-[var(--muted)]">
+              {description}
+            </Card.Description>
           </div>
+        </Card.Header>
 
-          <div className={panelClass}>
-            <div className="grid grid-cols-4 border-b border-[var(--line)] text-sm font-semibold">
-              {(["login", "signup", "forgot", "verify"] as AuthMode[]).map((mode) => (
-                <button
-                  className={`h-12 border-b-2 px-2 transition ${
-                    authMode === mode
-                      ? "border-[var(--accent)] text-[var(--text)]"
-                      : "border-transparent text-[var(--muted)] hover:text-[var(--text)]"
-                  }`}
+        <Card.Content className="px-6 py-6">
+          {isPrimaryMode ? (
+            <div className="mb-5 grid grid-cols-2 rounded-xl bg-[var(--surface-soft)] p-1">
+              {(["login", "signup"] as AuthMode[]).map((mode) => (
+                <Button
+                  className="w-full"
                   key={mode}
-                  onClick={() => {
+                  onPress={() => {
                     setAuthMode(mode);
                     setAuthNotice(null);
                     setDevCode(null);
                   }}
-                  type="button"
+                  size="sm"
+                  variant={authMode === mode ? "secondary" : "ghost"}
                 >
-                  {authLabel(mode)}
-                </button>
+                  {mode === "login" ? "Sign in" : "Create account"}
+                </Button>
               ))}
             </div>
+          ) : (
+            <Button
+              className="mb-5 -ml-2"
+              onPress={() => {
+                setAuthMode("login");
+                setAuthNotice(null);
+                setDevCode(null);
+              }}
+              size="sm"
+              variant="ghost"
+            >
+              <ArrowRight className="h-4 w-4 rotate-180" />
+              Back to sign in
+            </Button>
+          )}
 
-            <form className="space-y-4 p-5" onSubmit={submit}>
-              {authMode === "signup" ? (
-                <Field
-                  label="Full name"
-                  name="name"
-                  onChange={setName}
-                  placeholder="Alex Morgan"
-                  value={name}
-                />
-              ) : null}
-
+          <form className="space-y-4" onSubmit={submit}>
+            {authMode === "signup" ? (
               <Field
-                autoComplete="email"
-                label="Email"
-                name="email"
-                onChange={setEmail}
-                placeholder="you@company.com"
-                type="email"
-                value={email}
+                label="Full name"
+                name="name"
+                onChange={setName}
+                placeholder="Alex Morgan"
+                value={name}
               />
+            ) : null}
 
-              {authMode === "verify" || authMode === "forgot" ? (
-                <Field
-                  label={authMode === "forgot" ? "Reset code" : "Verification code"}
-                  name="code"
-                  onChange={setCode}
-                  placeholder="284991"
-                  value={code}
-                />
-              ) : null}
-
-              {authMode === "login" || authMode === "signup" || authMode === "forgot" ? (
-                <Field label="Password" name="password" placeholder="••••••••••" type="password" />
-              ) : null}
-
-              {authMode === "login" ? (
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <label className="flex items-center gap-2 text-[var(--muted)]">
-                    <input
-                      checked={remember}
-                      className="h-4 w-4 accent-[var(--accent)]"
-                      onChange={(event) => setRemember(event.target.checked)}
-                      type="checkbox"
-                    />
-                    Remember me
-                  </label>
-                  <button
-                    className="font-semibold text-[var(--accent)]"
-                    onClick={() => {
-                      setAuthMode("forgot");
-                      setAuthNotice(null);
-                    }}
-                    type="button"
-                  >
-                    Forgot password
-                  </button>
-                </div>
-              ) : null}
-
-              <button className={`${primaryButtonClass} w-full`} disabled={submitting}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
-                {authActionLabel(authMode)}
-              </button>
-              {authNotice ? (
-                <p className="rounded-md border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm font-medium text-[var(--warning)]">
-                  {authNotice}
-                </p>
-              ) : null}
-              {devCode ? (
-                <p className="rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)]">
-                  Development code: <span className="font-mono font-semibold text-[var(--text)]">{devCode}</span>
-                </p>
-              ) : null}
-              {signedInWithPassword ? (
-                <p className="rounded-md border border-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-sm font-medium text-[var(--success)]">
-                  Signed in as {passwordAuth?.user?.email ?? "email user"}.
-                </p>
-              ) : null}
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  className={secondaryButtonClass}
-                  disabled={!googleConfigured && !signedInToGoogle}
-                  onClick={connectGoogle}
-                  type="button"
-                >
-                  <Globe className="h-4 w-4" />
-                  Google
-                </button>
-                <button className={secondaryButtonClass} onClick={enterAfterAuth} type="button">
-                  <Sparkles className="h-4 w-4" />
-                  Local mode
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <div className="text-xs text-[var(--muted)]">
-          Email/password uses hashed local credentials and an HTTP-only session cookie.
-          Codes are displayed in development until an email sender is configured.
-        </div>
-      </section>
-
-      <section className="hidden min-h-screen border-l border-[var(--line)] bg-[var(--surface-soft)] p-6 lg:block">
-        <div className="grid h-full grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-strong)]">
-          <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
-            <div>
-              <p className="text-sm font-semibold">Relay Command Center</p>
-              <p className="text-xs text-[var(--muted)]">Current setup status</p>
-            </div>
-            <StatusBadge
-              ready={signedInToGoogle}
-              label={signedInToGoogle ? "Google connected" : "Not connected"}
+            <Field
+              autoComplete="email"
+              label="Email"
+              name="email"
+              onChange={setEmail}
+              placeholder="you@company.com"
+              type="email"
+              value={email}
             />
-          </div>
 
-          <div className="grid grid-cols-[0.95fr_1.05fr] gap-5 p-5">
-            <div className="space-y-4">
-              <PreviewMetric
-                icon={CalendarDays}
-                label="Google OAuth"
-                value={
-                  signedInToGoogle
-                    ? "Connected"
-                    : googleConfigured
-                      ? "Configured"
-                      : "Missing env"
+            {authMode === "verify" || authMode === "forgot" ? (
+              <Field
+                label={
+                  authMode === "forgot" ? "Reset code" : "Verification code"
                 }
+                name="code"
+                onChange={setCode}
+                placeholder="284991"
+                value={code}
               />
-              <PreviewMetric
-                icon={Bot}
-                label="AI provider"
-                value={aiStatus?.configured ? `${aiStatus.label} key set` : "Missing key"}
-              />
-              <PreviewMetric icon={ListTodo} label="Local tools" value="Available" />
-              <div className={softPanelClass + " p-4"}>
-                <div className="mb-4 flex items-center justify-between">
-                  <span className="text-sm font-semibold">Required env checks</span>
-                  <ShieldCheck className="h-4 w-4 text-[var(--accent)]" />
-                </div>
-                {(oauthStatus?.checks ?? []).map((check) => (
-                  <div className="mb-3 flex items-center gap-3" key={check.label}>
-                    <span
-                      className={`grid h-6 w-6 place-items-center rounded-full ${
-                        check.ready
-                          ? "bg-[var(--success-soft)] text-[var(--success)]"
-                          : "bg-[var(--warning-soft)] text-[var(--warning)]"
-                      }`}
-                    >
-                      {check.ready ? (
-                        <Check className="h-3.5 w-3.5" />
-                      ) : (
-                        <AlertCircle className="h-3.5 w-3.5" />
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold">{check.label}</p>
-                      <p className="truncate text-xs text-[var(--muted)]">{check.where}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            ) : null}
 
-            <div className={softPanelClass + " flex flex-col overflow-hidden"}>
-              <div className="border-b border-[var(--line)] px-4 py-3 text-sm font-semibold">
-                Available actions
+            {authMode === "login" ||
+            authMode === "signup" ||
+            authMode === "forgot" ? (
+              <Field
+                autoComplete={
+                  authMode === "login" ? "current-password" : "new-password"
+                }
+                label={authMode === "forgot" ? "New password" : "Password"}
+                name="password"
+                placeholder="Enter your password"
+                type="password"
+              />
+            ) : null}
+
+            {authMode === "login" ? (
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <Checkbox isSelected={remember} onChange={setRemember}>
+                  <Checkbox.Content className="text-[var(--muted)]">
+                    <Checkbox.Control>
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                    Remember me
+                  </Checkbox.Content>
+                </Checkbox>
+                <Button
+                  className="px-0 text-[var(--accent)]"
+                  onPress={() => {
+                    setAuthMode("forgot");
+                    setAuthNotice(null);
+                  }}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Forgot password?
+                </Button>
               </div>
-              <div className="space-y-4 p-4">
-                <MiniControl label="Chat" value={aiStatus?.configured ? "Provider key set" : "Local fallback only"} />
-                <MiniControl label="Calendar" value={signedInToGoogle ? "Can read/create" : "Connect Google first"} />
-                <MiniControl label="Drive" value={signedInToGoogle ? "Can list files" : "Connect Google first"} />
-                <MiniControl label="Memory" value="Local notes store" />
-                <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-sm font-semibold">Security</span>
-                    <LockKeyhole className="h-4 w-4 text-[var(--success)]" />
-                  </div>
-                  <p className="text-sm leading-6 text-[var(--muted)]">
-                    High-impact actions require a click confirmation and server-side credentials.
-                  </p>
-                </div>
-                <button className={`${primaryButtonClass} w-full`} onClick={enterAfterAuth} type="button">
-                  Enter workspace
-                </button>
-              </div>
-            </div>
+            ) : null}
+
+            <Button
+              fullWidth
+              isDisabled={submitting}
+              type="submit"
+              variant="primary"
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LogIn className="h-4 w-4" />
+              )}
+              {authActionLabel(authMode)}
+            </Button>
+
+            {authNotice ? (
+              <p className="rounded-xl border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm font-medium text-[var(--warning)]">
+                {authNotice}
+              </p>
+            ) : null}
+            {devCode ? (
+              <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)]">
+                Development code:{" "}
+                <span className="font-mono font-semibold text-[var(--text)]">
+                  {devCode}
+                </span>
+              </p>
+            ) : null}
+            {signedInWithPassword ? (
+              <p className="rounded-xl border border-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-sm font-medium text-[var(--success)]">
+                Signed in as {passwordAuth?.user?.email ?? "email user"}.
+              </p>
+            ) : null}
+          </form>
+
+          <div className="my-5 flex items-center gap-3 text-xs text-[var(--muted)] before:h-px before:flex-1 before:bg-[var(--line)] after:h-px after:flex-1 after:bg-[var(--line)]">
+            or
           </div>
 
-          <div className="grid grid-cols-4 gap-3 border-t border-[var(--line)] p-5">
-            {["Calendar", "Drive", "Gmail", "Memory"].map((item) => (
-              <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-4 text-center text-sm font-semibold" key={item}>
-                {item}
-              </div>
-            ))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button
+              fullWidth
+              isDisabled={!googleConfigured && !signedInToGoogle}
+              onPress={connectGoogle}
+              variant="secondary"
+            >
+              <Globe className="h-4 w-4" />
+              Google
+            </Button>
+            <Button fullWidth onPress={enterAfterAuth} variant="secondary">
+              <Sparkles className="h-4 w-4" />
+              Local mode
+            </Button>
           </div>
-        </div>
-      </section>
+        </Card.Content>
+
+        <Card.Footer className="border-t border-[var(--line)] px-6 py-4 text-center text-xs leading-5 text-[var(--muted)]">
+          Credentials are hashed locally and sessions use an HTTP-only cookie.
+        </Card.Footer>
+      </Card>
     </main>
   );
 }
@@ -1489,21 +1544,24 @@ function OnboardingExperience({
     },
     {
       label: "Drive and Docs",
-      detail: "List and open recent Drive files. Document parsing is not connected yet.",
+      detail:
+        "List and open recent Drive files. Document parsing is not connected yet.",
       icon: FolderOpen,
       ready: signedInToGoogle,
       status: signedInToGoogle ? "Connected" : "Pending",
     },
     {
       label: "Gmail",
-      detail: "Inbox search, drafts, replies, labels, archive, star, trash, and confirmed sends.",
+      detail:
+        "Inbox search, drafts, replies, labels, archive, star, trash, and confirmed sends.",
       icon: Mail,
       ready: signedInToGoogle,
       status: signedInToGoogle ? "Ready" : "Pending",
     },
     {
       label: "Tasks and Contacts",
-      detail: "Google Tasks plus saved Contacts search, birthdays, and confirmed contact edits.",
+      detail:
+        "Google Tasks plus saved Contacts search, birthdays, and confirmed contact edits.",
       icon: Users,
       ready: signedInToGoogle,
       status: signedInToGoogle ? "Ready" : "Pending",
@@ -1525,22 +1583,26 @@ function OnboardingExperience({
         <header className="flex items-center justify-between">
           <BrandMark />
           <div className="flex items-center gap-3">
-            <button
+            <Button
               className={iconButtonClass}
               onClick={() => refreshWorkspace()}
               type="button"
               title="Refresh"
             >
               <RefreshCcw className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               className={iconButtonClass}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               type="button"
               title="Toggle theme"
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </Button>
           </div>
         </header>
 
@@ -1554,24 +1616,30 @@ function OnboardingExperience({
               Connect the services your assistant can operate.
             </h1>
             <p className="mt-4 text-base leading-7 text-[var(--muted)]">
-              The assistant runs in local mode now and upgrades to Google Workspace
-              actions after OAuth consent.
+              The assistant runs in local mode now and upgrades to Google
+              Workspace actions after OAuth consent.
             </p>
 
             <div className="mt-6 space-y-3">
               {(oauthStatus?.checks ?? []).map((check) => (
-                <div className="flex items-center justify-between rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3" key={check.label}>
+                <div
+                  className="flex items-center justify-between rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3"
+                  key={check.label}
+                >
                   <div>
                     <p className="text-sm font-semibold">{check.label}</p>
                     <p className="text-xs text-[var(--muted)]">{check.where}</p>
                   </div>
-                  <StatusBadge ready={check.ready} label={check.ready ? "Ready" : "Missing"} />
+                  <StatusBadge
+                    ready={check.ready}
+                    label={check.ready ? "Ready" : "Missing"}
+                  />
                 </div>
               ))}
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
+              <Button
                 className={primaryButtonClass}
                 disabled={!googleConfigured && !signedInToGoogle}
                 onClick={connectGoogle}
@@ -1579,11 +1647,15 @@ function OnboardingExperience({
               >
                 <Link2 className="h-4 w-4" />
                 {signedInToGoogle ? "Reconnect Google" : "Connect Google"}
-              </button>
-              <button className={secondaryButtonClass} onClick={continueLocal} type="button">
+              </Button>
+              <Button
+                className={secondaryButtonClass}
+                onClick={continueLocal}
+                type="button"
+              >
                 Continue in local mode
                 <ArrowRight className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1599,7 +1671,9 @@ function OnboardingExperience({
                     <StatusBadge ready={group.ready} label={group.status} />
                   </div>
                   <h2 className="text-lg font-semibold">{group.label}</h2>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{group.detail}</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                    {group.detail}
+                  </p>
                 </article>
               );
             })}
@@ -1653,7 +1727,11 @@ function WorkspaceExperience({
   addTask: (input: AddTaskInput) => Promise<void>;
   aiStatus: AiStatus | null;
   briefing: Briefing | null;
-  completeSurfaceMessage: (messageId: string, summary: string, link?: string | null) => void;
+  completeSurfaceMessage: (
+    messageId: string,
+    summary: string,
+    link?: string | null,
+  ) => void;
   completeTask: (task: RelayTask) => Promise<void>;
   connectGithub: () => void;
   connectGoogle: () => void;
@@ -1673,7 +1751,9 @@ function WorkspaceExperience({
   runPrompt: (prompt: string) => void;
   setActiveView: (view: ViewId) => void;
   setCommandOpen: (open: boolean) => void;
-  setContextMenu: (menu: { x: number; y: number; task: RelayTask } | null) => void;
+  setContextMenu: (
+    menu: { x: number; y: number; task: RelayTask } | null,
+  ) => void;
   setInput: (value: string) => void;
   setSidebarOpen: (open: boolean) => void;
   setTheme: (theme: ThemeMode) => void;
@@ -1722,7 +1802,9 @@ function WorkspaceExperience({
           theme={theme}
         />
 
-        <div className={activeView === "chat" ? "p-3 sm:p-4" : "p-5 sm:p-7 xl:p-9"}>
+        <div
+          className={activeView === "chat" ? "p-3 sm:p-4" : "p-5 sm:p-7 xl:p-9"}
+        >
           {activeView === "dashboard" ? (
             <DashboardView
               briefing={briefing}
@@ -1777,10 +1859,16 @@ function WorkspaceExperience({
             />
           ) : null}
 
-          {activeView === "files" ? <FilesView briefing={briefing} runPrompt={runPrompt} /> : null}
+          {activeView === "files" ? (
+            <FilesView briefing={briefing} runPrompt={runPrompt} />
+          ) : null}
 
           {activeView === "github" ? (
-            <GithubView briefing={briefing} runPrompt={runPrompt} signedInToGithub={signedInToGithub} />
+            <GithubView
+              briefing={briefing}
+              runPrompt={runPrompt}
+              signedInToGithub={signedInToGithub}
+            />
           ) : null}
 
           {activeView === "memory" ? (
@@ -1857,7 +1945,9 @@ function Sidebar({
   width: number;
 }) {
   const content = (
-    <aside className={`sidebar-shell relative flex h-full flex-col bg-[var(--sidebar)] py-5 transition-all duration-300 ease-out ${collapsed ? "px-3" : "px-4"}`}>
+    <aside
+      className={`sidebar-shell relative flex h-full flex-col bg-[var(--sidebar)] py-5 transition-all duration-300 ease-out ${collapsed ? "px-3" : "px-4"}`}
+    >
       <div className="mb-8 flex items-center justify-between">
         {collapsed ? (
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent)] text-sm font-bold text-white">
@@ -1866,22 +1956,22 @@ function Sidebar({
         ) : (
           <BrandMark />
         )}
-        <button
+        <Button
           className="hidden h-9 w-9 items-center justify-center rounded-md text-[var(--muted)] transition hover:bg-[var(--surface-soft)] hover:text-[var(--text)] lg:inline-flex"
           onClick={onToggleCollapsed}
           type="button"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <Columns3 className="h-4 w-4" />
-        </button>
-        <button
+        </Button>
+        <Button
           className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--muted)] lg:hidden"
           onClick={() => setMobileOpen(false)}
           type="button"
           title="Close"
         >
           <X className="h-5 w-5" />
-        </button>
+        </Button>
       </div>
 
       <nav className="space-y-1">
@@ -1890,7 +1980,7 @@ function Sidebar({
           const active = activeView === item.id;
 
           return (
-            <button
+            <Button
               className={`nav-item flex h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold transition ${
                 active
                   ? "is-active bg-[var(--surface)] text-[var(--text)] shadow-sm"
@@ -1906,24 +1996,25 @@ function Sidebar({
             >
               <Icon className="h-4 w-4 shrink-0" />
               {collapsed ? null : item.label}
-            </button>
+            </Button>
           );
         })}
       </nav>
 
       {collapsed ? null : (
         <div className={`${softPanelClass} mt-auto p-4`}>
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Zap className="h-4 w-4 text-[var(--warning)]" />
-          Automation guard
-        </div>
-        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-          Sends, deletes, permission changes, and shared-doc edits require approval.
-        </p>
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Zap className="h-4 w-4 text-[var(--warning)]" />
+            Automation guard
+          </div>
+          <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+            Sends, deletes, permission changes, and shared-doc edits require
+            approval.
+          </p>
         </div>
       )}
       {!collapsed ? (
-        <input
+        <Input
           aria-label="Resize sidebar"
           className="absolute right-1 top-1/2 hidden h-28 w-1 -translate-y-1/2 cursor-ew-resize appearance-none rounded-full bg-[var(--line-strong)] opacity-0 transition hover:opacity-100 lg:block"
           max={360}
@@ -1976,17 +2067,19 @@ function TopBar({
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-[var(--line)] bg-[var(--surface-glass)] px-4 backdrop-blur-xl sm:px-5 xl:px-6">
       <div className="flex min-w-0 items-center gap-3">
-        <button
+        <Button
           className={iconButtonClass + " lg:hidden"}
           onClick={() => setSidebarOpen(true)}
           type="button"
           title="Menu"
         >
           <Menu className="h-4 w-4" />
-        </button>
+        </Button>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            {ActiveIcon ? <ActiveIcon className="h-4 w-4 text-[var(--accent)]" /> : null}
+            {ActiveIcon ? (
+              <ActiveIcon className="h-4 w-4 text-[var(--accent)]" />
+            ) : null}
             <h1 className="truncate text-base font-semibold sm:text-lg">
               {navItem?.label ?? "Workspace"}
             </h1>
@@ -2000,7 +2093,7 @@ function TopBar({
       </div>
 
       <div className="flex min-w-0 items-center gap-2">
-        <button
+        <Button
           className="hidden h-10 min-w-0 items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 text-left text-sm text-[var(--muted)] transition hover:border-[var(--line-strong)] sm:inline-flex lg:w-72"
           onClick={() => setCommandOpen(true)}
           type="button"
@@ -2008,32 +2101,40 @@ function TopBar({
           <Search className="h-4 w-4" />
           <span className="truncate">Search actions, tools, and views</span>
           <Command className="ml-auto h-3.5 w-3.5" />
-        </button>
-        <button
+        </Button>
+        <Button
           className={iconButtonClass}
           onClick={() => setCommandOpen(true)}
           type="button"
           title="Command"
         >
           <Command className="h-4 w-4" />
-        </button>
-        <button
+        </Button>
+        <Button
           className={iconButtonClass}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           type="button"
           title="Toggle theme"
         >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
-        <button
-          className={signedInToGoogle ? secondaryButtonClass : primaryButtonClass}
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+        </Button>
+        <Button
+          className={
+            signedInToGoogle ? secondaryButtonClass : primaryButtonClass
+          }
           disabled={!googleConfigured && !signedInToGoogle}
           onClick={connectGoogle}
           type="button"
         >
           <Globe className="h-4 w-4" />
-          <span className="hidden sm:inline">{signedInToGoogle ? "Google connected" : "Connect"}</span>
-        </button>
+          <span className="hidden sm:inline">
+            {signedInToGoogle ? "Google connected" : "Connect"}
+          </span>
+        </Button>
       </div>
     </header>
   );
@@ -2093,11 +2194,44 @@ function DashboardView({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <ControlMetric icon={CalendarDays} label="Schedule" value={briefing?.calendar.ok ? `${briefing.calendar.events.length}` : "Off"} detail="upcoming events" />
-        <ControlMetric icon={ListTodo} label="Tasks" value={`${openTasks.length}`} detail={`${tasks.length - openTasks.length} completed`} />
-        <ControlMetric icon={Mail} label="Inbox" value={briefing?.gmail?.ok ? `${briefing.gmail.messages.length}` : "Off"} detail="recent messages" />
-        <ControlMetric icon={GitBranch} label="GitHub" value={briefing?.github?.connected ? `${briefing.githubRepositories?.repositories.length ?? 0}` : "Off"} detail="recent repos" />
-        <ControlMetric icon={Brain} label="Memory" value={`${notes.length}`} detail="approved notes" />
+        <ControlMetric
+          icon={CalendarDays}
+          label="Schedule"
+          value={
+            briefing?.calendar.ok ? `${briefing.calendar.events.length}` : "Off"
+          }
+          detail="upcoming events"
+        />
+        <ControlMetric
+          icon={ListTodo}
+          label="Tasks"
+          value={`${openTasks.length}`}
+          detail={`${tasks.length - openTasks.length} completed`}
+        />
+        <ControlMetric
+          icon={Mail}
+          label="Inbox"
+          value={
+            briefing?.gmail?.ok ? `${briefing.gmail.messages.length}` : "Off"
+          }
+          detail="recent messages"
+        />
+        <ControlMetric
+          icon={GitBranch}
+          label="GitHub"
+          value={
+            briefing?.github?.connected
+              ? `${briefing.githubRepositories?.repositories.length ?? 0}`
+              : "Off"
+          }
+          detail="recent repos"
+        />
+        <ControlMetric
+          icon={Brain}
+          label="Memory"
+          value={`${notes.length}`}
+          detail="approved notes"
+        />
       </section>
     </div>
   );
@@ -2138,9 +2272,14 @@ function WeeklyCommandCalendar({
     return Array.from({ length: 7 }, (_, index) => addDays(today, index));
   }, []);
   const events = briefing?.calendar.events ?? [];
-  const googleTasks = briefing?.googleTasks?.tasks.filter((task) => task.status !== "completed") ?? [];
+  const googleTasks =
+    briefing?.googleTasks?.tasks.filter(
+      (task) => task.status !== "completed",
+    ) ?? [];
   const githubIssues = briefing?.githubIssues?.issues ?? [];
-  const [activeInspectorDay, setActiveInspectorDay] = useState<string | null>(null);
+  const [activeInspectorDay, setActiveInspectorDay] = useState<string | null>(
+    null,
+  );
 
   return (
     <section className={`${panelClass} overflow-visible p-5 sm:p-6`}>
@@ -2154,43 +2293,71 @@ function WeeklyCommandCalendar({
             Weekly operating view
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-            Calendar, task deadlines, reminders, notes, and GitHub activity are grouped by day.
+            Calendar, task deadlines, reminders, notes, and GitHub activity are
+            grouped by day.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className={secondaryButtonClass} onClick={() => runPrompt("What should I focus on this week?")} type="button">
+          <Button
+            className={secondaryButtonClass}
+            onClick={() => runPrompt("What should I focus on this week?")}
+            type="button"
+          >
             <Sparkles className="h-4 w-4" />
             Ask AI
-          </button>
-          <button className={primaryButtonClass} onClick={() => runPrompt("Schedule a meeting")} type="button">
+          </Button>
+          <Button
+            className={primaryButtonClass}
+            onClick={() => runPrompt("Schedule a meeting")}
+            type="button"
+          >
             <Plus className="h-4 w-4" />
             Add event
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-7">
         {days.map((day) => {
-          const dayEvents = events.filter((event) => sameCalendarDay(parseEventDate(event.start), day));
-          const dayTasks = openTasks.filter((task) => sameCalendarDay(parseEventDate(task.due), day));
-          const dayGoogleTasks = googleTasks.filter((task) => sameCalendarDay(parseEventDate(task.due), day));
-          const dayNotes = notes.filter((note) => sameCalendarDay(parseEventDate(note.createdAt), day));
-          const dayIssues = githubIssues.filter((issue) => sameCalendarDay(parseEventDate(issue.updatedAt), day));
-          const count = dayEvents.length + dayTasks.length + dayGoogleTasks.length + dayNotes.length + dayIssues.length;
+          const dayEvents = events.filter((event) =>
+            sameCalendarDay(parseEventDate(event.start), day),
+          );
+          const dayTasks = openTasks.filter((task) =>
+            sameCalendarDay(parseEventDate(task.due), day),
+          );
+          const dayGoogleTasks = googleTasks.filter((task) =>
+            sameCalendarDay(parseEventDate(task.due), day),
+          );
+          const dayNotes = notes.filter((note) =>
+            sameCalendarDay(parseEventDate(note.createdAt), day),
+          );
+          const dayIssues = githubIssues.filter((issue) =>
+            sameCalendarDay(parseEventDate(issue.updatedAt), day),
+          );
+          const count =
+            dayEvents.length +
+            dayTasks.length +
+            dayGoogleTasks.length +
+            dayNotes.length +
+            dayIssues.length;
           const isToday = sameCalendarDay(day, new Date());
           const dayKey = day.toISOString();
           const inspectorActive = activeInspectorDay === dayKey;
 
           return (
             <div className="day-inspector relative" key={dayKey}>
-              <button
+              <Button
                 className={`min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 hover:-translate-y-1 hover:shadow-[var(--shadow)] ${
                   isToday
                     ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                     : "border-[var(--line)] bg-[var(--surface-soft)] hover:border-[var(--line-strong)]"
                 }`}
                 onBlur={() => setActiveInspectorDay(null)}
-                onClick={() => runPrompt(`Inspect my schedule and deadlines for ${day.toDateString()}`)}
+                onClick={() =>
+                  runPrompt(
+                    `Inspect my schedule and deadlines for ${day.toDateString()}`,
+                  )
+                }
                 onFocus={() => setActiveInspectorDay(dayKey)}
                 onPointerEnter={() => setActiveInspectorDay(dayKey)}
                 onPointerLeave={() => setActiveInspectorDay(null)}
@@ -2199,19 +2366,31 @@ function WeeklyCommandCalendar({
                 <span className="block text-[11px] font-semibold uppercase text-[var(--muted)]">
                   {day.toLocaleDateString(undefined, { weekday: "short" })}
                 </span>
-                <span className="mt-1 block text-2xl font-semibold">{day.getDate()}</span>
+                <span className="mt-1 block text-2xl font-semibold">
+                  {day.getDate()}
+                </span>
                 <span className="mt-1 block text-xs text-[var(--muted)]">
                   {day.toLocaleDateString(undefined, { month: "short" })}
                 </span>
                 <div className="mt-4 space-y-2">
                   {dayEvents.slice(0, 2).map((event) => (
-                    <span className="block truncate rounded-lg bg-[var(--surface)] px-2 py-1 text-xs font-semibold" key={event.id ?? `${event.title}-${event.start}`}>
+                    <span
+                      className="block truncate rounded-lg bg-[var(--surface)] px-2 py-1 text-xs font-semibold"
+                      key={event.id ?? `${event.title}-${event.start}`}
+                    >
                       {formatEventTime(event.start)} · {event.title}
                     </span>
                   ))}
                   {[...dayTasks, ...dayGoogleTasks].slice(0, 2).map((task) => (
-                    <span className="flex items-center gap-2 truncate rounded-lg bg-[var(--surface)] px-2 py-1 text-xs font-semibold" key={task.id ?? task.title}>
-                      <PriorityDot priority={"priority" in task ? task.priority : undefined} />
+                    <span
+                      className="flex items-center gap-2 truncate rounded-lg bg-[var(--surface)] px-2 py-1 text-xs font-semibold"
+                      key={task.id ?? task.title}
+                    >
+                      <PriorityDot
+                        priority={
+                          "priority" in task ? task.priority : undefined
+                        }
+                      />
                       {task.title}
                     </span>
                   ))}
@@ -2224,7 +2403,7 @@ function WeeklyCommandCalendar({
                 <span className="mt-4 inline-flex rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
                   {count} signal{count === 1 ? "" : "s"}
                 </span>
-              </button>
+              </Button>
 
               <DayInspector
                 active={inspectorActive}
@@ -2276,11 +2455,18 @@ function DayInspector({
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold">
-            {date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+            {date.toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
           </p>
           <p className="text-xs text-[var(--muted)]">Day inspector</p>
         </div>
-        <StatusBadge ready label={`${events.length + tasks.length + googleTasks.length + githubIssues.length} active`} />
+        <StatusBadge
+          ready
+          label={`${events.length + tasks.length + googleTasks.length + githubIssues.length} active`}
+        />
       </div>
 
       <InspectorGroup
@@ -2291,7 +2477,8 @@ function DayInspector({
           title: event.title,
           detail: `${formatEventTime(event.start)}${event.end ? ` - ${formatEventTime(event.end)}` : ""}`,
           action: "Edit",
-          onClick: () => runPrompt(`Edit ${event.title} on ${date.toDateString()}`),
+          onClick: () =>
+            runPrompt(`Edit ${event.title} on ${date.toDateString()}`),
         }))}
         title="Events"
       />
@@ -2324,7 +2511,10 @@ function DayInspector({
           title: issue.title,
           detail: `${issue.repositoryFullName ?? "GitHub"} #${issue.number} · ${githubUrgency(issue)}`,
           action: "Review",
-          onClick: () => runPrompt(`Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`),
+          onClick: () =>
+            runPrompt(
+              `Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`,
+            ),
         }))}
         title="GitHub"
       />
@@ -2342,12 +2532,22 @@ function DayInspector({
       />
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <button className={secondaryButtonClass + " pointer-events-auto h-9 px-3"} onClick={() => runPrompt(`Reschedule items on ${date.toDateString()}`)} type="button">
+        <Button
+          className={secondaryButtonClass + " pointer-events-auto h-9 px-3"}
+          onClick={() =>
+            runPrompt(`Reschedule items on ${date.toDateString()}`)
+          }
+          type="button"
+        >
           Reschedule
-        </button>
-        <button className={primaryButtonClass + " pointer-events-auto h-9 px-3"} onClick={() => runPrompt(`Create a task due ${date.toDateString()}`)} type="button">
+        </Button>
+        <Button
+          className={primaryButtonClass + " pointer-events-auto h-9 px-3"}
+          onClick={() => runPrompt(`Create a task due ${date.toDateString()}`)}
+          type="button"
+        >
           Add task
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -2361,7 +2561,13 @@ function InspectorGroup({
 }: {
   empty: string;
   icon: LucideIcon;
-  items: Array<{ action: string; detail: string; id: string; onClick: () => void; title: string }>;
+  items: Array<{
+    action: string;
+    detail: string;
+    id: string;
+    onClick: () => void;
+    title: string;
+  }>;
   title: string;
 }) {
   return (
@@ -2373,18 +2579,24 @@ function InspectorGroup({
       <div className="space-y-1.5">
         {items.length > 0 ? (
           items.slice(0, 4).map((item) => (
-            <button
+            <Button
               className="pointer-events-auto grid w-full grid-cols-[1fr_auto] gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-[var(--surface)]"
               key={item.id}
               onClick={item.onClick}
               type="button"
             >
               <span className="min-w-0">
-                <span className="block truncate text-xs font-semibold">{item.title}</span>
-                <span className="mt-0.5 block truncate text-[11px] text-[var(--muted)]">{item.detail}</span>
+                <span className="block truncate text-xs font-semibold">
+                  {item.title}
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] text-[var(--muted)]">
+                  {item.detail}
+                </span>
               </span>
-              <span className="text-[11px] font-semibold text-[var(--accent)]">{item.action}</span>
-            </button>
+              <span className="text-[11px] font-semibold text-[var(--accent)]">
+                {item.action}
+              </span>
+            </Button>
           ))
         ) : (
           <p className="px-2 py-1 text-xs text-[var(--muted)]">{empty}</p>
@@ -2407,7 +2619,10 @@ function TaskSnapshot({
   runPrompt: (prompt: string) => void;
   tasks: RelayTask[];
 }) {
-  const googleTasks = briefing?.googleTasks?.tasks.filter((task) => task.status !== "completed") ?? [];
+  const googleTasks =
+    briefing?.googleTasks?.tasks.filter(
+      (task) => task.status !== "completed",
+    ) ?? [];
   const sortedTasks = sortTasksByUrgency(openTasks).slice(0, 6);
   const overdueCount = openTasks.filter((task) => isOverdue(task.due)).length;
 
@@ -2417,12 +2632,19 @@ function TaskSnapshot({
         <div>
           <h2 className="text-lg font-semibold">Task snapshot</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            {overdueCount > 0 ? `${overdueCount} overdue` : `${openTasks.length} local open`} · {googleTasks.length} Google open
+            {overdueCount > 0
+              ? `${overdueCount} overdue`
+              : `${openTasks.length} local open`}{" "}
+            · {googleTasks.length} Google open
           </p>
         </div>
-        <button className={secondaryButtonClass + " h-9 px-3"} onClick={() => runPrompt("Review my highest priority tasks")} type="button">
+        <Button
+          className={secondaryButtonClass + " h-9 px-3"}
+          onClick={() => runPrompt("Review my highest priority tasks")}
+          type="button"
+        >
           Review
-        </button>
+        </Button>
       </div>
       <div className="divide-y divide-[var(--line)]">
         {sortedTasks.map((task) => (
@@ -2432,24 +2654,33 @@ function TaskSnapshot({
             meta={task.due ? `Due ${formatDueDate(task.due)}` : "No due date"}
             title={task.title}
           >
-            <button
+            <Button
               className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-[var(--accent-soft)]"
               onClick={() => void completeTask(task)}
               type="button"
             >
               <PriorityTag priority={task.priority} />
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{task.title}</span>
+                <span className="block truncate text-sm font-semibold">
+                  {task.title}
+                </span>
                 <span className="mt-1 block truncate text-xs text-[var(--muted)]">
-                  {task.due ? formatDueDate(task.due) : "No deadline"} · {task.notes || "No note"}
+                  {task.due ? formatDueDate(task.due) : "No deadline"} ·{" "}
+                  {task.notes || "No note"}
                 </span>
               </span>
               <Check className="h-4 w-4 text-[var(--success)]" />
-            </button>
+            </Button>
           </HoverPreview>
         ))}
         {sortedTasks.length === 0 ? (
-          <EmptyState icon={ListTodo} title={tasks.length > 0 ? "All local tasks completed" : "No local tasks"} detail="Create tasks from chat or the Tasks tab." />
+          <EmptyState
+            icon={ListTodo}
+            title={
+              tasks.length > 0 ? "All local tasks completed" : "No local tasks"
+            }
+            detail="Create tasks from chat or the Tasks tab."
+          />
         ) : null}
       </div>
     </section>
@@ -2471,12 +2702,18 @@ function GithubActivityPanel({
         <div>
           <h2 className="text-lg font-semibold">GitHub activity</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            {briefing?.github?.connected ? `${issues.length} assigned issue${issues.length === 1 ? "" : "s"}` : "GitHub not connected"}
+            {briefing?.github?.connected
+              ? `${issues.length} assigned issue${issues.length === 1 ? "" : "s"}`
+              : "GitHub not connected"}
           </p>
         </div>
-        <button className={secondaryButtonClass + " h-9 px-3"} onClick={() => runPrompt("What should I fix first on GitHub?")} type="button">
+        <Button
+          className={secondaryButtonClass + " h-9 px-3"}
+          onClick={() => runPrompt("What should I fix first on GitHub?")}
+          type="button"
+        >
           Ask AI
-        </button>
+        </Button>
       </div>
       <div className="divide-y divide-[var(--line)]">
         {issues.slice(0, 5).map((issue) => (
@@ -2487,23 +2724,37 @@ function GithubActivityPanel({
             title={issue.title}
           >
             <div className="grid grid-cols-[1fr_auto] gap-3 p-4">
-              <button
+              <Button
                 className="min-w-0 text-left"
-                onClick={() => runPrompt(`Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`)}
+                onClick={() =>
+                  runPrompt(
+                    `Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`,
+                  )
+                }
                 type="button"
               >
-                <span className="block truncate text-sm font-semibold">{issue.title}</span>
+                <span className="block truncate text-sm font-semibold">
+                  {issue.title}
+                </span>
                 <span className="mt-1 block truncate text-xs text-[var(--muted)]">
                   {issue.repositoryFullName ?? "Repository"} #{issue.number}
                 </span>
-              </button>
+              </Button>
               <div className="flex items-center gap-2">
-                <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${githubUrgencyClass(issue)}`}>
+                <span
+                  className={`rounded-full px-2 py-1 text-[11px] font-semibold ${githubUrgencyClass(issue)}`}
+                >
                   {githubUrgency(issue)}
                 </span>
-                <a className={iconButtonClass + " h-8 w-8"} href={issue.htmlUrl} rel="noreferrer" target="_blank" title="Open issue">
+                <Link
+                  aria-label="Open issue"
+                  className={iconButtonClass + " h-8 w-8"}
+                  href={issue.htmlUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
                   <ExternalLink className="h-3.5 w-3.5" />
-                </a>
+                </Link>
               </div>
             </div>
           </HoverPreview>
@@ -2511,8 +2762,15 @@ function GithubActivityPanel({
         {issues.length === 0 ? (
           <EmptyState
             icon={GitBranch}
-            title={briefing?.github?.connected ? "No assigned issues loaded" : "GitHub not connected"}
-            detail={briefing?.githubIssues?.reason ?? "Connect GitHub to see repository work."}
+            title={
+              briefing?.github?.connected
+                ? "No assigned issues loaded"
+                : "GitHub not connected"
+            }
+            detail={
+              briefing?.githubIssues?.reason ??
+              "Connect GitHub to see repository work."
+            }
           />
         ) : null}
       </div>
@@ -2532,7 +2790,12 @@ function AiActionPlanner({
   setActiveView: (view: ViewId) => void;
   tasks: RelayTask[];
 }) {
-  const actions = buildPlannerActions(briefing, openTasks, runPrompt, setActiveView);
+  const actions = buildPlannerActions(
+    briefing,
+    openTasks,
+    runPrompt,
+    setActiveView,
+  );
 
   return (
     <section className={`${panelClass} ai-planner overflow-hidden p-5`}>
@@ -2543,15 +2806,21 @@ function AiActionPlanner({
             Executive decision layer
           </div>
           <h2 className="text-xl font-semibold">What to do next</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Prioritized from live calendar, tasks, inbox, files, and GitHub signals.</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Prioritized from live calendar, tasks, inbox, files, and GitHub
+            signals.
+          </p>
         </div>
-        <StatusBadge ready={actions.length > 0} label={`${actions.length} action${actions.length === 1 ? "" : "s"}`} />
+        <StatusBadge
+          ready={actions.length > 0}
+          label={`${actions.length} action${actions.length === 1 ? "" : "s"}`}
+        />
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
         {actions.map((action) => {
           const Icon = action.icon;
           return (
-            <button
+            <Button
               className="group rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-left transition hover:-translate-y-1 hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
               key={action.title}
               onClick={action.onClick}
@@ -2564,12 +2833,18 @@ function AiActionPlanner({
                 <ArrowRight className="h-4 w-4 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--accent)]" />
               </div>
               <p className="font-semibold">{action.title}</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{action.detail}</p>
-            </button>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                {action.detail}
+              </p>
+            </Button>
           );
         })}
         {actions.length === 0 ? (
-          <EmptyState icon={Sparkles} title="No urgent decision loaded" detail="Connect services or add tasks to give the planner live context." />
+          <EmptyState
+            icon={Sparkles}
+            title="No urgent decision loaded"
+            detail="Connect services or add tasks to give the planner live context."
+          />
         ) : null}
       </div>
     </section>
@@ -2623,7 +2898,8 @@ function InboxHighlights({
     })),
   ];
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
+  const selected =
+    items.find((item) => item.id === selectedId) ?? items[0] ?? null;
 
   return (
     <section className="space-y-4">
@@ -2638,44 +2914,58 @@ function InboxHighlights({
           <div className="grid min-h-80 xl:grid-cols-[minmax(0,1fr)_280px]">
             <div className="divide-y divide-[var(--line)]">
               {items.map((item) => (
-            <HoverPreview
-              detail={item.snippet}
-              key={item.id}
-              meta={item.time ? formatFileTime(item.time) : item.kind}
-              title={item.person}
-            >
-              <button
-                className={`grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-[var(--accent-soft)] ${
-                  selected?.id === item.id ? "bg-[var(--accent-soft)]" : ""
-                }`}
-                onClick={() => setSelectedId(item.id)}
-                type="button"
-              >
-                <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--warning-soft)] text-[var(--warning)]">
-                  <Mail className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{item.title}</span>
-                  <span className="mt-1 block truncate text-xs text-[var(--muted)]">{item.person}</span>
-                </span>
-                <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
-                  {item.kind}
-                </span>
-              </button>
-            </HoverPreview>
+                <HoverPreview
+                  detail={item.snippet}
+                  key={item.id}
+                  meta={item.time ? formatFileTime(item.time) : item.kind}
+                  title={item.person}
+                >
+                  <Button
+                    className={`grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-[var(--accent-soft)] ${
+                      selected?.id === item.id ? "bg-[var(--accent-soft)]" : ""
+                    }`}
+                    onClick={() => setSelectedId(item.id)}
+                    type="button"
+                  >
+                    <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--warning-soft)] text-[var(--warning)]">
+                      <Mail className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold">
+                        {item.title}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                        {item.person}
+                      </span>
+                    </span>
+                    <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
+                      {item.kind}
+                    </span>
+                  </Button>
+                </HoverPreview>
               ))}
             </div>
             <div className="border-t border-[var(--line)] bg-[var(--surface-soft)] p-4 xl:border-l xl:border-t-0">
               {selected ? (
                 <div className="animate-fade-in">
-                  <p className="text-xs font-semibold uppercase text-[var(--muted)]">{selected.kind}</p>
-                  <h3 className="mt-2 text-base font-semibold leading-6">{selected.title}</h3>
-                  <p className="mt-2 text-sm text-[var(--muted)]">{selected.person}</p>
+                  <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    {selected.kind}
+                  </p>
+                  <h3 className="mt-2 text-base font-semibold leading-6">
+                    {selected.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-[var(--muted)]">
+                    {selected.person}
+                  </p>
                   <p className="mt-4 text-sm leading-6">{selected.snippet}</p>
-                  <button className={primaryButtonClass + " mt-4 w-full"} onClick={() => runPrompt(selected.prompt)} type="button">
+                  <Button
+                    className={primaryButtonClass + " mt-4 w-full"}
+                    onClick={() => runPrompt(selected.prompt)}
+                    type="button"
+                  >
                     <Sparkles className="h-4 w-4" />
                     Ask AI
-                  </button>
+                  </Button>
                 </div>
               ) : null}
             </div>
@@ -2683,8 +2973,13 @@ function InboxHighlights({
         ) : (
           <EmptyState
             icon={Mail}
-            title={briefing?.gmail?.ok ? "Inbox is quiet" : "Gmail not connected"}
-            detail={briefing?.gmail?.reason ?? "Connect Gmail to load inbox highlights."}
+            title={
+              briefing?.gmail?.ok ? "Inbox is quiet" : "Gmail not connected"
+            }
+            detail={
+              briefing?.gmail?.reason ??
+              "Connect Gmail to load inbox highlights."
+            }
           />
         )}
       </div>
@@ -2709,7 +3004,9 @@ function ControlMetric({
         <Icon className="h-4 w-4 text-[var(--accent)]" />
         <MoreHorizontal className="h-4 w-4 text-[var(--muted)] opacity-0 transition group-hover:opacity-100" />
       </div>
-      <p className="text-xs font-semibold uppercase text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+        {label}
+      </p>
       <p className="mt-2 text-3xl font-semibold">{value}</p>
       <p className="mt-1 text-sm text-[var(--muted)]">{detail}</p>
     </article>
@@ -2735,9 +3032,9 @@ function SectionHeader({
         </span>
         <h2 className="text-lg font-semibold">{title}</h2>
       </div>
-      <button className={secondaryButtonClass} onClick={onAction} type="button">
+      <Button className={secondaryButtonClass} onClick={onAction} type="button">
         {action}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -2758,8 +3055,12 @@ function HoverPreview({
       {children}
       <div className="hover-card-panel pointer-events-none absolute left-4 top-[calc(100%+8px)] z-30 w-72 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-sm opacity-0 shadow-[var(--shadow-strong)] transition duration-200 group-hover:translate-y-0 group-hover:opacity-100">
         <p className="truncate font-semibold">{title}</p>
-        <p className="mt-1 text-xs font-semibold uppercase text-[var(--muted)]">{meta}</p>
-        <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--muted)]">{detail}</p>
+        <p className="mt-1 text-xs font-semibold uppercase text-[var(--muted)]">
+          {meta}
+        </p>
+        <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--muted)]">
+          {detail}
+        </p>
       </div>
     </div>
   );
@@ -2787,7 +3088,11 @@ function ChatView({
   addMemory: (body: string) => Promise<void>;
   addTask: (input: AddTaskInput) => Promise<void>;
   briefing: Briefing | null;
-  completeSurfaceMessage: (messageId: string, summary: string, link?: string | null) => void;
+  completeSurfaceMessage: (
+    messageId: string,
+    summary: string,
+    link?: string | null,
+  ) => void;
   completeTask: (task: RelayTask) => Promise<void>;
   input: string;
   loading: boolean;
@@ -2864,7 +3169,11 @@ function AgentConsole({
 }: {
   addMemory: (body: string) => Promise<void>;
   addTask: (input: AddTaskInput) => Promise<void>;
-  completeSurfaceMessage: (messageId: string, summary: string, link?: string | null) => void;
+  completeSurfaceMessage: (
+    messageId: string,
+    summary: string,
+    link?: string | null,
+  ) => void;
   input: string;
   loading: boolean;
   messages: Message[];
@@ -2898,7 +3207,11 @@ function AgentConsole({
       continuous: boolean;
       interimResults: boolean;
       lang: string;
-      onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+      onresult:
+        | ((event: {
+            results: ArrayLike<{ 0: { transcript: string } }>;
+          }) => void)
+        | null;
       onend: (() => void) | null;
       onerror: (() => void) | null;
       start: () => void;
@@ -2944,7 +3257,9 @@ function AgentConsole({
   }, [messages, loading]);
 
   return (
-    <section className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden`}>
+    <section
+      className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden`}
+    >
       <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-5 py-4">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
@@ -2952,12 +3267,17 @@ function AgentConsole({
           </span>
           <div>
             <h2 className="font-semibold">Executive assistant</h2>
-            <p className="text-xs text-[var(--muted)]">Neutral routing, generated UI, and session memory</p>
+            <p className="text-xs text-[var(--muted)]">
+              Neutral routing, generated UI, and session memory
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5" ref={scrollRef}>
+      <div
+        className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5"
+        ref={scrollRef}
+      >
         {messages.map((message) => (
           <ChatMessage
             addMemory={addMemory}
@@ -2978,7 +3298,7 @@ function AgentConsole({
         id="agent-chat-form"
         onSubmit={submitMessage}
       >
-        <input
+        <Input
           className="hidden"
           multiple
           onChange={(event) => attachFiles(event.target.files)}
@@ -2986,31 +3306,48 @@ function AgentConsole({
           type="file"
         />
         <div className="flex gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-2">
-          <button
-            className={iconButtonClass + " h-11 w-11 border-transparent bg-transparent"}
+          <Button
+            className={
+              iconButtonClass + " h-11 w-11 border-transparent bg-transparent"
+            }
             onClick={() => fileInputRef.current?.click()}
             type="button"
             title="Attach files"
           >
             <Paperclip className="h-4 w-4" />
-          </button>
-          <button
-            className={iconButtonClass + " h-11 w-11 border-transparent bg-transparent"}
+          </Button>
+          <Button
+            className={
+              iconButtonClass + " h-11 w-11 border-transparent bg-transparent"
+            }
             onClick={startVoiceInput}
             type="button"
             title="Voice input"
           >
-            {listening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-          </button>
-          <input
+            {listening ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
+          </Button>
+          <Input
             className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-[var(--muted)]"
             onChange={(event) => setInput(event.target.value)}
             placeholder="Ask the assistant to plan, schedule, draft, search, or remember..."
             value={input}
           />
-          <button className={`${primaryButtonClass} h-11 w-11 px-0`} disabled={loading} type="submit" title="Send">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </button>
+          <Button
+            className={`${primaryButtonClass} h-11 w-11 px-0`}
+            disabled={loading}
+            type="submit"
+            title="Send"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
         </div>
       </form>
     </section>
@@ -3034,7 +3371,10 @@ function AssistantThinkingCard({ messages }: { messages: Message[] }) {
         </div>
         <div className="grid gap-2">
           {steps.map((step) => (
-            <div className="flex items-center gap-2 text-xs text-[var(--muted)]" key={step}>
+            <div
+              className="flex items-center gap-2 text-xs text-[var(--muted)]"
+              key={step}
+            >
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
               {step}
             </div>
@@ -3056,7 +3396,11 @@ function ChatMessage({
 }: {
   addMemory: (body: string) => Promise<void>;
   addTask: (input: AddTaskInput) => Promise<void>;
-  completeSurfaceMessage: (messageId: string, summary: string, link?: string | null) => void;
+  completeSurfaceMessage: (
+    messageId: string,
+    summary: string,
+    link?: string | null,
+  ) => void;
   message: Message;
   openTasks: RelayTask[];
   refreshWorkspace: () => Promise<void>;
@@ -3069,7 +3413,13 @@ function ChatMessage({
   const visibleContent = fromUser ? message.content : parsedContent.markdown;
 
   return (
-    <div className={fromUser ? "ml-auto flex max-w-[88%] flex-row-reverse gap-3" : "mr-auto flex max-w-[92%] gap-3"}>
+    <div
+      className={
+        fromUser
+          ? "ml-auto flex max-w-[88%] flex-row-reverse gap-3"
+          : "mr-auto flex max-w-[92%] gap-3"
+      }
+    >
       <AvatarIcon role={message.role} />
       <div className="min-w-0">
         {visibleContent ? (
@@ -3087,14 +3437,18 @@ function ChatMessage({
             )}
           </div>
         ) : null}
-        <div className={`mt-1 text-xs text-[var(--muted)] ${fromUser ? "text-right" : ""}`}>
+        <div
+          className={`mt-1 text-xs text-[var(--muted)] ${fromUser ? "text-right" : ""}`}
+        >
           {message.timestamp}
         </div>
         {message.surface && message.surfaceStatus !== "done" ? (
           <GeneratedMessageSurface
             addMemory={addMemory}
             addTask={addTask}
-            onComplete={(summary, link) => completeSurfaceMessage(message.id, summary, link)}
+            onComplete={(summary, link) =>
+              completeSurfaceMessage(message.id, summary, link)
+            }
             refreshWorkspace={refreshWorkspace}
             runPrompt={runPrompt}
             surface={message.surface}
@@ -3106,7 +3460,9 @@ function ChatMessage({
             {parsedContent.requests.map((request) => (
               <AssistantUiRequestCard
                 key={request.id}
-                onComplete={(summary) => completeSurfaceMessage(message.id, summary)}
+                onComplete={(summary) =>
+                  completeSurfaceMessage(message.id, summary)
+                }
                 openTasks={openTasks}
                 refreshWorkspace={refreshWorkspace}
                 request={request}
@@ -3142,15 +3498,25 @@ function AssistantUiRequestCard({
   runPrompt: (prompt: string) => void;
 }) {
   const candidateTasks = sortTasksByUrgency(openTasks).slice(0, 8);
-  const [selectedTaskId, setSelectedTaskId] = useState(candidateTasks[0]?.id ?? "");
+  const [selectedTaskId, setSelectedTaskId] = useState(
+    candidateTasks[0]?.id ?? "",
+  );
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<{ tone: "success" | "warning"; text: string } | null>(null);
-  const effectiveSelectedTaskId = candidateTasks.some((task) => task.id === selectedTaskId)
+  const [status, setStatus] = useState<{
+    tone: "success" | "warning";
+    text: string;
+  } | null>(null);
+  const effectiveSelectedTaskId = candidateTasks.some(
+    (task) => task.id === selectedTaskId,
+  )
     ? selectedTaskId
-    : candidateTasks[0]?.id ?? "";
-  const selectedTask = candidateTasks.find((task) => task.id === effectiveSelectedTaskId) ?? null;
+    : (candidateTasks[0]?.id ?? "");
+  const selectedTask =
+    candidateTasks.find((task) => task.id === effectiveSelectedTaskId) ?? null;
   const shiftedDue =
-    request.action === "shift_task_due" && selectedTask?.due && request.daysDelta
+    request.action === "shift_task_due" &&
+    selectedTask?.due &&
+    request.daysDelta
       ? addDays(new Date(selectedTask.due), request.daysDelta)
       : null;
 
@@ -3170,7 +3536,10 @@ function AssistantUiRequestCard({
           due: shiftedDue.toISOString(),
         }),
       });
-      const data = (await response.json()) as { task?: RelayTask | null; error?: string };
+      const data = (await response.json()) as {
+        task?: RelayTask | null;
+        error?: string;
+      };
 
       if (!response.ok || !data.task) {
         setStatus({
@@ -3181,7 +3550,9 @@ function AssistantUiRequestCard({
       }
 
       await refreshWorkspace();
-      onComplete(`Updated "${data.task.title}" due date to ${formatDateShort(data.task.due)}.`);
+      onComplete(
+        `Updated "${data.task.title}" due date to ${formatDateShort(data.task.due)}.`,
+      );
       setStatus({ tone: "success", text: "Task updated." });
     } catch (error) {
       setStatus({
@@ -3203,7 +3574,9 @@ function AssistantUiRequestCard({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="font-semibold">Choose the missing detail</h3>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{request.detail}</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                {request.detail}
+              </p>
             </div>
             <StatusBadge ready={false} label="Needs selection" />
           </div>
@@ -3213,46 +3586,67 @@ function AssistantUiRequestCard({
               {candidateTasks.length > 0 ? (
                 <>
                   <label className="grid gap-1">
-                    <span className="text-xs font-semibold uppercase text-[var(--muted)]">Task</span>
-                    <select
+                    <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                      Task
+                    </span>
+                    <Select
                       className="h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none transition focus:border-[var(--accent)]"
-                      onChange={(event) => setSelectedTaskId(event.target.value)}
+                      onChange={(event) =>
+                        setSelectedTaskId(event.target.value)
+                      }
                       value={effectiveSelectedTaskId}
                     >
                       {candidateTasks.map((task) => (
                         <option key={task.id} value={task.id}>
                           {task.title}
-                          {task.due ? ` - due ${formatDateShort(task.due)}` : " - no due date"}
+                          {task.due
+                            ? ` - due ${formatDateShort(task.due)}`
+                            : " - no due date"}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                   <div className="grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-sm sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                    <MiniControl label="Current due date" value={formatDateShort(selectedTask?.due)} />
+                    <MiniControl
+                      label="Current due date"
+                      value={formatDateShort(selectedTask?.due)}
+                    />
                     <ArrowRight className="hidden h-4 w-4 text-[var(--muted)] sm:block" />
                     <MiniControl
                       label="New due date"
-                      value={shiftedDue ? formatDateShort(shiftedDue.toISOString()) : "Pick a task with a due date"}
+                      value={
+                        shiftedDue
+                          ? formatDateShort(shiftedDue.toISOString())
+                          : "Pick a task with a due date"
+                      }
                     />
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <button
+                    <Button
                       className={primaryButtonClass}
                       disabled={!shiftedDue || busy}
                       onClick={() => void applyTaskDueShift()}
                       type="button"
                     >
-                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      {busy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4" />
+                      )}
                       Apply change
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       className={secondaryButtonClass}
-                      onClick={() => runPrompt(`Use this task for the change: ${selectedTask?.id ?? effectiveSelectedTaskId}`)}
+                      onClick={() =>
+                        runPrompt(
+                          `Use this task for the change: ${selectedTask?.id ?? effectiveSelectedTaskId}`,
+                        )
+                      }
                       type="button"
                     >
                       <Sparkles className="h-4 w-4" />
                       Ask assistant
-                    </button>
+                    </Button>
                   </div>
                 </>
               ) : (
@@ -3265,10 +3659,14 @@ function AssistantUiRequestCard({
             </div>
           ) : (
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button className={primaryButtonClass} onClick={() => runPrompt(request.detail)} type="button">
+              <Button
+                className={primaryButtonClass}
+                onClick={() => runPrompt(request.detail)}
+                type="button"
+              >
                 <Sparkles className="h-4 w-4" />
                 Continue in chat
-              </button>
+              </Button>
             </div>
           )}
 
@@ -3306,7 +3704,13 @@ function GeneratedMessageSurface({
   surface: GeneratedSurface;
   surfaceContext?: GeneratedSurfaceContext;
 }) {
-  if (surface === "schedule") return <ScheduleComposer onComplete={onComplete} refreshWorkspace={refreshWorkspace} />;
+  if (surface === "schedule")
+    return (
+      <ScheduleComposer
+        onComplete={onComplete}
+        refreshWorkspace={refreshWorkspace}
+      />
+    );
   if (surface === "task") {
     return (
       <TaskComposer
@@ -3319,7 +3723,10 @@ function GeneratedMessageSurface({
     );
   }
   if (surface === "files") return <FileGeneratedSurface />;
-  if (surface === "memory") return <MemoryPermissionSurface addMemory={addMemory} onComplete={onComplete} />;
+  if (surface === "memory")
+    return (
+      <MemoryPermissionSurface addMemory={addMemory} onComplete={onComplete} />
+    );
   return <EmailApprovalSurface onComplete={onComplete} />;
 }
 
@@ -3364,7 +3771,10 @@ function ContextWorkspace({
     const startWidth = width;
 
     function onMove(moveEvent: PointerEvent) {
-      const nextWidth = Math.min(620, Math.max(360, startWidth - (moveEvent.clientX - startX)));
+      const nextWidth = Math.min(
+        620,
+        Math.max(360, startWidth - (moveEvent.clientX - startX)),
+      );
       setWidth(nextWidth);
     }
 
@@ -3379,20 +3789,33 @@ function ContextWorkspace({
 
   if (collapsed) {
     return (
-      <aside className={`${panelClass} surface-pop hidden h-full min-h-0 flex-col items-center gap-3 p-3 transition-all duration-300 ease-out xl:flex`}>
-        <button
+      <aside
+        className={`${panelClass} surface-pop hidden h-full min-h-0 flex-col items-center gap-3 p-3 transition-all duration-300 ease-out xl:flex`}
+      >
+        <Button
           className={iconButtonClass}
           onClick={onToggleCollapsed}
           title="Expand workspace"
           type="button"
         >
           <Columns3 className="h-4 w-4" />
-        </button>
+        </Button>
         <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
           <Icon className="h-5 w-5" />
         </span>
         <div className="h-px w-full bg-[var(--line)]" />
-        {(["focus", "calendar", "tasks", "files", "github", "memory", "contacts", "email"] as ContextWorkspaceMode[]).map((item) => {
+        {(
+          [
+            "focus",
+            "calendar",
+            "tasks",
+            "files",
+            "github",
+            "memory",
+            "contacts",
+            "email",
+          ] as ContextWorkspaceMode[]
+        ).map((item) => {
           const ItemIcon = contextWorkspaceMeta(item).icon;
           return (
             <span
@@ -3413,7 +3836,9 @@ function ContextWorkspace({
   }
 
   return (
-    <aside className={`${panelClass} surface-pop relative hidden h-full min-h-0 flex-col overflow-hidden transition-all duration-300 ease-out xl:flex`}>
+    <aside
+      className={`${panelClass} surface-pop relative hidden h-full min-h-0 flex-col overflow-hidden transition-all duration-300 ease-out xl:flex`}
+    >
       <div
         aria-label="Resize contextual workspace"
         className="resize-rail absolute bottom-0 left-0 top-0 z-10 w-2 cursor-ew-resize"
@@ -3427,38 +3852,47 @@ function ContextWorkspace({
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{meta.label}</p>
-            <p className="truncate text-xs text-[var(--muted)]">{meta.detail}</p>
+            <p className="truncate text-xs text-[var(--muted)]">
+              {meta.detail}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             className={iconButtonClass}
             onClick={() => void refreshWorkspace()}
             title="Refresh workspace"
             type="button"
           >
             <RefreshCcw className="h-4 w-4" />
-          </button>
-          <button
+          </Button>
+          <Button
             className={iconButtonClass}
             onClick={onToggleCollapsed}
             title="Collapse workspace"
             type="button"
           >
             <Columns3 className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-2">
-        <span className="text-xs font-semibold uppercase text-[var(--muted)]">AI selected</span>
+        <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+          AI selected
+        </span>
         <div className="min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--track)]">
           <div className="animated-progress h-1.5 w-2/3 rounded-full bg-[var(--accent)]" />
         </div>
-        <span className="text-xs font-semibold text-[var(--accent)]">{meta.signal}</span>
+        <span className="text-xs font-semibold text-[var(--accent)]">
+          {meta.signal}
+        </span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 animate-fade-in" key={mode}>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto p-4 animate-fade-in"
+        key={mode}
+      >
         {mode === "focus" ? (
           <FocusWorkspace
             briefing={briefing}
@@ -3484,17 +3918,27 @@ function ContextWorkspace({
             tasks={tasks}
           />
         ) : null}
-        {mode === "files" ? <FilesWorkspace briefing={briefing} runPrompt={runPrompt} /> : null}
-        {mode === "github" ? <GithubWorkspace briefing={briefing} runPrompt={runPrompt} /> : null}
-        {mode === "memory" ? <MemoryWorkspace notes={notes} runPrompt={runPrompt} /> : null}
-        {mode === "contacts" ? <ContactsWorkspace briefing={briefing} runPrompt={runPrompt} /> : null}
-        {mode === "email" ? <EmailWorkspace briefing={briefing} runPrompt={runPrompt} /> : null}
+        {mode === "files" ? (
+          <FilesWorkspace briefing={briefing} runPrompt={runPrompt} />
+        ) : null}
+        {mode === "github" ? (
+          <GithubWorkspace briefing={briefing} runPrompt={runPrompt} />
+        ) : null}
+        {mode === "memory" ? (
+          <MemoryWorkspace notes={notes} runPrompt={runPrompt} />
+        ) : null}
+        {mode === "contacts" ? (
+          <ContactsWorkspace briefing={briefing} runPrompt={runPrompt} />
+        ) : null}
+        {mode === "email" ? (
+          <EmailWorkspace briefing={briefing} runPrompt={runPrompt} />
+        ) : null}
       </div>
 
       <div className="border-t border-[var(--line)] px-4 py-3">
         <label className="flex items-center gap-3 text-xs font-semibold text-[var(--muted)]">
           Width
-          <input
+          <Input
             aria-label="Resize contextual workspace"
             className="min-w-0 flex-1 accent-[var(--accent)]"
             max={620}
@@ -3522,18 +3966,27 @@ function FocusWorkspace({
 }) {
   const nextEvent = briefing?.calendar.events[0];
   const recentFile = briefing?.drive.files[0];
-  const googleTasks = briefing?.googleTasks?.tasks.filter((task) => task.status !== "completed") ?? [];
+  const googleTasks =
+    briefing?.googleTasks?.tasks.filter(
+      (task) => task.status !== "completed",
+    ) ?? [];
   const contacts = briefing?.contacts?.contacts ?? [];
   const actions = [
     {
       title: nextEvent ? nextEvent.title : "Plan my day",
-      detail: nextEvent ? formatEventTime(nextEvent.start) : "Create a briefing from connected workspace data.",
+      detail: nextEvent
+        ? formatEventTime(nextEvent.start)
+        : "Create a briefing from connected workspace data.",
       icon: CalendarDays,
       prompt: nextEvent ? "Prepare me for my next meeting" : "Plan my day",
     },
     {
       title: openTasks[0]?.title ?? googleTasks[0]?.title ?? "Capture a task",
-      detail: openTasks[0] ? "Local priority task" : googleTasks[0] ? "Google Tasks item" : "Start with one concrete next action.",
+      detail: openTasks[0]
+        ? "Local priority task"
+        : googleTasks[0]
+          ? "Google Tasks item"
+          : "Start with one concrete next action.",
       icon: ListTodo,
       prompt: openTasks[0]
         ? `Plan the next step for ${openTasks[0].title}`
@@ -3542,8 +3995,12 @@ function FocusWorkspace({
           : "add task ",
     },
     {
-      title: recentFile?.name ?? (signedInToGoogle ? "Review Drive" : "Connect Google"),
-      detail: recentFile ? driveFileType(recentFile.mimeType) : "Drive, Calendar, and Tasks unlock live workspace context.",
+      title:
+        recentFile?.name ??
+        (signedInToGoogle ? "Review Drive" : "Connect Google"),
+      detail: recentFile
+        ? driveFileType(recentFile.mimeType)
+        : "Drive, Calendar, and Tasks unlock live workspace context.",
       icon: FolderOpen,
       prompt: recentFile ? `Summarize ${recentFile.name}` : "OAuth status",
     },
@@ -3562,10 +4019,34 @@ function FocusWorkspace({
           <span className="pulse-dot mt-1" />
         </div>
         <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-          <MiniControl label="Calendar" value={briefing?.calendar.ok ? `${briefing.calendar.events.length} events` : "Not connected"} />
-          <MiniControl label="Tasks" value={`${openTasks.length + googleTasks.length} open`} />
-          <MiniControl label="Files" value={briefing?.drive.ok ? `${briefing.drive.files.length} recent` : "Not connected"} />
-          <MiniControl label="Contacts" value={briefing?.contacts?.ok ? `${contacts.length} people` : "Not connected"} />
+          <MiniControl
+            label="Calendar"
+            value={
+              briefing?.calendar.ok
+                ? `${briefing.calendar.events.length} events`
+                : "Not connected"
+            }
+          />
+          <MiniControl
+            label="Tasks"
+            value={`${openTasks.length + googleTasks.length} open`}
+          />
+          <MiniControl
+            label="Files"
+            value={
+              briefing?.drive.ok
+                ? `${briefing.drive.files.length} recent`
+                : "Not connected"
+            }
+          />
+          <MiniControl
+            label="Contacts"
+            value={
+              briefing?.contacts?.ok
+                ? `${contacts.length} people`
+                : "Not connected"
+            }
+          />
         </div>
       </section>
 
@@ -3573,7 +4054,7 @@ function FocusWorkspace({
         {actions.map((action) => {
           const Icon = action.icon;
           return (
-            <button
+            <Button
               className="interactive-row grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-left transition hover:bg-[var(--accent-soft)]"
               key={action.title}
               onClick={() => runPrompt(action.prompt)}
@@ -3583,11 +4064,15 @@ function FocusWorkspace({
                 <Icon className="h-4 w-4" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{action.title}</span>
-                <span className="mt-1 block truncate text-xs text-[var(--muted)]">{action.detail}</span>
+                <span className="block truncate text-sm font-semibold">
+                  {action.title}
+                </span>
+                <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                  {action.detail}
+                </span>
               </span>
               <ArrowRight className="h-4 w-4 text-[var(--muted)]" />
-            </button>
+            </Button>
           );
         })}
       </section>
@@ -3605,27 +4090,51 @@ function CalendarWorkspace({
   const events = briefing?.calendar.events ?? [];
   const [view, setView] = useState<"day" | "week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [calendarAction, setCalendarAction] = useState<CalendarAction | null>(null);
+  const [calendarAction, setCalendarAction] = useState<CalendarAction | null>(
+    null,
+  );
   const [savingEvent, setSavingEvent] = useState(false);
-  const dayEvents = events.filter((event) => sameCalendarDay(parseEventDate(event.start), selectedDate));
+  const dayEvents = events.filter((event) =>
+    sameCalendarDay(parseEventDate(event.start), selectedDate),
+  );
   const weekStart = startOfWeek(selectedDate);
-  const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const weekDays = Array.from({ length: 7 }, (_, index) =>
+    addDays(weekStart, index),
+  );
   const monthDays = getMonthGrid(selectedDate);
 
   function openSlot(date: Date, hour: number) {
     const start = new Date(date);
     start.setHours(hour, 0, 0, 0);
     const end = new Date(start.getTime() + 30 * 60_000);
-    setCalendarAction({ mode: "create", start, end, title: "", reminderMinutes: 30 });
+    setCalendarAction({
+      mode: "create",
+      start,
+      end,
+      title: "",
+      reminderMinutes: 30,
+    });
   }
 
   function openEvent(event: CalendarEvent) {
     const start = parseEventDate(event.start) ?? new Date();
-    const end = parseEventDate(event.end) ?? new Date(start.getTime() + 30 * 60_000);
-    setCalendarAction({ mode: "edit", event, start, end, title: event.title, reminderMinutes: 30 });
+    const end =
+      parseEventDate(event.end) ?? new Date(start.getTime() + 30 * 60_000);
+    setCalendarAction({
+      mode: "edit",
+      event,
+      start,
+      end,
+      title: event.title,
+      reminderMinutes: 30,
+    });
   }
 
-  async function moveEvent(event: CalendarEvent, targetDate: Date, hour: number) {
+  async function moveEvent(
+    event: CalendarEvent,
+    targetDate: Date,
+    hour: number,
+  ) {
     const start = parseEventDate(event.start);
     const end = parseEventDate(event.end);
     if (!event.id || !start) return;
@@ -3686,24 +4195,54 @@ function CalendarWorkspace({
     <div className="space-y-4 animate-fade-in">
       <section className={softPanelClass + " p-3"}>
         <div className="mb-3 flex items-center justify-between gap-2">
-          <button className={iconButtonClass} onClick={() => setSelectedDate(addDays(selectedDate, view === "month" ? -30 : view === "week" ? -7 : -1))} type="button" title="Previous">
+          <Button
+            className={iconButtonClass}
+            onClick={() =>
+              setSelectedDate(
+                addDays(
+                  selectedDate,
+                  view === "month" ? -30 : view === "week" ? -7 : -1,
+                ),
+              )
+            }
+            type="button"
+            title="Previous"
+          >
             <ArrowRight className="h-4 w-4 rotate-180" />
-          </button>
+          </Button>
           <div className="min-w-0 text-center">
             <p className="truncate text-sm font-semibold">
-              {selectedDate.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+              {selectedDate.toLocaleDateString(undefined, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
             </p>
             <p className="text-xs text-[var(--muted)]">
-              {briefing?.calendar.ok ? "Google Calendar" : briefing?.calendar.reason ?? "Calendar not connected"}
+              {briefing?.calendar.ok
+                ? "Google Calendar"
+                : (briefing?.calendar.reason ?? "Calendar not connected")}
             </p>
           </div>
-          <button className={iconButtonClass} onClick={() => setSelectedDate(addDays(selectedDate, view === "month" ? 30 : view === "week" ? 7 : 1))} type="button" title="Next">
+          <Button
+            className={iconButtonClass}
+            onClick={() =>
+              setSelectedDate(
+                addDays(
+                  selectedDate,
+                  view === "month" ? 30 : view === "week" ? 7 : 1,
+                ),
+              )
+            }
+            type="button"
+            title="Next"
+          >
             <ArrowRight className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
         <div className="grid grid-cols-3 gap-2">
           {(["day", "week", "month"] as const).map((option) => (
-            <button
+            <Button
               className={`h-9 rounded-md text-xs font-semibold transition ${
                 view === option
                   ? "bg-[var(--accent)] text-white"
@@ -3714,17 +4253,19 @@ function CalendarWorkspace({
               type="button"
             >
               {option[0].toUpperCase() + option.slice(1)}
-            </button>
+            </Button>
           ))}
         </div>
-        <button
+        <Button
           className={`${primaryButtonClass} mt-3 w-full`}
-          onClick={() => openSlot(selectedDate, Math.max(9, new Date().getHours() + 1))}
+          onClick={() =>
+            openSlot(selectedDate, Math.max(9, new Date().getHours() + 1))
+          }
           type="button"
         >
           <Plus className="h-4 w-4" />
           Add event
-        </button>
+        </Button>
       </section>
 
       <CalendarSignalStrip
@@ -3765,10 +4306,12 @@ function CalendarWorkspace({
           </div>
           <div className="grid grid-cols-7 gap-1">
             {monthDays.map((day) => {
-              const dayCount = events.filter((event) => sameCalendarDay(parseEventDate(event.start), day)).length;
+              const dayCount = events.filter((event) =>
+                sameCalendarDay(parseEventDate(event.start), day),
+              ).length;
               const currentMonth = day.getMonth() === selectedDate.getMonth();
               return (
-                <button
+                <Button
                   className={`min-h-16 rounded-md border p-1.5 text-left transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] ${
                     sameCalendarDay(day, selectedDate)
                       ? "border-[var(--accent)] bg-[var(--accent-soft)]"
@@ -3784,12 +4327,18 @@ function CalendarWorkspace({
                   <span className="text-xs font-semibold">{day.getDate()}</span>
                   {dayCount > 0 ? (
                     <span className="mt-2 flex gap-1">
-                      {Array.from({ length: Math.min(3, dayCount) }, (_, index) => (
-                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" key={index} />
-                      ))}
+                      {Array.from(
+                        { length: Math.min(3, dayCount) },
+                        (_, index) => (
+                          <span
+                            className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]"
+                            key={index}
+                          />
+                        ),
+                      )}
                     </span>
                   ) : null}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -3797,14 +4346,24 @@ function CalendarWorkspace({
       ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <button className={primaryButtonClass} onClick={() => openSlot(selectedDate, Math.max(9, new Date().getHours() + 1))} type="button">
+        <Button
+          className={primaryButtonClass}
+          onClick={() =>
+            openSlot(selectedDate, Math.max(9, new Date().getHours() + 1))
+          }
+          type="button"
+        >
           <Plus className="h-4 w-4" />
           Add event
-        </button>
-        <button className={secondaryButtonClass} onClick={() => void refreshWorkspace()} type="button">
+        </Button>
+        <Button
+          className={secondaryButtonClass}
+          onClick={() => void refreshWorkspace()}
+          type="button"
+        >
           <RefreshCcw className="h-4 w-4" />
           Refresh
-        </button>
+        </Button>
       </div>
       {calendarAction ? (
         <CalendarEventEditor
@@ -3835,7 +4394,9 @@ function CalendarSignalStrip({
   const now = new Date();
   const nextEvent = events
     .map((event) => ({ event, start: parseEventDate(event.start) }))
-    .filter((item): item is { event: CalendarEvent; start: Date } => Boolean(item.start))
+    .filter((item): item is { event: CalendarEvent; start: Date } =>
+      Boolean(item.start),
+    )
     .filter((item) => item.start.getTime() >= now.getTime())
     .sort((a, b) => a.start.getTime() - b.start.getTime())[0]?.event;
   const selectedLabel = selectedDate.toLocaleDateString(undefined, {
@@ -3852,11 +4413,21 @@ function CalendarSignalStrip({
       />
       <MiniControl
         label="Next"
-        value={nextEvent ? `${nextEvent.title} · ${formatEventTime(nextEvent.start)}` : "No upcoming event loaded"}
+        value={
+          nextEvent
+            ? `${nextEvent.title} · ${formatEventTime(nextEvent.start)}`
+            : "No upcoming event loaded"
+        }
       />
       <MiniControl
         label="Source"
-        value={briefing ? (briefing.calendar.ok ? `Google Calendar · ${view}` : "Calendar disconnected") : "Loading"}
+        value={
+          briefing
+            ? briefing.calendar.ok
+              ? `Google Calendar · ${view}`
+              : "Calendar disconnected"
+            : "Loading"
+        }
       />
     </section>
   );
@@ -3883,16 +4454,19 @@ function WeekCalendar({
   const hourHeight = 56;
   const now = new Date();
   const showNow = weekDays.some((day) => sameCalendarDay(day, now));
-  const nowTop = ((now.getHours() * 60 + now.getMinutes() - 7 * 60) / 60) * hourHeight;
+  const nowTop =
+    ((now.getHours() * 60 + now.getMinutes() - 7 * 60) / 60) * hourHeight;
 
   return (
     <section className={softPanelClass + " overflow-hidden p-3"}>
       <div className="grid grid-cols-[52px_repeat(7,minmax(86px,1fr))] border-b border-[var(--line)] pb-2">
         <span />
         {weekDays.map((day) => (
-          <button
+          <Button
             className={`rounded-xl px-2 py-2 text-left transition hover:bg-[var(--accent-soft)] ${
-              sameCalendarDay(day, selectedDate) ? "bg-[var(--accent-soft)] text-[var(--accent)]" : ""
+              sameCalendarDay(day, selectedDate)
+                ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                : ""
             }`}
             key={day.toISOString()}
             onClick={() => onSelectDate(day)}
@@ -3901,26 +4475,33 @@ function WeekCalendar({
             <span className="block text-[10px] font-semibold uppercase text-[var(--muted)]">
               {day.toLocaleDateString(undefined, { weekday: "short" })}
             </span>
-            <span className="mt-1 block text-lg font-semibold">{day.getDate()}</span>
-          </button>
+            <span className="mt-1 block text-lg font-semibold">
+              {day.getDate()}
+            </span>
+          </Button>
         ))}
       </div>
       <div className="relative max-h-[620px] overflow-auto">
         <div className="grid grid-cols-[52px_repeat(7,minmax(86px,1fr))]">
           {hours.map((hour) => (
             <div className="contents" key={hour}>
-              <div className="border-t border-[var(--line)] pt-1 text-[10px] font-semibold text-[var(--muted)]" style={{ height: hourHeight }}>
+              <div
+                className="border-t border-[var(--line)] pt-1 text-[10px] font-semibold text-[var(--muted)]"
+                style={{ height: hourHeight }}
+              >
                 {formatHour(hour)}
               </div>
               {weekDays.map((day) => (
-                <button
+                <Button
                   className="border-l border-t border-[var(--line)] text-left transition hover:bg-[var(--accent-soft)]"
                   key={`${day.toISOString()}-${hour}`}
                   onClick={() => onSlotClick(day, hour)}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={(dropEvent) => {
                     dropEvent.preventDefault();
-                    const id = dropEvent.dataTransfer.getData("text/calendar-event-id");
+                    const id = dropEvent.dataTransfer.getData(
+                      "text/calendar-event-id",
+                    );
                     const dropped = events.find((event) => event.id === id);
                     if (dropped) void onEventDrop(dropped, day, hour);
                   }}
@@ -3934,9 +4515,14 @@ function WeekCalendar({
         </div>
         <div className="pointer-events-none absolute bottom-0 left-[52px] right-0 top-0 grid grid-cols-7">
           {weekDays.map((day) => (
-            <div className="relative border-l border-transparent" key={`events-${day.toISOString()}`}>
+            <div
+              className="relative border-l border-transparent"
+              key={`events-${day.toISOString()}`}
+            >
               {events
-                .filter((event) => sameCalendarDay(parseEventDate(event.start), day))
+                .filter((event) =>
+                  sameCalendarDay(parseEventDate(event.start), day),
+                )
                 .map((event) => (
                   <CalendarEventBlock
                     event={event}
@@ -3972,11 +4558,16 @@ function CalendarEventBlock({
   onClick: () => void;
 }) {
   const start = parseEventDate(event.start);
-  const end = parseEventDate(event.end) ?? (start ? new Date(start.getTime() + 30 * 60_000) : null);
+  const end =
+    parseEventDate(event.end) ??
+    (start ? new Date(start.getTime() + 30 * 60_000) : null);
   if (!start || !end) return null;
 
   const startMinutes = start.getHours() * 60 + start.getMinutes();
-  const endMinutes = Math.max(startMinutes + 20, end.getHours() * 60 + end.getMinutes());
+  const endMinutes = Math.max(
+    startMinutes + 20,
+    end.getHours() * 60 + end.getMinutes(),
+  );
   const top = ((startMinutes - 7 * 60) / 60) * hourHeight;
   const height = Math.max(34, ((endMinutes - startMinutes) / 60) * hourHeight);
 
@@ -3993,12 +4584,16 @@ function CalendarEventBlock({
         meta={event.hangoutLink ? "Online meeting" : "Calendar event"}
         title={event.title}
       >
-        <button
+        <Button
           className="h-full w-full overflow-hidden rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] p-2 text-left text-xs shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--surface)]"
           draggable={Boolean(event.id)}
           onClick={onClick}
           onDragStart={(dragEvent) => {
-            if (event.id) dragEvent.dataTransfer.setData("text/calendar-event-id", event.id);
+            if (event.id)
+              dragEvent.dataTransfer.setData(
+                "text/calendar-event-id",
+                event.id,
+              );
           }}
           type="button"
         >
@@ -4006,7 +4601,7 @@ function CalendarEventBlock({
           <span className="mt-0.5 block truncate text-[var(--muted)]">
             {formatEventTime(event.start)}
           </span>
-        </button>
+        </Button>
       </HoverPreview>
     </div>
   );
@@ -4030,14 +4625,21 @@ function DayCalendar({
     <section className={softPanelClass + " overflow-hidden p-3"}>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold">
-          {selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+          {selectedDate.toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+          })}
         </h3>
-        <StatusBadge ready={events.length > 0} label={`${events.length} events`} />
+        <StatusBadge
+          ready={events.length > 0}
+          label={`${events.length} events`}
+        />
       </div>
       <div className="relative">
         <div className="space-y-0">
           {hours.map((hour) => (
-            <button
+            <Button
               className="grid border-t border-[var(--line)] text-left transition hover:bg-[var(--accent-soft)]"
               key={hour}
               onClick={() => onSlotClick(hour)}
@@ -4047,19 +4649,27 @@ function DayCalendar({
               <span className="-mt-2 w-12 bg-[var(--surface-soft)] pr-2 text-[10px] font-semibold text-[var(--muted)]">
                 {formatHour(hour)}
               </span>
-            </button>
+            </Button>
           ))}
         </div>
         <div className="absolute left-14 right-0 top-0">
           {events.map((event) => {
             const start = parseEventDate(event.start);
-            const end = parseEventDate(event.end) ?? (start ? new Date(start.getTime() + 30 * 60_000) : null);
+            const end =
+              parseEventDate(event.end) ??
+              (start ? new Date(start.getTime() + 30 * 60_000) : null);
             if (!start || !end) return null;
 
             const startMinutes = start.getHours() * 60 + start.getMinutes();
-            const endMinutes = Math.max(startMinutes + 20, end.getHours() * 60 + end.getMinutes());
+            const endMinutes = Math.max(
+              startMinutes + 20,
+              end.getHours() * 60 + end.getMinutes(),
+            );
             const top = ((startMinutes - 7 * 60) / 60) * hourHeight;
-            const height = Math.max(34, ((endMinutes - startMinutes) / 60) * hourHeight);
+            const height = Math.max(
+              34,
+              ((endMinutes - startMinutes) / 60) * hourHeight,
+            );
 
             return (
               <div
@@ -4075,16 +4685,19 @@ function DayCalendar({
                   meta={event.hangoutLink ? "Online meeting" : "Calendar event"}
                   title={event.title}
                 >
-                  <button
+                  <Button
                     className="h-full w-full overflow-hidden rounded-lg border border-[var(--accent)] bg-[var(--accent-soft)] p-2 text-left text-xs shadow-sm transition hover:bg-[var(--surface)]"
                     onClick={() => onEventClick(event)}
                     type="button"
                   >
-                    <span className="block truncate font-semibold">{event.title}</span>
-                    <span className="mt-0.5 block truncate text-[var(--muted)]">
-                      {formatEventTime(event.start)} - {formatEventTime(event.end)}
+                    <span className="block truncate font-semibold">
+                      {event.title}
                     </span>
-                  </button>
+                    <span className="mt-0.5 block truncate text-[var(--muted)]">
+                      {formatEventTime(event.start)} -{" "}
+                      {formatEventTime(event.end)}
+                    </span>
+                  </Button>
                 </HoverPreview>
               </div>
             );
@@ -4092,7 +4705,9 @@ function DayCalendar({
         </div>
       </div>
       {events.length === 0 ? (
-        <p className="mt-3 text-center text-sm text-[var(--muted)]">No events loaded for this day.</p>
+        <p className="mt-3 text-center text-sm text-[var(--muted)]">
+          No events loaded for this day.
+        </p>
       ) : null}
     </section>
   );
@@ -4113,130 +4728,194 @@ function CalendarEventEditor({
 }) {
   const date = action.start.toISOString().slice(0, 10);
   const time = action.start.toTimeString().slice(0, 5);
-  const duration = Math.max(15, Math.round((action.end.getTime() - action.start.getTime()) / 60_000));
+  const duration = Math.max(
+    15,
+    Math.round((action.end.getTime() - action.start.getTime()) / 60_000),
+  );
 
-  function updateDateTime(nextDate = date, nextTime = time, nextDuration = duration) {
+  function updateDateTime(
+    nextDate = date,
+    nextTime = time,
+    nextDuration = duration,
+  ) {
     const start = new Date(`${nextDate}T${nextTime}:00`);
     const end = new Date(start.getTime() + nextDuration * 60_000);
     onChange({ ...action, start, end });
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4 backdrop-blur-sm">
-      <div className={`${panelClass} w-full max-w-md animate-slide-up p-5`}>
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold">
-              {action.mode === "edit" ? "Edit event" : "Add event"}
-            </h3>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              {action.mode === "edit" ? "Update the real Google Calendar event." : "Create a real Google Calendar event."}
-            </p>
-          </div>
-          <button className={iconButtonClass} onClick={onClose} type="button" title="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-3">
-          <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Title</span>
-            <input
-              className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-              onChange={(event) => onChange({ ...action, title: event.target.value })}
-              value={action.title}
-            />
-          </label>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="space-y-1">
-              <span className="text-xs font-semibold uppercase text-[var(--muted)]">Date</span>
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-                onChange={(event) => updateDateTime(event.target.value)}
-                type="date"
-                value={date}
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold uppercase text-[var(--muted)]">Time</span>
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-                onChange={(event) => updateDateTime(date, event.target.value)}
-                type="time"
-                value={time}
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold uppercase text-[var(--muted)]">Min</span>
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-                min={15}
-                onChange={(event) => updateDateTime(date, time, Number(event.target.value))}
-                step={15}
-                type="number"
-                value={duration}
-              />
-            </label>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1">
-              <span className="text-xs font-semibold uppercase text-[var(--muted)]">Attendees</span>
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
-                onChange={(event) => onChange({ ...action, attendees: event.target.value })}
-                placeholder="name@example.com, team@example.com"
-                value={action.attendees ?? ""}
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold uppercase text-[var(--muted)]">Reminder</span>
-              <select
-                className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-                onChange={(event) =>
-                  onChange({
-                    ...action,
-                    reminderMinutes: event.target.value === "default" ? null : Number(event.target.value),
-                  })
-                }
-                value={action.reminderMinutes ?? "default"}
+    <Modal isOpen onOpenChange={(open) => !open && onClose()}>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container placement="center">
+          <Modal.Dialog
+            className={`${panelClass} w-full max-w-md animate-slide-up p-5`}
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">
+                  {action.mode === "edit" ? "Edit event" : "Add event"}
+                </h3>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  {action.mode === "edit"
+                    ? "Update the real Google Calendar event."
+                    : "Create a real Google Calendar event."}
+                </p>
+              </div>
+              <Button
+                className={iconButtonClass}
+                onClick={onClose}
+                type="button"
+                title="Close"
               >
-                <option value="default">Default</option>
-                <option value={5}>5 minutes</option>
-                <option value={30}>30 minutes</option>
-                <option value={60}>1 hour</option>
-                <option value={1440}>1 day</option>
-              </select>
-            </label>
-          </div>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Location</span>
-            <input
-              className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
-              onChange={(event) => onChange({ ...action, location: event.target.value })}
-              placeholder="Room, address, or meeting link"
-              value={action.location ?? ""}
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Notes</span>
-            <textarea
-              className="min-h-24 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
-              onChange={(event) => onChange({ ...action, notes: event.target.value })}
-              placeholder="Agenda, prep notes, links, or context"
-              value={action.notes ?? ""}
-            />
-          </label>
-        </div>
-        <div className="mt-5 flex gap-2">
-          <button className={primaryButtonClass} disabled={!action.title.trim() || saving} onClick={onSave} type="button">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            {action.mode === "edit" ? "Save changes" : "Create event"}
-          </button>
-          <button className={secondaryButtonClass} onClick={onClose} type="button">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  Title
+                </span>
+                <Input
+                  className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) =>
+                    onChange({ ...action, title: event.target.value })
+                  }
+                  value={action.title}
+                />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    Date
+                  </span>
+                  <Input
+                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) => updateDateTime(event.target.value)}
+                    type="date"
+                    value={date}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    Time
+                  </span>
+                  <Input
+                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) =>
+                      updateDateTime(date, event.target.value)
+                    }
+                    type="time"
+                    value={time}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    Min
+                  </span>
+                  <Input
+                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    min={15}
+                    onChange={(event) =>
+                      updateDateTime(date, time, Number(event.target.value))
+                    }
+                    step={15}
+                    type="number"
+                    value={duration}
+                  />
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    Attendees
+                  </span>
+                  <Input
+                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+                    onChange={(event) =>
+                      onChange({ ...action, attendees: event.target.value })
+                    }
+                    placeholder="name@example.com, team@example.com"
+                    value={action.attendees ?? ""}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    Reminder
+                  </span>
+                  <Select
+                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) =>
+                      onChange({
+                        ...action,
+                        reminderMinutes:
+                          event.target.value === "default"
+                            ? null
+                            : Number(event.target.value),
+                      })
+                    }
+                    value={action.reminderMinutes ?? "default"}
+                  >
+                    <option value="default">Default</option>
+                    <option value={5}>5 minutes</option>
+                    <option value={30}>30 minutes</option>
+                    <option value={60}>1 hour</option>
+                    <option value={1440}>1 day</option>
+                  </Select>
+                </label>
+              </div>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  Location
+                </span>
+                <Input
+                  className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+                  onChange={(event) =>
+                    onChange({ ...action, location: event.target.value })
+                  }
+                  placeholder="Room, address, or meeting link"
+                  value={action.location ?? ""}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  Notes
+                </span>
+                <TextArea
+                  className="min-h-24 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+                  onChange={(event) =>
+                    onChange({ ...action, notes: event.target.value })
+                  }
+                  placeholder="Agenda, prep notes, links, or context"
+                  value={action.notes ?? ""}
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <Button
+                className={primaryButtonClass}
+                disabled={!action.title.trim() || saving}
+                onClick={onSave}
+                type="button"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                {action.mode === "edit" ? "Save changes" : "Create event"}
+              </Button>
+              <Button
+                className={secondaryButtonClass}
+                onClick={onClose}
+                type="button"
+              >
+                Cancel
+              </Button>
+            </div>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
 
@@ -4258,7 +4937,9 @@ function TaskWorkspace({
   tasks: RelayTask[];
 }) {
   const googleTasks = briefing?.googleTasks?.tasks ?? [];
-  const openGoogleTasks = googleTasks.filter((task) => task.status !== "completed");
+  const openGoogleTasks = googleTasks.filter(
+    (task) => task.status !== "completed",
+  );
   const [googleStatus, setGoogleStatus] = useState<string | null>(null);
 
   async function completeGoogleTask(task: GoogleTask) {
@@ -4274,7 +4955,11 @@ function TaskWorkspace({
       }),
     });
     const data = (await response.json()) as { ok: boolean; reason?: string };
-    setGoogleStatus(response.ok && data.ok ? "Google task completed." : data.reason ?? "Google task was not completed.");
+    setGoogleStatus(
+      response.ok && data.ok
+        ? "Google task completed."
+        : (data.reason ?? "Google task was not completed."),
+    );
     await refreshWorkspace();
   }
 
@@ -4287,26 +4972,32 @@ function TaskWorkspace({
           <div>
             <h3 className="font-semibold">Open tasks</h3>
             <p className="text-xs text-[var(--muted)]">
-              {tasks.length} local total, {taskColumns.length} columns, {openGoogleTasks.length} Google open
+              {tasks.length} local total, {taskColumns.length} columns,{" "}
+              {openGoogleTasks.length} Google open
             </p>
           </div>
-          <StatusBadge ready={Boolean(briefing?.googleTasks?.ok)} label={briefing?.googleTasks?.ok ? "Google ready" : "Local"} />
+          <StatusBadge
+            ready={Boolean(briefing?.googleTasks?.ok)}
+            label={briefing?.googleTasks?.ok ? "Google ready" : "Local"}
+          />
         </div>
         <div className="space-y-2">
           {openTasks.slice(0, 5).map((task) => (
-            <button
+            <Button
               className="interactive-row flex w-full items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left"
               key={task.id}
               onClick={() => completeTask(task)}
               type="button"
             >
               <Check className="h-4 w-4 text-[var(--success)]" />
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{task.title}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                {task.title}
+              </span>
               <PriorityTag priority={task.priority} />
-            </button>
+            </Button>
           ))}
           {openGoogleTasks.slice(0, 6).map((task) => (
-            <button
+            <Button
               className="interactive-row flex w-full items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left"
               key={`${task.taskListId}-${task.id}`}
               onClick={() => void completeGoogleTask(task)}
@@ -4314,23 +5005,32 @@ function TaskWorkspace({
             >
               <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{task.title}</span>
+                <span className="block truncate text-sm font-semibold">
+                  {task.title}
+                </span>
                 <span className="mt-1 block truncate text-xs text-[var(--muted)]">
-                  {task.due ? `Due ${formatEventTime(task.due)}` : task.taskListTitle ?? "Google Tasks"}
+                  {task.due
+                    ? `Due ${formatEventTime(task.due)}`
+                    : (task.taskListTitle ?? "Google Tasks")}
                 </span>
               </span>
               <span className="text-xs text-[var(--muted)]">Google</span>
-            </button>
+            </Button>
           ))}
         </div>
         {openTasks.length === 0 && openGoogleTasks.length === 0 ? (
           <EmptyState
             icon={ListTodo}
             title="No open tasks"
-            detail={briefing?.googleTasks?.reason ?? "Create one from the task builder."}
+            detail={
+              briefing?.googleTasks?.reason ??
+              "Create one from the task builder."
+            }
           />
         ) : null}
-        {googleStatus ? <p className="mt-3 text-sm text-[var(--muted)]">{googleStatus}</p> : null}
+        {googleStatus ? (
+          <p className="mt-3 text-sm text-[var(--muted)]">{googleStatus}</p>
+        ) : null}
       </section>
     </div>
   );
@@ -4346,10 +5046,14 @@ function FilesWorkspace({
   return (
     <div className="space-y-4 animate-fade-in">
       <RecentFilesPanel briefing={briefing} />
-      <button className={primaryButtonClass} onClick={() => runPrompt("List recent Drive files")} type="button">
+      <Button
+        className={primaryButtonClass}
+        onClick={() => runPrompt("List recent Drive files")}
+        type="button"
+      >
         <FolderOpen className="h-4 w-4" />
         Search Drive
-      </button>
+      </Button>
     </div>
   );
 }
@@ -4370,20 +5074,33 @@ function MemoryWorkspace({
         </div>
         <div className="space-y-2">
           {notes.slice(0, 8).map((note) => (
-            <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3" key={note.id}>
+            <div
+              className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3"
+              key={note.id}
+            >
               <p className="text-sm leading-5">{note.body}</p>
-              <p className="mt-2 text-xs text-[var(--muted)]">{formatFileTime(note.createdAt)}</p>
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                {formatFileTime(note.createdAt)}
+              </p>
             </div>
           ))}
         </div>
         {notes.length === 0 ? (
-          <EmptyState icon={Brain} title="No memories saved" detail="The assistant asks permission before storing long-term memory." />
+          <EmptyState
+            icon={Brain}
+            title="No memories saved"
+            detail="The assistant asks permission before storing long-term memory."
+          />
         ) : null}
       </section>
-      <button className={primaryButtonClass} onClick={() => runPrompt("Remember that ")} type="button">
+      <Button
+        className={primaryButtonClass}
+        onClick={() => runPrompt("Remember that ")}
+        type="button"
+      >
         <Brain className="h-4 w-4" />
         Add memory
-      </button>
+      </Button>
     </div>
   );
 }
@@ -4396,7 +5113,9 @@ function ContactsWorkspace({
   runPrompt: (prompt: string) => void;
 }) {
   const contacts = briefing?.contacts?.contacts ?? [];
-  const birthdayContacts = contacts.filter((contact) => contact.birthday).slice(0, 4);
+  const birthdayContacts = contacts
+    .filter((contact) => contact.birthday)
+    .slice(0, 4);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -4407,32 +5126,37 @@ function ContactsWorkspace({
             <p className="mt-1 text-sm text-[var(--muted)]">
               {briefing?.contacts?.ok
                 ? "Saved contacts, birthdays, emails, phones, and organizations."
-                : briefing?.contacts?.reason ?? "Reconnect Google to grant Contacts access."}
+                : (briefing?.contacts?.reason ??
+                  "Reconnect Google to grant Contacts access.")}
             </p>
           </div>
           <StatusBadge
             ready={Boolean(briefing?.contacts?.ok)}
-            label={briefing?.contacts?.ok ? `${contacts.length} loaded` : "Scope needed"}
+            label={
+              briefing?.contacts?.ok
+                ? `${contacts.length} loaded`
+                : "Scope needed"
+            }
           />
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-          <button
+          <Button
             className={secondaryButtonClass}
             onClick={() => runPrompt("Find a contact")}
             type="button"
           >
             <Search className="h-4 w-4" />
             Find contact
-          </button>
-          <button
+          </Button>
+          <Button
             className={secondaryButtonClass}
             onClick={() => runPrompt("Show upcoming contact birthdays")}
             type="button"
           >
             <CalendarDays className="h-4 w-4" />
             Birthdays
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -4441,18 +5165,26 @@ function ContactsWorkspace({
           <h3 className="mb-3 font-semibold">Birthdays</h3>
           <div className="space-y-2">
             {birthdayContacts.map((contact) => (
-              <button
+              <Button
                 className="interactive-row flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--accent-soft)]"
                 key={`${contact.resourceName}-birthday`}
-                onClick={() => runPrompt(`Prepare a birthday reminder for ${contact.displayName}`)}
+                onClick={() =>
+                  runPrompt(
+                    `Prepare a birthday reminder for ${contact.displayName}`,
+                  )
+                }
                 type="button"
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{contact.displayName}</span>
-                  <span className="mt-1 block text-xs text-[var(--muted)]">{contact.birthday}</span>
+                  <span className="block truncate text-sm font-semibold">
+                    {contact.displayName}
+                  </span>
+                  <span className="mt-1 block text-xs text-[var(--muted)]">
+                    {contact.birthday}
+                  </span>
                 </span>
                 <Bell className="h-4 w-4 text-[var(--muted)]" />
-              </button>
+              </Button>
             ))}
           </div>
         </section>
@@ -4462,7 +5194,7 @@ function ContactsWorkspace({
         <h3 className="mb-3 font-semibold">Recent contacts</h3>
         <div className="space-y-2">
           {contacts.slice(0, 8).map((contact) => (
-            <button
+            <Button
               className="interactive-row grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--accent-soft)]"
               key={contact.resourceName ?? contact.displayName}
               onClick={() => runPrompt(`Open contact ${contact.displayName}`)}
@@ -4471,26 +5203,42 @@ function ContactsWorkspace({
               <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent)]">
                 {contact.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img alt="" className="h-full w-full object-cover" src={contact.photoUrl} />
+                  <img
+                    alt=""
+                    className="h-full w-full object-cover"
+                    src={contact.photoUrl}
+                  />
                 ) : (
                   contact.displayName.slice(0, 1).toUpperCase()
                 )}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{contact.displayName}</span>
+                <span className="block truncate text-sm font-semibold">
+                  {contact.displayName}
+                </span>
                 <span className="mt-1 block truncate text-xs text-[var(--muted)]">
-                  {contact.emails[0] ?? contact.phoneNumbers[0] ?? contact.organization ?? "No contact method"}
+                  {contact.emails[0] ??
+                    contact.phoneNumbers[0] ??
+                    contact.organization ??
+                    "No contact method"}
                 </span>
               </span>
               <ArrowRight className="h-4 w-4 text-[var(--muted)]" />
-            </button>
+            </Button>
           ))}
         </div>
         {contacts.length === 0 ? (
           <EmptyState
             icon={Users}
-            title={briefing?.contacts?.ok ? "No contacts loaded" : "Contacts not connected"}
-            detail={briefing?.contacts?.reason ?? "Reconnect Google to grant the Contacts scope."}
+            title={
+              briefing?.contacts?.ok
+                ? "No contacts loaded"
+                : "Contacts not connected"
+            }
+            detail={
+              briefing?.contacts?.reason ??
+              "Reconnect Google to grant the Contacts scope."
+            }
           />
         ) : null}
       </section>
@@ -4509,10 +5257,14 @@ function EmailWorkspace({
     <div className="space-y-4 animate-fade-in">
       <EmailApprovalSurface />
       <InboxHighlights briefing={briefing ?? null} runPrompt={runPrompt} />
-      <button className={primaryButtonClass} onClick={() => runPrompt("Draft a follow-up email")} type="button">
+      <Button
+        className={primaryButtonClass}
+        onClick={() => runPrompt("Draft a follow-up email")}
+        type="button"
+      >
         <Mail className="h-4 w-4" />
         Draft email
-      </button>
+      </Button>
     </div>
   );
 }
@@ -4536,8 +5288,14 @@ function ScheduleComposer({
   const [date, setDate] = useState(tomorrow.toISOString().slice(0, 10));
   const [time, setTime] = useState("10:00");
   const [duration, setDuration] = useState(30);
-  const [timeZone, setTimeZone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
-  const [status, setStatus] = useState<{ ok: boolean; message: string; link?: string | null } | null>(null);
+  const [timeZone, setTimeZone] = useState(
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
+  const [status, setStatus] = useState<{
+    ok: boolean;
+    message: string;
+    link?: string | null;
+  } | null>(null);
   const [creating, setCreating] = useState(false);
 
   async function createEvent() {
@@ -4570,7 +5328,7 @@ function ScheduleComposer({
         message:
           response.ok && data.ok
             ? `Created ${data.event?.title ?? summary} in Google Calendar.`
-            : data.reason ?? "Calendar event was not created.",
+            : (data.reason ?? "Calendar event was not created."),
         link: data.event?.htmlLink ?? null,
       });
       if (response.ok && data.ok) {
@@ -4583,7 +5341,10 @@ function ScheduleComposer({
     } catch (error) {
       setStatus({
         ok: false,
-        message: error instanceof Error ? error.message : "Calendar event was not created.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Calendar event was not created.",
       });
     } finally {
       setCreating(false);
@@ -4595,14 +5356,21 @@ function ScheduleComposer({
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold">Meeting details</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">Create a real Google Calendar event after approval.</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Create a real Google Calendar event after approval.
+          </p>
         </div>
-        <StatusBadge ready={Boolean(status?.ok)} label={status?.ok ? "Created" : "Needs details"} />
+        <StatusBadge
+          ready={Boolean(status?.ok)}
+          label={status?.ok ? "Created" : "Needs details"}
+        />
       </div>
       <div className="grid gap-3">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">Title</span>
-          <input
+          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            Title
+          </span>
+          <Input
             className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setSummary(event.target.value)}
             placeholder="What should the meeting be called?"
@@ -4611,8 +5379,10 @@ function ScheduleComposer({
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Date</span>
-            <input
+            <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+              Date
+            </span>
+            <Input
               className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
               onChange={(event) => setDate(event.target.value)}
               type="date"
@@ -4620,8 +5390,10 @@ function ScheduleComposer({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Time</span>
-            <input
+            <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+              Time
+            </span>
+            <Input
               className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
               onChange={(event) => setTime(event.target.value)}
               type="time"
@@ -4629,8 +5401,10 @@ function ScheduleComposer({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Duration</span>
-            <select
+            <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+              Duration
+            </span>
+            <Select
               className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
               onChange={(event) => setDuration(Number(event.target.value))}
               value={duration}
@@ -4639,11 +5413,13 @@ function ScheduleComposer({
               <option value={30}>30 minutes</option>
               <option value={45}>45 minutes</option>
               <option value={60}>60 minutes</option>
-            </select>
+            </Select>
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Timezone</span>
-            <input
+            <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+              Timezone
+            </span>
+            <Input
               className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
               onChange={(event) => setTimeZone(event.target.value)}
               value={timeZone}
@@ -4653,23 +5429,36 @@ function ScheduleComposer({
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <ToggleRow checked={online} label="Google Meet" onChange={setOnline} />
-        <ToggleRow checked={reminder} label="10 minute reminder" onChange={setReminder} />
+        <ToggleRow
+          checked={reminder}
+          label="10 minute reminder"
+          onChange={setReminder}
+        />
       </div>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button
+        <Button
           className={primaryButtonClass}
           disabled={creating || !summary.trim()}
           onClick={createEvent}
           type="button"
         >
-          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+          {creating ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
           Create Google event
-        </button>
+        </Button>
         {status?.link ? (
-          <a className={secondaryButtonClass} href={status.link} rel="noreferrer" target="_blank">
+          <Link
+            className={secondaryButtonClass}
+            href={status.link}
+            rel="noreferrer"
+            target="_blank"
+          >
             <ExternalLink className="h-4 w-4" />
             Open event
-          </a>
+          </Link>
         ) : null}
       </div>
       {status ? (
@@ -4701,12 +5490,16 @@ function TaskComposer({
   runPrompt?: (prompt: string) => void;
 }) {
   const [title, setTitle] = useState(initialContext?.title ?? "");
-  const [priority, setPriority] = useState<RelayTaskPriority>(initialContext?.priority ?? "medium");
+  const [priority, setPriority] = useState<RelayTaskPriority>(
+    initialContext?.priority ?? "medium",
+  );
   const [due, setDue] = useState(initialContext?.due ?? "");
   const [notes, setNotes] = useState(initialContext?.notes ?? "");
   const [syncGoogle, setSyncGoogle] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(
+    null,
+  );
 
   async function saveTask() {
     const trimmed = title.trim();
@@ -4735,12 +5528,17 @@ function TaskComposer({
             priority,
           }),
         });
-        const data = (await response.json()) as { ok: boolean; reason?: string };
+        const data = (await response.json()) as {
+          ok: boolean;
+          reason?: string;
+        };
 
         if (!response.ok || !data.ok) {
           setStatus({
             ok: false,
-            message: data.reason ?? "Saved locally, but Google Tasks did not accept the task.",
+            message:
+              data.reason ??
+              "Saved locally, but Google Tasks did not accept the task.",
           });
           return;
         }
@@ -4749,9 +5547,13 @@ function TaskComposer({
       await refreshWorkspace?.();
       setStatus({
         ok: true,
-        message: syncGoogle ? "Saved locally and synced to Google Tasks." : "Saved to local tasks.",
+        message: syncGoogle
+          ? "Saved locally and synced to Google Tasks."
+          : "Saved to local tasks.",
       });
-      onComplete?.(`Task "${trimmed}" created${syncGoogle ? " and synced to Google Tasks" : ""}.`);
+      onComplete?.(
+        `Task "${trimmed}" created${syncGoogle ? " and synced to Google Tasks" : ""}.`,
+      );
       setTitle("");
       setNotes("");
       setDue("");
@@ -4779,54 +5581,71 @@ function TaskComposer({
         </span>
         <div>
           <h3 className="font-semibold">Task builder</h3>
-          <p className="text-sm text-[var(--muted)]">Prefilled from your request. Adjust only what changed.</p>
+          <p className="text-sm text-[var(--muted)]">
+            Prefilled from your request. Adjust only what changed.
+          </p>
         </div>
       </div>
       {initialContext?.relatedCompletionHint ? (
         <div className="mb-4 rounded-xl border border-[var(--warning)] bg-[var(--warning-soft)] p-3">
-          <p className="text-sm font-semibold text-[var(--warning)]">Existing task reference</p>
+          <p className="text-sm font-semibold text-[var(--warning)]">
+            Existing task reference
+          </p>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Possible completed task: {initialContext.relatedCompletionHint}. Confirm before I modify it.
+            Possible completed task: {initialContext.relatedCompletionHint}.
+            Confirm before I modify it.
           </p>
           {runPrompt ? (
-            <button
+            <Button
               className={`${secondaryButtonClass} mt-3 h-9 px-3`}
-              onClick={() => runPrompt(`Confirm and mark the matching task complete: ${initialContext.relatedCompletionHint}`)}
+              onClick={() =>
+                runPrompt(
+                  `Confirm and mark the matching task complete: ${initialContext.relatedCompletionHint}`,
+                )
+              }
               type="button"
             >
               <CheckCircle2 className="h-4 w-4" />
               Confirm completion
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
       <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">Task</span>
-          <input
+          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            Task
+          </span>
+          <Input
             className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setTitle(event.target.value)}
             value={title}
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">Priority</span>
-          <select
+          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            Priority
+          </span>
+          <Select
             className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-            onChange={(event) => setPriority(event.target.value as RelayTaskPriority)}
+            onChange={(event) =>
+              setPriority(event.target.value as RelayTaskPriority)
+            }
             value={priority}
           >
             <option value="urgent">Urgent</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
-          </select>
+          </Select>
         </label>
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr]">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">Due date</span>
-          <input
+          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            Due date
+          </span>
+          <Input
             className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setDue(event.target.value)}
             type="date"
@@ -4834,8 +5653,10 @@ function TaskComposer({
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">Notes</span>
-          <input
+          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            Notes
+          </span>
+          <Input
             className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Context, project, or reminder details"
@@ -4846,14 +5667,28 @@ function TaskComposer({
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <MiniControl label="Storage" value="Local task file" />
         <MiniControl label="Completion" value="Task board checkbox" />
-        <ToggleRow checked={syncGoogle} label="Sync Google Tasks" onChange={setSyncGoogle} />
+        <ToggleRow
+          checked={syncGoogle}
+          label="Sync Google Tasks"
+          onChange={setSyncGoogle}
+        />
       </div>
-      <button className={`${primaryButtonClass} mt-4`} disabled={!title.trim() || saving} type="submit">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+      <Button
+        className={`${primaryButtonClass} mt-4`}
+        disabled={!title.trim() || saving}
+        type="submit"
+      >
+        {saving ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Plus className="h-4 w-4" />
+        )}
         Save task
-      </button>
+      </Button>
       {status ? (
-        <p className={`mt-3 text-sm font-medium ${status.ok ? "text-[var(--success)]" : "text-[var(--warning)]"}`}>
+        <p
+          className={`mt-3 text-sm font-medium ${status.ok ? "text-[var(--success)]" : "text-[var(--warning)]"}`}
+        >
           {status.message}
         </p>
       ) : null}
@@ -4882,7 +5717,10 @@ function FileGeneratedSurface() {
     } catch (error) {
       setResult({
         ok: false,
-        reason: error instanceof Error ? error.message : "Unable to load Drive files.",
+        reason:
+          error instanceof Error
+            ? error.message
+            : "Unable to load Drive files.",
         files: [],
       });
     } finally {
@@ -4907,7 +5745,10 @@ function FileGeneratedSurface() {
         if (!active) return;
         setResult({
           ok: false,
-          reason: error instanceof Error ? error.message : "Unable to load Drive files.",
+          reason:
+            error instanceof Error
+              ? error.message
+              : "Unable to load Drive files.",
           files: [],
         });
       })
@@ -4925,31 +5766,45 @@ function FileGeneratedSurface() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="font-semibold">Drive organizer</h3>
-          <p className="text-sm text-[var(--muted)]">Real recent files from Google Drive.</p>
+          <p className="text-sm text-[var(--muted)]">
+            Real recent files from Google Drive.
+          </p>
         </div>
-        <button className={iconButtonClass} onClick={loadFiles} type="button" title="Refresh files">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-        </button>
+        <Button
+          className={iconButtonClass}
+          onClick={loadFiles}
+          type="button"
+          title="Refresh files"
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCcw className="h-4 w-4" />
+          )}
+        </Button>
       </div>
       {result?.ok && result.files.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-[var(--line)]">
           {result.files.map((file) => {
             const row = (
               <>
-                <DriveFileGlyph className="h-4 w-4 text-[var(--accent)]" mimeType={file.mimeType} />
+                <DriveFileGlyph
+                  className="h-4 w-4 text-[var(--accent)]"
+                  mimeType={file.mimeType}
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{file.name}</p>
                   <p className="text-xs text-[var(--muted)]">
-                    {driveFileType(file.mimeType)} by {file.owner ?? "Unknown owner"}
+                    {driveFileType(file.mimeType)} by{" "}
+                    {file.owner ?? "Unknown owner"}
                   </p>
                 </div>
                 <ExternalLink className="h-4 w-4 text-[var(--muted)]" />
               </>
             );
 
-          return (
-            file.webViewLink ? (
-              <a
+            return file.webViewLink ? (
+              <Link
                 className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3 transition hover:bg-[var(--accent-soft)] last:border-b-0"
                 href={file.webViewLink}
                 key={file.id ?? file.name}
@@ -4957,7 +5812,7 @@ function FileGeneratedSurface() {
                 target="_blank"
               >
                 {row}
-              </a>
+              </Link>
             ) : (
               <div
                 className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3 last:border-b-0"
@@ -4965,15 +5820,16 @@ function FileGeneratedSurface() {
               >
                 {row}
               </div>
-            )
-          );
-        })}
+            );
+          })}
         </div>
       ) : (
         <EmptyState
           icon={FolderOpen}
           title="No Drive files loaded"
-          detail={result?.reason ?? "Connect Google Drive, then refresh this view."}
+          detail={
+            result?.reason ?? "Connect Google Drive, then refresh this view."
+          }
         />
       )}
     </div>
@@ -4998,11 +5854,13 @@ function MemoryPermissionSurface({
         </span>
         <div>
           <h3 className="font-semibold">Memory request</h3>
-          <p className="text-sm text-[var(--muted)]">Long-term memory requires approval.</p>
+          <p className="text-sm text-[var(--muted)]">
+            Long-term memory requires approval.
+          </p>
         </div>
       </div>
       <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-sm leading-6">
-        <textarea
+        <TextArea
           className="min-h-24 w-full resize-y bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
           onChange={(event) => setMemory(event.target.value)}
           placeholder="Write the exact preference, project fact, contact note, or habit to remember."
@@ -5010,8 +5868,12 @@ function MemoryPermissionSurface({
         />
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <ToggleRow checked={allowed} label="Allow memory storage" onChange={setAllowed} />
-        <button
+        <ToggleRow
+          checked={allowed}
+          label="Allow memory storage"
+          onChange={setAllowed}
+        />
+        <Button
           className={primaryButtonClass}
           disabled={!allowed || !memory.trim()}
           onClick={async () => {
@@ -5023,7 +5885,7 @@ function MemoryPermissionSurface({
         >
           <Database className="h-4 w-4" />
           Store memory
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -5060,7 +5922,10 @@ function EmailApprovalSurface({
             },
           }),
         });
-        const data = (await response.json()) as { ok: boolean; reason?: string };
+        const data = (await response.json()) as {
+          ok: boolean;
+          reason?: string;
+        };
         if (!response.ok || !data.ok) {
           setStatus(data.reason ?? "Gmail draft was not created.");
           return;
@@ -5084,14 +5949,21 @@ function EmailApprovalSurface({
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="font-semibold">Email draft</h3>
-          <p className="text-sm text-[var(--muted)]">Creates a Gmail draft when a recipient is provided.</p>
+          <p className="text-sm text-[var(--muted)]">
+            Creates a Gmail draft when a recipient is provided.
+          </p>
         </div>
-        <StatusBadge ready={approved} label={approved ? "Approved" : "Pending"} />
+        <StatusBadge
+          ready={approved}
+          label={approved ? "Approved" : "Pending"}
+        />
       </div>
       <div className="space-y-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-4 text-sm leading-6">
         <label className="block space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">To</span>
-          <input
+          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            To
+          </span>
+          <Input
             className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             disabled={!editing}
             onChange={(event) => setTo(event.target.value)}
@@ -5100,8 +5972,10 @@ function EmailApprovalSurface({
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">Subject</span>
-          <input
+          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            Subject
+          </span>
+          <Input
             className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             disabled={!editing}
             onChange={(event) => setSubject(event.target.value)}
@@ -5109,8 +5983,10 @@ function EmailApprovalSurface({
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">Body</span>
-          <textarea
+          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            Body
+          </span>
+          <TextArea
             className="min-h-28 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
             disabled={!editing}
             onChange={(event) => setBody(event.target.value)}
@@ -5120,20 +5996,32 @@ function EmailApprovalSurface({
         </label>
       </div>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button
+        <Button
           className={primaryButtonClass}
           disabled={!subject.trim() || !body.trim() || savingDraft}
           onClick={() => void approveDraft()}
           type="button"
         >
-          {savingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+          {savingDraft ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ShieldCheck className="h-4 w-4" />
+          )}
           Approve draft
-        </button>
-        <button className={secondaryButtonClass} onClick={() => setEditing(true)} type="button">
+        </Button>
+        <Button
+          className={secondaryButtonClass}
+          onClick={() => setEditing(true)}
+          type="button"
+        >
           Edit draft
-        </button>
+        </Button>
       </div>
-      {status ? <p className="mt-3 text-sm font-medium text-[var(--warning)]">{status}</p> : null}
+      {status ? (
+        <p className="mt-3 text-sm font-medium text-[var(--warning)]">
+          {status}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -5170,7 +6058,9 @@ function TasksView({
   completeTask: (task: RelayTask) => Promise<void>;
   openTasks: RelayTask[];
   refreshWorkspace: () => Promise<void>;
-  setContextMenu: (menu: { x: number; y: number; task: RelayTask } | null) => void;
+  setContextMenu: (
+    menu: { x: number; y: number; task: RelayTask } | null,
+  ) => void;
   taskColumns: TaskColumn[];
   tasks: RelayTask[];
 }) {
@@ -5178,8 +6068,14 @@ function TasksView({
   const [newColumnTitle, setNewColumnTitle] = useState("");
   const [renamingColumn, setRenamingColumn] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const columns = taskColumns.length > 0 ? taskColumns : [{ id: "today", title: "Today", order: 0, createdAt: "system" }];
-  const googleTasks = briefing?.googleTasks?.tasks.filter((task) => task.status !== "completed") ?? [];
+  const columns =
+    taskColumns.length > 0
+      ? taskColumns
+      : [{ id: "today", title: "Today", order: 0, createdAt: "system" }];
+  const googleTasks =
+    briefing?.googleTasks?.tasks.filter(
+      (task) => task.status !== "completed",
+    ) ?? [];
   const sortedLocalTasks = sortTasksByUrgency(openTasks);
 
   async function taskAction(body: Record<string, unknown>) {
@@ -5232,26 +6128,38 @@ function TasksView({
 
   return (
     <div className="grid min-h-[calc(100vh-144px)] gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section className={`${panelClass} flex min-h-0 flex-col overflow-hidden p-5`}>
+      <section
+        className={`${panelClass} flex min-h-0 flex-col overflow-hidden p-5`}
+      >
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold">Task board</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">Editable local Kanban columns with deadline-aware cards.</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Editable local Kanban columns with deadline-aware cards.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button className={secondaryButtonClass} onClick={addColumn} type="button">
+            <Button
+              className={secondaryButtonClass}
+              onClick={addColumn}
+              type="button"
+            >
               <Plus className="h-4 w-4" />
               Add column
-            </button>
-            <button className={primaryButtonClass} onClick={() => setTaskModalOpen(true)} type="button">
+            </Button>
+            <Button
+              className={primaryButtonClass}
+              onClick={() => setTaskModalOpen(true)}
+              type="button"
+            >
               <Plus className="h-4 w-4" />
               Add task
-            </button>
+            </Button>
           </div>
         </div>
 
         <div className="mb-4 flex gap-2">
-          <input
+          <Input
             className="h-10 min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
             onChange={(event) => setNewColumnTitle(event.target.value)}
             onKeyDown={(event) => {
@@ -5260,39 +6168,60 @@ function TasksView({
             placeholder="New column name..."
             value={newColumnTitle}
           />
-          <button className={secondaryButtonClass + " px-3"} onClick={addColumn} type="button" title="Create column">
+          <Button
+            className={secondaryButtonClass + " px-3"}
+            onClick={addColumn}
+            type="button"
+            title="Create column"
+          >
             <Plus className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-x-auto pb-2">
-          <div className="grid min-w-[920px] gap-4" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(260px, 1fr))` }}>
+          <div
+            className="grid min-w-[920px] gap-4"
+            style={{
+              gridTemplateColumns: `repeat(${columns.length}, minmax(260px, 1fr))`,
+            }}
+          >
             {columns.map((column, columnIndex) => {
-              const columnTasks = openTasks.filter((task) => (task.columnId ?? columns[0]?.id) === column.id);
+              const columnTasks = openTasks.filter(
+                (task) => (task.columnId ?? columns[0]?.id) === column.id,
+              );
               return (
                 <div
-                  className={softPanelClass + " flex min-h-[560px] flex-col p-3"}
+                  className={
+                    softPanelClass + " flex min-h-[560px] flex-col p-3"
+                  }
                   key={column.id}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={(event) => {
                     event.preventDefault();
-                    const taskId = event.dataTransfer.getData("text/relay-task-id");
-                    if (taskId) void taskAction({ action: "move", id: taskId, columnId: column.id });
+                    const taskId =
+                      event.dataTransfer.getData("text/relay-task-id");
+                    if (taskId)
+                      void taskAction({
+                        action: "move",
+                        id: taskId,
+                        columnId: column.id,
+                      });
                   }}
                 >
                   <div className="mb-3 flex items-center gap-2">
                     {renamingColumn === column.id ? (
-                      <input
+                      <Input
                         className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-2 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                         onChange={(event) => setRenameValue(event.target.value)}
                         onKeyDown={(event) => {
-                          if (event.key === "Enter") void renameColumn(column.id);
+                          if (event.key === "Enter")
+                            void renameColumn(column.id);
                           if (event.key === "Escape") setRenamingColumn(null);
                         }}
                         value={renameValue}
                       />
                     ) : (
-                      <button
+                      <Button
                         className="min-w-0 flex-1 truncate text-left text-sm font-semibold"
                         onClick={() => {
                           setRenamingColumn(column.id);
@@ -5301,20 +6230,43 @@ function TasksView({
                         type="button"
                       >
                         {column.title}
-                      </button>
+                      </Button>
                     )}
                     <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
                       {columnTasks.length}
                     </span>
-                    <button className={iconButtonClass + " h-8 w-8"} disabled={columnIndex === 0} onClick={() => void reorderColumn(column.id, -1)} type="button" title="Move column left">
+                    <Button
+                      className={iconButtonClass + " h-8 w-8"}
+                      disabled={columnIndex === 0}
+                      onClick={() => void reorderColumn(column.id, -1)}
+                      type="button"
+                      title="Move column left"
+                    >
                       <ArrowRight className="h-3.5 w-3.5 rotate-180" />
-                    </button>
-                    <button className={iconButtonClass + " h-8 w-8"} disabled={columnIndex === columns.length - 1} onClick={() => void reorderColumn(column.id, 1)} type="button" title="Move column right">
+                    </Button>
+                    <Button
+                      className={iconButtonClass + " h-8 w-8"}
+                      disabled={columnIndex === columns.length - 1}
+                      onClick={() => void reorderColumn(column.id, 1)}
+                      type="button"
+                      title="Move column right"
+                    >
                       <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
-                    <button className={iconButtonClass + " h-8 w-8"} disabled={columns.length <= 1} onClick={() => void taskAction({ action: "delete_column", id: column.id })} type="button" title="Delete column">
+                    </Button>
+                    <Button
+                      className={iconButtonClass + " h-8 w-8"}
+                      disabled={columns.length <= 1}
+                      onClick={() =>
+                        void taskAction({
+                          action: "delete_column",
+                          id: column.id,
+                        })
+                      }
+                      type="button"
+                      title="Delete column"
+                    >
                       <X className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   </div>
                   <div className="space-y-3">
                     {columnTasks.map((task) => (
@@ -5338,7 +6290,9 @@ function TasksView({
         </div>
       </section>
 
-      <section className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}>
+      <section
+        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+      >
         <div className="border-b border-[var(--line)] p-5">
           <h2 className="text-lg font-semibold">Global task view</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
@@ -5348,7 +6302,7 @@ function TasksView({
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="space-y-3">
             {sortedLocalTasks.map((task) => (
-              <button
+              <Button
                 className="interactive-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-left"
                 key={task.id}
                 onClick={() => void completeTask(task)}
@@ -5356,16 +6310,19 @@ function TasksView({
               >
                 <PriorityTag priority={task.priority} />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{task.title}</span>
+                  <span className="block truncate text-sm font-semibold">
+                    {task.title}
+                  </span>
                   <span className="mt-1 block truncate text-xs text-[var(--muted)]">
-                    {task.due ? formatDueDate(task.due) : "No deadline"} · {task.notes || "No notes"}
+                    {task.due ? formatDueDate(task.due) : "No deadline"} ·{" "}
+                    {task.notes || "No notes"}
                   </span>
                 </span>
                 <Check className="h-4 w-4 text-[var(--success)]" />
-              </button>
+              </Button>
             ))}
             {googleTasks.map((task) => (
-              <button
+              <Button
                 className="interactive-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-left"
                 key={`${task.taskListId}-${task.id ?? task.title}`}
                 onClick={() => void completeGoogleTask(task)}
@@ -5373,16 +6330,28 @@ function TasksView({
               >
                 <PriorityTag priority={googleTaskPriority(task)} />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{task.title}</span>
+                  <span className="block truncate text-sm font-semibold">
+                    {task.title}
+                  </span>
                   <span className="mt-1 block truncate text-xs text-[var(--muted)]">
-                    {task.due ? formatDueDate(task.due) : task.taskListTitle ?? "Google Tasks"} · {task.notes || "No notes"}
+                    {task.due
+                      ? formatDueDate(task.due)
+                      : (task.taskListTitle ?? "Google Tasks")}{" "}
+                    · {task.notes || "No notes"}
                   </span>
                 </span>
                 <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />
-              </button>
+              </Button>
             ))}
             {sortedLocalTasks.length === 0 && googleTasks.length === 0 ? (
-              <EmptyState icon={ListTodo} title={tasks.length > 0 ? "All tasks complete" : "No tasks yet"} detail={briefing?.googleTasks?.reason ?? "Use Add task or ask chat to create one."} />
+              <EmptyState
+                icon={ListTodo}
+                title={tasks.length > 0 ? "All tasks complete" : "No tasks yet"}
+                detail={
+                  briefing?.googleTasks?.reason ??
+                  "Use Add task or ask chat to create one."
+                }
+              />
             ) : null}
           </div>
         </div>
@@ -5406,7 +6375,9 @@ function TaskKanbanCard({
   task,
 }: {
   completeTask: (task: RelayTask) => Promise<void>;
-  setContextMenu: (menu: { x: number; y: number; task: RelayTask } | null) => void;
+  setContextMenu: (
+    menu: { x: number; y: number; task: RelayTask } | null,
+  ) => void;
   task: RelayTask;
 }) {
   return (
@@ -5422,13 +6393,20 @@ function TaskKanbanCard({
           event.preventDefault();
           setContextMenu({ x: event.clientX, y: event.clientY, task });
         }}
-        onDragStart={(event) => event.dataTransfer.setData("text/relay-task-id", task.id)}
+        onDragStart={(event) =>
+          event.dataTransfer.setData("text/relay-task-id", task.id)
+        }
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <PriorityTag priority={task.priority} />
-          <button className={iconButtonClass + " h-8 w-8"} onClick={() => completeTask(task)} type="button" title="Complete task">
+          <Button
+            className={iconButtonClass + " h-8 w-8"}
+            onClick={() => completeTask(task)}
+            type="button"
+            title="Complete task"
+          >
             <Check className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
         <p className="text-sm font-semibold leading-5">{task.title}</p>
         <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--muted)]">
@@ -5477,61 +6455,122 @@ function TaskCreationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4 backdrop-blur-sm">
-      <div className={`${panelClass} w-full max-w-lg animate-slide-up p-5`}>
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold">Add task</h3>
-            <p className="mt-1 text-sm text-[var(--muted)]">Create a local task with real metadata.</p>
-          </div>
-          <button className={iconButtonClass} onClick={onClose} type="button" title="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-3">
-          <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Title</span>
-            <input className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]" onChange={(event) => setTitle(event.target.value)} value={title} />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">Notes</span>
-            <textarea className="min-h-24 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" onChange={(event) => setNotes(event.target.value)} value={notes} />
-          </label>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="space-y-1">
-              <span className="text-xs font-semibold uppercase text-[var(--muted)]">Due</span>
-              <input className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]" onChange={(event) => setDue(event.target.value)} type="date" value={due} />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold uppercase text-[var(--muted)]">Priority</span>
-              <select className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]" onChange={(event) => setPriority(event.target.value as RelayTaskPriority)} value={priority}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold uppercase text-[var(--muted)]">Column</span>
-              <select className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]" onChange={(event) => setColumnId(event.target.value)} value={columnId}>
-                {columns.map((column) => (
-                  <option key={column.id} value={column.id}>{column.title}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
-        <div className="mt-5 flex gap-2">
-          <button className={primaryButtonClass} disabled={!title.trim() || saving} onClick={() => void save()} type="button">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Create task
-          </button>
-          <button className={secondaryButtonClass} onClick={onClose} type="button">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal isOpen onOpenChange={(open) => !open && onClose()}>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container placement="center">
+          <Modal.Dialog
+            className={`${panelClass} w-full max-w-lg animate-slide-up p-5`}
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">Add task</h3>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Create a local task with real metadata.
+                </p>
+              </div>
+              <Button
+                className={iconButtonClass}
+                onClick={onClose}
+                type="button"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  Title
+                </span>
+                <Input
+                  className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) => setTitle(event.target.value)}
+                  value={title}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  Notes
+                </span>
+                <TextArea
+                  className="min-h-24 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) => setNotes(event.target.value)}
+                  value={notes}
+                />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    Due
+                  </span>
+                  <Input
+                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) => setDue(event.target.value)}
+                    type="date"
+                    value={due}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    Priority
+                  </span>
+                  <Select
+                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) =>
+                      setPriority(event.target.value as RelayTaskPriority)
+                    }
+                    value={priority}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </Select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    Column
+                  </span>
+                  <Select
+                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) => setColumnId(event.target.value)}
+                    value={columnId}
+                  >
+                    {columns.map((column) => (
+                      <option key={column.id} value={column.id}>
+                        {column.title}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              </div>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <Button
+                className={primaryButtonClass}
+                disabled={!title.trim() || saving}
+                onClick={() => void save()}
+                type="button"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Create task
+              </Button>
+              <Button
+                className={secondaryButtonClass}
+                onClick={onClose}
+                type="button"
+              >
+                Cancel
+              </Button>
+            </div>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
 
@@ -5542,7 +6581,10 @@ function FilesView({
   briefing: Briefing | null;
   runPrompt: (prompt: string) => void;
 }) {
-  const initialFiles = useMemo(() => briefing?.drive.files ?? [], [briefing?.drive.files]);
+  const initialFiles = useMemo(
+    () => briefing?.drive.files ?? [],
+    [briefing?.drive.files],
+  );
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<DriveFile[] | null>(null);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
@@ -5550,19 +6592,32 @@ function FilesView({
   const [status, setStatus] = useState<string | null>(null);
   const files = searchResults ?? initialFiles;
   const selectedFile =
-    files.find((file) => (file.id ?? file.name) === selectedFileId) ?? files[0] ?? null;
+    files.find((file) => (file.id ?? file.name) === selectedFileId) ??
+    files[0] ??
+    null;
 
   async function searchFiles(nextQuery = query) {
     setLoading(true);
     setStatus(null);
     try {
-      const response = await fetch(`/api/google/drive/files${nextQuery ? `?q=${encodeURIComponent(nextQuery)}` : ""}`);
-      const data = (await response.json()) as { ok: boolean; reason?: string; files: DriveFile[] };
+      const response = await fetch(
+        `/api/google/drive/files${nextQuery ? `?q=${encodeURIComponent(nextQuery)}` : ""}`,
+      );
+      const data = (await response.json()) as {
+        ok: boolean;
+        reason?: string;
+        files: DriveFile[];
+      };
       setSearchResults(data.files ?? []);
-      setSelectedFileId(data.files?.[0] ? data.files[0].id ?? data.files[0].name : null);
-      if (!response.ok || !data.ok) setStatus(data.reason ?? "Drive search failed.");
+      setSelectedFileId(
+        data.files?.[0] ? (data.files[0].id ?? data.files[0].name) : null,
+      );
+      if (!response.ok || !data.ok)
+        setStatus(data.reason ?? "Drive search failed.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Drive search failed.");
+      setStatus(
+        error instanceof Error ? error.message : "Drive search failed.",
+      );
     } finally {
       setLoading(false);
     }
@@ -5570,19 +6625,27 @@ function FilesView({
 
   return (
     <div className="grid min-h-[calc(100vh-144px)] gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <section className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}>
+      <section
+        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+      >
         <div className="border-b border-[var(--line)] p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold">Drive browser</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                {briefing?.google.connected ? "Browse and search real Google Drive files." : "Connect Google Drive to browse files."}
+                {briefing?.google.connected
+                  ? "Browse and search real Google Drive files."
+                  : "Connect Google Drive to browse files."}
               </p>
             </div>
-            <button className={primaryButtonClass} onClick={() => runPrompt("Summarize my recent Drive files")} type="button">
+            <Button
+              className={primaryButtonClass}
+              onClick={() => runPrompt("Summarize my recent Drive files")}
+              type="button"
+            >
               <Wand2 className="h-4 w-4" />
               Ask AI
-            </button>
+            </Button>
           </div>
           <form
             className="flex gap-2"
@@ -5593,95 +6656,143 @@ function FilesView({
           >
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3">
               <Search className="h-4 w-4 text-[var(--muted)]" />
-              <input
+              <Input
                 className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search Drive files and folders..."
                 value={query}
               />
             </div>
-            <button className={secondaryButtonClass} disabled={loading} type="submit">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            <Button
+              className={secondaryButtonClass}
+              disabled={loading}
+              type="submit"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
               Search
-            </button>
+            </Button>
           </form>
         </div>
 
         <div className="recent-file-strip border-b border-[var(--line)] px-5 py-3">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {initialFiles.slice(0, 8).map((file) => (
-              <button
+              <Button
                 className="interactive-control flex min-w-52 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-left"
                 key={file.id ?? file.name}
                 onClick={() => setSelectedFileId(file.id ?? file.name)}
                 type="button"
               >
-                <DriveFileGlyph className="h-4 w-4 shrink-0 text-[var(--accent)]" mimeType={file.mimeType} />
+                <DriveFileGlyph
+                  className="h-4 w-4 shrink-0 text-[var(--accent)]"
+                  mimeType={file.mimeType}
+                />
                 <span className="min-w-0">
-                  <span className="block truncate text-xs font-semibold">{file.name}</span>
-                  <span className="block truncate text-[11px] text-[var(--muted)]">{formatFileTime(file.modifiedTime)}</span>
+                  <span className="block truncate text-xs font-semibold">
+                    {file.name}
+                  </span>
+                  <span className="block truncate text-[11px] text-[var(--muted)]">
+                    {formatFileTime(file.modifiedTime)}
+                  </span>
                 </span>
-              </button>
+              </Button>
             ))}
             {initialFiles.length === 0 ? (
-              <span className="text-sm text-[var(--muted)]">{briefing?.drive.reason ?? "No recent files loaded."}</span>
+              <span className="text-sm text-[var(--muted)]">
+                {briefing?.drive.reason ?? "No recent files loaded."}
+              </span>
             ) : null}
           </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {status ? <p className="mb-3 rounded-lg border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]">{status}</p> : null}
+          {status ? (
+            <p className="mb-3 rounded-lg border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]">
+              {status}
+            </p>
+          ) : null}
           <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {files.map((file) => (
-                <HoverPreview
-                  detail={`${driveFileType(file.mimeType)} · ${file.owner ?? "Unknown owner"} · ${formatFileTime(file.modifiedTime)}`}
-                  key={file.id ?? file.name}
-                  meta={file.mimeType.includes("folder") ? "Folder" : driveFileType(file.mimeType)}
-                  title={file.name}
+              <HoverPreview
+                detail={`${driveFileType(file.mimeType)} · ${file.owner ?? "Unknown owner"} · ${formatFileTime(file.modifiedTime)}`}
+                key={file.id ?? file.name}
+                meta={
+                  file.mimeType.includes("folder")
+                    ? "Folder"
+                    : driveFileType(file.mimeType)
+                }
+                title={file.name}
+              >
+                <Button
+                  className={`interactive-row rounded-2xl border p-4 text-left ${
+                    selectedFileId === (file.id ?? file.name)
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                      : "border-[var(--line)] bg-[var(--surface-soft)]"
+                  }`}
+                  onClick={() => setSelectedFileId(file.id ?? file.name)}
+                  type="button"
                 >
-                  <button
-                    className={`interactive-row rounded-2xl border p-4 text-left ${
-                      selectedFileId === (file.id ?? file.name)
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                        : "border-[var(--line)] bg-[var(--surface-soft)]"
-                    }`}
-                    onClick={() => setSelectedFileId(file.id ?? file.name)}
-                    type="button"
-                  >
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
-                        <DriveFileGlyph className="h-5 w-5" mimeType={file.mimeType} />
-                      </span>
-                      <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
-                        {driveFileType(file.mimeType)}
-                      </span>
-                    </div>
-                    <p className="line-clamp-3 text-sm font-semibold leading-5">{file.name}</p>
-                    <p className="mt-2 truncate text-xs text-[var(--muted)]">{file.owner ?? "Unknown owner"}</p>
-                  </button>
-                </HoverPreview>
-              ))}
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+                      <DriveFileGlyph
+                        className="h-5 w-5"
+                        mimeType={file.mimeType}
+                      />
+                    </span>
+                    <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
+                      {driveFileType(file.mimeType)}
+                    </span>
+                  </div>
+                  <p className="line-clamp-3 text-sm font-semibold leading-5">
+                    {file.name}
+                  </p>
+                  <p className="mt-2 truncate text-xs text-[var(--muted)]">
+                    {file.owner ?? "Unknown owner"}
+                  </p>
+                </Button>
+              </HoverPreview>
+            ))}
           </div>
           {files.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
-              title={briefing?.google.connected ? "No Drive files found" : "Drive not connected"}
-              detail={status ?? briefing?.drive.reason ?? "Search Drive or connect Google."}
+              title={
+                briefing?.google.connected
+                  ? "No Drive files found"
+                  : "Drive not connected"
+              }
+              detail={
+                status ??
+                briefing?.drive.reason ??
+                "Search Drive or connect Google."
+              }
             />
           ) : null}
         </div>
       </section>
 
-      <section className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}>
+      <section
+        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+      >
         <div className="border-b border-[var(--line)] p-5">
           <h2 className="text-lg font-semibold">Quick preview</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Open, download, or ask AI about the selected file.</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Open, download, or ask AI about the selected file.
+          </p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {selectedFile ? (
             <FilePreviewCard file={selectedFile} runPrompt={runPrompt} />
           ) : (
-            <EmptyState icon={FileText} title="No file selected" detail="Select a Drive file to preview actions." />
+            <EmptyState
+              icon={FileText}
+              title="No file selected"
+              detail="Select a Drive file to preview actions."
+            />
           )}
         </div>
       </section>
@@ -5696,7 +6807,9 @@ function FilePreviewCard({
   file: DriveFile;
   runPrompt: (prompt: string) => void;
 }) {
-  const downloadUrl = file.id ? `https://drive.google.com/uc?id=${encodeURIComponent(file.id)}&export=download` : null;
+  const downloadUrl = file.id
+    ? `https://drive.google.com/uc?id=${encodeURIComponent(file.id)}&export=download`
+    : null;
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -5708,26 +6821,43 @@ function FilePreviewCard({
         <div className="mt-4 space-y-2">
           <MiniControl label="Type" value={driveFileType(file.mimeType)} />
           <MiniControl label="Owner" value={file.owner ?? "Unknown owner"} />
-          <MiniControl label="Modified" value={formatFileTime(file.modifiedTime)} />
+          <MiniControl
+            label="Modified"
+            value={formatFileTime(file.modifiedTime)}
+          />
         </div>
       </div>
       <div className="grid gap-2">
         {file.webViewLink ? (
-          <a className={primaryButtonClass} href={file.webViewLink} rel="noreferrer" target="_blank">
+          <Link
+            className={primaryButtonClass}
+            href={file.webViewLink}
+            rel="noreferrer"
+            target="_blank"
+          >
             <ExternalLink className="h-4 w-4" />
             Open in Drive
-          </a>
+          </Link>
         ) : null}
         {downloadUrl ? (
-          <a className={secondaryButtonClass} href={downloadUrl} rel="noreferrer" target="_blank">
+          <Link
+            className={secondaryButtonClass}
+            href={downloadUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
             <UploadCloud className="h-4 w-4 rotate-180" />
             Download
-          </a>
+          </Link>
         ) : null}
-        <button className={secondaryButtonClass} onClick={() => runPrompt(`Summarize Drive file ${file.name}`)} type="button">
+        <Button
+          className={secondaryButtonClass}
+          onClick={() => runPrompt(`Summarize Drive file ${file.name}`)}
+          type="button"
+        >
           <Sparkles className="h-4 w-4" />
           Ask AI about file
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -5746,8 +6876,13 @@ function GithubView({
     () => briefing?.githubRepositories?.repositories ?? [],
     [briefing?.githubRepositories?.repositories],
   );
-  const [selectedRepoName, setSelectedRepoName] = useState(repositories[0]?.fullName ?? "");
-  const selectedRepo = repositories.find((repo) => repo.fullName === selectedRepoName) ?? repositories[0] ?? null;
+  const [selectedRepoName, setSelectedRepoName] = useState(
+    repositories[0]?.fullName ?? "",
+  );
+  const selectedRepo =
+    repositories.find((repo) => repo.fullName === selectedRepoName) ??
+    repositories[0] ??
+    null;
   const selectedRepoFullName = selectedRepo?.fullName ?? "";
   const [repoIssues, setRepoIssues] = useState<GithubIssue[]>([]);
   const [repoPulls, setRepoPulls] = useState<GithubPullRequest[]>([]);
@@ -5765,19 +6900,42 @@ function GithubView({
       setGithubStatus(null);
       try {
         const [issuesResponse, pullsResponse] = await Promise.all([
-          fetch(`/api/github/issues?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(name)}&maxResults=20`),
-          fetch(`/api/github/pulls?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(name)}&maxResults=10`),
+          fetch(
+            `/api/github/issues?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(name)}&maxResults=20`,
+          ),
+          fetch(
+            `/api/github/pulls?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(name)}&maxResults=10`,
+          ),
         ]);
-        const issuesData = (await issuesResponse.json()) as { ok: boolean; reason?: string; issues: GithubIssue[] };
-        const pullsData = (await pullsResponse.json()) as { ok: boolean; reason?: string; pullRequests: GithubPullRequest[] };
+        const issuesData = (await issuesResponse.json()) as {
+          ok: boolean;
+          reason?: string;
+          issues: GithubIssue[];
+        };
+        const pullsData = (await pullsResponse.json()) as {
+          ok: boolean;
+          reason?: string;
+          pullRequests: GithubPullRequest[];
+        };
 
         if (!active) return;
         setRepoIssues(issuesData.issues ?? []);
         setRepoPulls(pullsData.pullRequests ?? []);
-        if (!issuesResponse.ok || !issuesData.ok) setGithubStatus(issuesData.reason ?? "Unable to load repository issues.");
-        if (!pullsResponse.ok || !pullsData.ok) setGithubStatus(pullsData.reason ?? "Unable to load repository pull requests.");
+        if (!issuesResponse.ok || !issuesData.ok)
+          setGithubStatus(
+            issuesData.reason ?? "Unable to load repository issues.",
+          );
+        if (!pullsResponse.ok || !pullsData.ok)
+          setGithubStatus(
+            pullsData.reason ?? "Unable to load repository pull requests.",
+          );
       } catch (error) {
-        if (active) setGithubStatus(error instanceof Error ? error.message : "Unable to load repository context.");
+        if (active)
+          setGithubStatus(
+            error instanceof Error
+              ? error.message
+              : "Unable to load repository context.",
+          );
       } finally {
         if (active) setLoadingRepo(false);
       }
@@ -5796,64 +6954,110 @@ function GithubView({
 
   return (
     <div className="grid min-h-[calc(100vh-144px)] gap-5 xl:grid-cols-[300px_minmax(0,1fr)_360px]">
-      <section className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}>
+      <section
+        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+      >
         <div className="border-b border-[var(--line)] p-5">
           <h2 className="text-lg font-semibold">Repositories</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            {signedInToGithub ? `${repositories.length} recent repos` : "Connect GitHub to browse repositories."}
+            {signedInToGithub
+              ? `${repositories.length} recent repos`
+              : "Connect GitHub to browse repositories."}
           </p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {repositories.map((repo) => (
-            <button
+            <Button
               className={`mb-2 w-full rounded-xl border p-3 text-left transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] ${
-                selectedRepo?.id === repo.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--line)] bg-[var(--surface-soft)]"
+                selectedRepo?.id === repo.id
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                  : "border-[var(--line)] bg-[var(--surface-soft)]"
               }`}
               key={repo.id}
               onClick={() => setSelectedRepoName(repo.fullName)}
               type="button"
             >
-              <span className="block truncate text-sm font-semibold">{repo.fullName}</span>
+              <span className="block truncate text-sm font-semibold">
+                {repo.fullName}
+              </span>
               <span className="mt-1 block truncate text-xs text-[var(--muted)]">
                 {repo.language ?? "No language"} · {repo.openIssues} open
               </span>
-            </button>
+            </Button>
           ))}
           {repositories.length === 0 ? (
-            <EmptyState icon={GitBranch} title={signedInToGithub ? "No repositories loaded" : "GitHub not connected"} detail={briefing?.githubRepositories?.reason ?? "Connect GitHub from Integrations."} />
+            <EmptyState
+              icon={GitBranch}
+              title={
+                signedInToGithub
+                  ? "No repositories loaded"
+                  : "GitHub not connected"
+              }
+              detail={
+                briefing?.githubRepositories?.reason ??
+                "Connect GitHub from Integrations."
+              }
+            />
           ) : null}
         </div>
       </section>
 
-      <section className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}>
+      <section
+        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+      >
         <div className="border-b border-[var(--line)] p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-semibold">{selectedRepo?.fullName ?? "Repository workspace"}</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">{selectedRepo?.description ?? "Select a repository to inspect its issues and pull requests."}</p>
+              <h2 className="truncate text-xl font-semibold">
+                {selectedRepo?.fullName ?? "Repository workspace"}
+              </h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                {selectedRepo?.description ??
+                  "Select a repository to inspect its issues and pull requests."}
+              </p>
             </div>
             <div className="flex gap-2">
               {selectedRepo?.htmlUrl ? (
-                <a className={secondaryButtonClass} href={selectedRepo.htmlUrl} rel="noreferrer" target="_blank">
+                <Link
+                  className={secondaryButtonClass}
+                  href={selectedRepo.htmlUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
                   <ExternalLink className="h-4 w-4" />
                   Open repo
-                </a>
+                </Link>
               ) : null}
-              <button className={primaryButtonClass} disabled={!selectedRepo} onClick={() => askRepo("What should I fix first in this repo?")} type="button">
+              <Button
+                className={primaryButtonClass}
+                disabled={!selectedRepo}
+                onClick={() => askRepo("What should I fix first in this repo?")}
+                type="button"
+              >
                 <Sparkles className="h-4 w-4" />
                 Ask AI
-              </button>
+              </Button>
             </div>
           </div>
           {selectedRepo ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-4">
-              <MiniControl label="Issues" value={`${selectedRepo.openIssues}`} />
+              <MiniControl
+                label="Issues"
+                value={`${selectedRepo.openIssues}`}
+              />
               <MiniControl label="Stars" value={`${selectedRepo.stars}`} />
               <MiniControl label="Forks" value={`${selectedRepo.forks}`} />
-              <MiniControl label="Updated" value={formatFileTime(selectedRepo.updatedAt)} />
+              <MiniControl
+                label="Updated"
+                value={formatFileTime(selectedRepo.updatedAt)}
+              />
             </div>
           ) : null}
-          {githubStatus ? <p className="mt-3 rounded-lg border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]">{githubStatus}</p> : null}
+          {githubStatus ? (
+            <p className="mt-3 rounded-lg border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]">
+              {githubStatus}
+            </p>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -5865,28 +7069,40 @@ function GithubView({
             </div>
           ) : (
             <div className="grid gap-5 xl:grid-cols-2">
-              <GithubIssueList issues={repoIssues} runPrompt={runPrompt} title="Open issues" />
+              <GithubIssueList
+                issues={repoIssues}
+                runPrompt={runPrompt}
+                title="Open issues"
+              />
               <GithubPullList pullRequests={repoPulls} runPrompt={runPrompt} />
             </div>
           )}
         </div>
       </section>
 
-      <section className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}>
+      <section
+        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+      >
         <div className="border-b border-[var(--line)] p-5">
           <h2 className="text-lg font-semibold">Repo Q&A</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Ask the assistant with repository context attached.</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Ask the assistant with repository context attached.
+          </p>
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
-          {["Summarize open issues", "What should I fix first?", "What changed recently?"].map((prompt) => (
-            <button
+          {[
+            "Summarize open issues",
+            "What should I fix first?",
+            "What changed recently?",
+          ].map((prompt) => (
+            <Button
               className="interactive-row w-full rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-left text-sm font-semibold"
               key={prompt}
               onClick={() => askRepo(prompt)}
               type="button"
             >
               {prompt}
-            </button>
+            </Button>
           ))}
         </div>
         <form
@@ -5899,15 +7115,20 @@ function GithubView({
           }}
         >
           <div className="flex gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-2">
-            <input
+            <Input
               className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-[var(--muted)]"
               onChange={(event) => setQuestion(event.target.value)}
               placeholder="Ask about this repo..."
               value={question}
             />
-            <button className={primaryButtonClass + " h-10 w-10 px-0"} disabled={!selectedRepo} type="submit" title="Ask">
+            <Button
+              className={primaryButtonClass + " h-10 w-10 px-0"}
+              disabled={!selectedRepo}
+              type="submit"
+              title="Ask"
+            >
               <Send className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </form>
       </section>
@@ -5932,29 +7153,61 @@ function GithubIssueList({
       </div>
       <div className="space-y-3">
         {issues.map((issue) => (
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3" key={issue.id}>
+          <div
+            className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3"
+            key={issue.id}
+          >
             <div className="mb-2 flex items-start justify-between gap-3">
-              <button
+              <Button
                 className="min-w-0 text-left"
-                onClick={() => runPrompt(`Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`)}
+                onClick={() =>
+                  runPrompt(
+                    `Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`,
+                  )
+                }
                 type="button"
               >
-                <span className="block line-clamp-3 text-sm font-semibold leading-5">{issue.title}</span>
-                <span className="mt-1 block text-xs text-[var(--muted)]">#{issue.number} · {formatFileTime(issue.updatedAt)}</span>
-              </button>
-              <a className={iconButtonClass + " h-8 w-8"} href={issue.htmlUrl} rel="noreferrer" target="_blank" title="Open issue">
+                <span className="block line-clamp-3 text-sm font-semibold leading-5">
+                  {issue.title}
+                </span>
+                <span className="mt-1 block text-xs text-[var(--muted)]">
+                  #{issue.number} · {formatFileTime(issue.updatedAt)}
+                </span>
+              </Button>
+              <Link
+                aria-label="Open issue"
+                className={iconButtonClass + " h-8 w-8"}
+                href={issue.htmlUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
                 <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+              </Link>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${githubUrgencyClass(issue)}`}>{githubUrgency(issue)}</span>
+              <span
+                className={`rounded-full px-2 py-1 text-[11px] font-semibold ${githubUrgencyClass(issue)}`}
+              >
+                {githubUrgency(issue)}
+              </span>
               {issue.labels.slice(0, 3).map((label) => (
-                <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]" key={label}>{label}</span>
+                <span
+                  className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]"
+                  key={label}
+                >
+                  {label}
+                </span>
               ))}
             </div>
           </div>
         ))}
-        {issues.length === 0 ? <EmptyState icon={GitBranch} title="No issues loaded" detail="This repository has no open issues in the loaded view." /> : null}
+        {issues.length === 0 ? (
+          <EmptyState
+            icon={GitBranch}
+            title="No issues loaded"
+            detail="This repository has no open issues in the loaded view."
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -5975,27 +7228,57 @@ function GithubPullList({
       </div>
       <div className="space-y-3">
         {pullRequests.map((pullRequest) => (
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3" key={pullRequest.id}>
+          <div
+            className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3"
+            key={pullRequest.id}
+          >
             <div className="mb-2 flex items-start justify-between gap-3">
-              <button
+              <Button
                 className="min-w-0 text-left"
-                onClick={() => runPrompt(`Summarize GitHub pull request ${pullRequest.repositoryFullName} #${pullRequest.number}`)}
+                onClick={() =>
+                  runPrompt(
+                    `Summarize GitHub pull request ${pullRequest.repositoryFullName} #${pullRequest.number}`,
+                  )
+                }
                 type="button"
               >
-                <span className="block line-clamp-3 text-sm font-semibold leading-5">{pullRequest.title}</span>
-                <span className="mt-1 block text-xs text-[var(--muted)]">#{pullRequest.number} · {formatFileTime(pullRequest.updatedAt)}</span>
-              </button>
-              <a className={iconButtonClass + " h-8 w-8"} href={pullRequest.htmlUrl} rel="noreferrer" target="_blank" title="Open pull request">
+                <span className="block line-clamp-3 text-sm font-semibold leading-5">
+                  {pullRequest.title}
+                </span>
+                <span className="mt-1 block text-xs text-[var(--muted)]">
+                  #{pullRequest.number} ·{" "}
+                  {formatFileTime(pullRequest.updatedAt)}
+                </span>
+              </Button>
+              <Link
+                aria-label="Open pull request"
+                className={iconButtonClass + " h-8 w-8"}
+                href={pullRequest.htmlUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
                 <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+              </Link>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)]">{pullRequest.state}</span>
-              {pullRequest.draft ? <span className="rounded-full bg-[var(--warning-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--warning)]">draft</span> : null}
+              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)]">
+                {pullRequest.state}
+              </span>
+              {pullRequest.draft ? (
+                <span className="rounded-full bg-[var(--warning-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--warning)]">
+                  draft
+                </span>
+              ) : null}
             </div>
           </div>
         ))}
-        {pullRequests.length === 0 ? <EmptyState icon={GitBranch} title="No pull requests loaded" detail="Open pull requests will appear here." /> : null}
+        {pullRequests.length === 0 ? (
+          <EmptyState
+            icon={GitBranch}
+            title="No pull requests loaded"
+            detail="Open pull requests will appear here."
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -6017,27 +7300,44 @@ function GithubWorkspace({
       <section className={softPanelClass + " p-4"}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate font-semibold">{selectedRepo?.fullName ?? "GitHub context"}</h3>
+            <h3 className="truncate font-semibold">
+              {selectedRepo?.fullName ?? "GitHub context"}
+            </h3>
             <p className="mt-1 truncate text-xs text-[var(--muted)]">
-              {briefing?.github?.connected ? `${repositories.length} repos loaded` : "GitHub not connected"}
+              {briefing?.github?.connected
+                ? `${repositories.length} repos loaded`
+                : "GitHub not connected"}
             </p>
           </div>
           <GitBranch className="h-4 w-4 text-[var(--accent)]" />
         </div>
         <div className="grid gap-2">
-          <button className={primaryButtonClass + " w-full"} onClick={() => runPrompt("What should I fix first on GitHub?")} type="button">
+          <Button
+            className={primaryButtonClass + " w-full"}
+            onClick={() => runPrompt("What should I fix first on GitHub?")}
+            type="button"
+          >
             <Sparkles className="h-4 w-4" />
             Prioritize GitHub work
-          </button>
+          </Button>
           {selectedRepo?.htmlUrl ? (
-            <a className={secondaryButtonClass + " w-full"} href={selectedRepo.htmlUrl} rel="noreferrer" target="_blank">
+            <Link
+              className={secondaryButtonClass + " w-full"}
+              href={selectedRepo.htmlUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
               <ExternalLink className="h-4 w-4" />
               Open repo
-            </a>
+            </Link>
           ) : null}
         </div>
       </section>
-      <GithubIssueList issues={issues.slice(0, 5)} runPrompt={runPrompt} title="Assigned issues" />
+      <GithubIssueList
+        issues={issues.slice(0, 5)}
+        runPrompt={runPrompt}
+        title="Assigned issues"
+      />
     </div>
   );
 }
@@ -6056,14 +7356,19 @@ function MemoryView({
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Memory vault</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">Preferences, projects, contacts, and habits.</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Preferences, projects, contacts, and habits.
+            </p>
           </div>
           <StatusBadge ready label={`${notes.length} notes`} />
         </div>
         <div className="space-y-3">
           {notes.length > 0 ? (
             notes.slice(0, 8).map((note) => (
-              <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-4" key={note.id}>
+              <div
+                className="rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-4"
+                key={note.id}
+              >
                 <p className="text-sm leading-6">{note.body}</p>
                 <p className="mt-2 text-xs text-[var(--muted)]">
                   {new Date(note.createdAt).toLocaleString()}
@@ -6215,11 +7520,13 @@ function IntegrationConnectPanel({
                   ? "OAuth app configured"
                   : disconnectedLabel}
             </p>
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{description}</p>
+            <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+              {description}
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
-          <button
+          <Button
             className={signedIn ? secondaryButtonClass : primaryButtonClass}
             disabled={!configured && !signedIn}
             onClick={onConnect}
@@ -6227,11 +7534,15 @@ function IntegrationConnectPanel({
           >
             <Link2 className="h-4 w-4" />
             {signedIn ? "Reconnect" : "Connect"}
-          </button>
+          </Button>
           {signedIn ? (
-            <button className={secondaryButtonClass} onClick={onDisconnect} type="button">
+            <Button
+              className={secondaryButtonClass}
+              onClick={onDisconnect}
+              type="button"
+            >
               Disconnect
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -6267,15 +7578,24 @@ function ProfileView({
   signedInToGoogle: boolean;
 }) {
   const user = passwordAuth?.user;
-  const displayEmail = user?.email ?? oauthStatus?.googleEmail ?? oauthStatus?.github?.email ?? "No email connected";
-  const displayName = user?.name || oauthStatus?.github?.name || oauthStatus?.github?.login || "Relay user";
+  const displayEmail =
+    user?.email ??
+    oauthStatus?.googleEmail ??
+    oauthStatus?.github?.email ??
+    "No email connected";
+  const displayName =
+    user?.name ||
+    oauthStatus?.github?.name ||
+    oauthStatus?.github?.login ||
+    "Relay user";
   const usingPostgres = passwordAuth?.persistence === "postgres";
-  const initials = displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "R";
+  const initials =
+    displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "R";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -6288,22 +7608,59 @@ function ProfileView({
                   {initials}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">Profile</p>
-                  <h2 className="mt-2 truncate text-2xl font-semibold text-white sm:text-3xl">{displayName}</h2>
-                  <p className="mt-1 truncate text-sm text-white/75">{displayEmail}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+                    Profile
+                  </p>
+                  <h2 className="mt-2 truncate text-2xl font-semibold text-white sm:text-3xl">
+                    {displayName}
+                  </h2>
+                  <p className="mt-1 truncate text-sm text-white/75">
+                    {displayEmail}
+                  </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <StatusBadge ready={Boolean(user?.emailVerified)} label={user?.emailVerified ? "Email verified" : "Email not verified"} />
-                <StatusBadge ready={Boolean(signedInToGoogle || signedInToGithub)} label={signedInToGoogle || signedInToGithub ? "OAuth linked" : "No OAuth"} />
+                <StatusBadge
+                  ready={Boolean(user?.emailVerified)}
+                  label={
+                    user?.emailVerified
+                      ? "Email verified"
+                      : "Email not verified"
+                  }
+                />
+                <StatusBadge
+                  ready={Boolean(signedInToGoogle || signedInToGithub)}
+                  label={
+                    signedInToGoogle || signedInToGithub
+                      ? "OAuth linked"
+                      : "No OAuth"
+                  }
+                />
               </div>
             </div>
           </div>
 
           <div className="grid gap-3 p-5 sm:grid-cols-3">
-            <MiniControl label="Password session" value={passwordAuth?.authenticated ? "Active" : "Not signed in"} />
-            <MiniControl label="Google" value={signedInToGoogle ? oauthStatus?.googleEmail ?? "Connected" : "Not connected"} />
-            <MiniControl label="GitHub" value={signedInToGithub ? oauthStatus?.github?.login ?? "Connected" : "Not connected"} />
+            <MiniControl
+              label="Password session"
+              value={passwordAuth?.authenticated ? "Active" : "Not signed in"}
+            />
+            <MiniControl
+              label="Google"
+              value={
+                signedInToGoogle
+                  ? (oauthStatus?.googleEmail ?? "Connected")
+                  : "Not connected"
+              }
+            />
+            <MiniControl
+              label="GitHub"
+              value={
+                signedInToGithub
+                  ? (oauthStatus?.github?.login ?? "Connected")
+                  : "Not connected"
+              }
+            />
           </div>
         </div>
 
@@ -6319,14 +7676,20 @@ function ProfileView({
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold">Connected identities</h3>
-              <p className="mt-1 text-sm text-[var(--muted)]">Manage the accounts this assistant can use.</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Manage the accounts this assistant can use.
+              </p>
             </div>
             <Link2 className="h-5 w-5 text-[var(--accent)]" />
           </div>
           <div className="space-y-3">
             <ProfileConnectionRow
               configured={googleConfigured}
-              detail={signedInToGoogle ? oauthStatus?.googleEmail ?? "Google Workspace connected" : "Calendar, Gmail, Drive, and Tasks access"}
+              detail={
+                signedInToGoogle
+                  ? (oauthStatus?.googleEmail ?? "Google Workspace connected")
+                  : "Calendar, Gmail, Drive, and Tasks access"
+              }
               icon={Globe}
               name="Google Workspace"
               onConnect={connectGoogle}
@@ -6335,7 +7698,11 @@ function ProfileView({
             />
             <ProfileConnectionRow
               configured={githubConfigured}
-              detail={signedInToGithub ? oauthStatus?.github?.login ?? "GitHub connected" : "Repositories, issues, and pull requests"}
+              detail={
+                signedInToGithub
+                  ? (oauthStatus?.github?.login ?? "GitHub connected")
+                  : "Repositories, issues, and pull requests"
+              }
               icon={GitBranch}
               name="GitHub"
               onConnect={connectGithub}
@@ -6352,14 +7719,31 @@ function ProfileView({
             </span>
             <div>
               <h3 className="text-lg font-semibold">Account persistence</h3>
-              <p className="mt-1 text-sm text-[var(--muted)]">What is real in this deployment.</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                What is real in this deployment.
+              </p>
             </div>
           </div>
           <div className="grid gap-3">
-            <SettingRow label="Email/password users" value={usingPostgres ? "Postgres database" : "Local JSON file store"} />
+            <SettingRow
+              label="Email/password users"
+              value={
+                usingPostgres ? "Postgres database" : "Local JSON file store"
+              }
+            />
             <SettingRow label="Session type" value="Signed HTTP-only cookie" />
-            <SettingRow label="Vercel database" value={usingPostgres ? "Connected through DATABASE_URL" : "Not connected yet"} />
-            <SettingRow label="Production recommendation" value="Postgres + Auth adapter" />
+            <SettingRow
+              label="Vercel database"
+              value={
+                usingPostgres
+                  ? "Connected through DATABASE_URL"
+                  : "Not connected yet"
+              }
+            />
+            <SettingRow
+              label="Production recommendation"
+              value="Postgres + Auth adapter"
+            />
           </div>
           <p
             className={`mt-4 rounded-xl border p-4 text-sm leading-6 ${
@@ -6390,7 +7774,10 @@ function ProfilePasswordPanel({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState<{ tone: "success" | "warning"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    tone: "success" | "warning";
+    text: string;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -6413,17 +7800,26 @@ function ProfilePasswordPanel({
       const data = (await response.json()) as { ok: boolean; reason?: string };
 
       if (!response.ok || !data.ok) {
-        setMessage({ tone: "warning", text: data.reason ?? "Unable to change password." });
+        setMessage({
+          tone: "warning",
+          text: data.reason ?? "Unable to change password.",
+        });
         return;
       }
 
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setMessage({ tone: "success", text: "Password updated. Your session remains active." });
+      setMessage({
+        tone: "success",
+        text: "Password updated. Your session remains active.",
+      });
       await onPasswordChanged();
     } catch {
-      setMessage({ tone: "warning", text: "Password update failed. Try again." });
+      setMessage({
+        tone: "warning",
+        text: "Password update failed. Try again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -6446,7 +7842,9 @@ function ProfilePasswordPanel({
         </span>
         <div>
           <h3 className="text-lg font-semibold">Security</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">Change password or end this browser session.</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Change password or end this browser session.
+          </p>
         </div>
       </div>
 
@@ -6479,25 +7877,44 @@ function ProfilePasswordPanel({
           value={confirmPassword}
         />
         {message ? (
-          <p className={`rounded-lg p-3 text-sm font-medium ${message.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--warning-soft)] text-[var(--warning)]"}`}>
+          <p
+            className={`rounded-lg p-3 text-sm font-medium ${message.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--warning-soft)] text-[var(--warning)]"}`}
+          >
             {message.text}
           </p>
         ) : null}
-        <button className={primaryButtonClass + " w-full"} disabled={!canChangePassword || saving} type="submit">
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+        <Button
+          className={primaryButtonClass + " w-full"}
+          disabled={!canChangePassword || saving}
+          type="submit"
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ShieldCheck className="h-4 w-4" />
+          )}
           Change password
-        </button>
+        </Button>
       </form>
 
       <div className="mt-4 border-t border-[var(--line)] pt-4">
-        <button className={secondaryButtonClass + " w-full"} disabled={signingOut} onClick={signOut} type="button">
-          {signingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+        <Button
+          className={secondaryButtonClass + " w-full"}
+          disabled={signingOut}
+          onClick={signOut}
+          type="button"
+        >
+          {signingOut ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="h-4 w-4" />
+          )}
           Sign out
-        </button>
+        </Button>
         {!canChangePassword ? (
           <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-            Password changes require an active email/password session. OAuth-only users can manage
-            connected accounts below.
+            Password changes require an active email/password session.
+            OAuth-only users can manage connected accounts below.
           </p>
         ) : null}
       </div>
@@ -6531,22 +7948,28 @@ function ProfileConnectionRow({
           </span>
           <div className="min-w-0">
             <p className="font-semibold">{name}</p>
-            <p className="mt-1 truncate text-sm text-[var(--muted)]">{detail}</p>
+            <p className="mt-1 truncate text-sm text-[var(--muted)]">
+              {detail}
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
-          <button
+          <Button
             className={signedIn ? secondaryButtonClass : primaryButtonClass}
             disabled={!configured && !signedIn}
             onClick={onConnect}
             type="button"
           >
             {signedIn ? "Reconnect" : "Connect"}
-          </button>
+          </Button>
           {signedIn ? (
-            <button className={secondaryButtonClass} onClick={onDisconnect} type="button">
+            <Button
+              className={secondaryButtonClass}
+              onClick={onDisconnect}
+              type="button"
+            >
               Disconnect
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -6585,7 +8008,10 @@ function SettingsView({
     } catch (error) {
       setProviderHealth({
         ok: false,
-        message: error instanceof Error ? error.message : "Unable to reach the provider check.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to reach the provider check.",
       });
     } finally {
       setCheckingProvider(false);
@@ -6602,15 +8028,29 @@ function SettingsView({
           <div>
             <h2 className="text-xl font-semibold">AI provider</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              {aiStatus?.configured ? `${aiStatus.label} key is present` : "Local mode"}
+              {aiStatus?.configured
+                ? `${aiStatus.label} key is present`
+                : "Local mode"}
             </p>
           </div>
         </div>
         <div className="grid gap-3">
-          <SettingRow label="Provider" value={aiStatus?.label ?? "OpenRouter"} />
-          <SettingRow label="Model" value={aiStatus?.modelId ?? "openrouter/free"} />
-          <SettingRow label="Server key" value={aiStatus?.configured ? "Present" : "Missing"} />
-          <SettingRow label="Recommended free start" value="OpenRouter free router" />
+          <SettingRow
+            label="Provider"
+            value={aiStatus?.label ?? "OpenRouter"}
+          />
+          <SettingRow
+            label="Model"
+            value={aiStatus?.modelId ?? "openrouter/free"}
+          />
+          <SettingRow
+            label="Server key"
+            value={aiStatus?.configured ? "Present" : "Missing"}
+          />
+          <SettingRow
+            label="Recommended free start"
+            value="OpenRouter free router"
+          />
           <SettingRow label="Regional fallback" value="Gemini when available" />
         </div>
         <div className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3">
@@ -6621,15 +8061,19 @@ function SettingsView({
                 Confirms the server key can make a real model call.
               </p>
             </div>
-            <button
+            <Button
               className={secondaryButtonClass}
               disabled={checkingProvider}
               onClick={testProvider}
               type="button"
             >
-              {checkingProvider ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+              {checkingProvider ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
               Test
-            </button>
+            </Button>
           </div>
           {providerHealth ? (
             <p
@@ -6653,13 +8097,30 @@ function SettingsView({
           </span>
           <div>
             <h2 className="text-xl font-semibold">Security posture</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">Human approval and scoped OAuth.</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Human approval and scoped OAuth.
+            </p>
           </div>
         </div>
         <div className="grid gap-3">
-          <SettingRow label="Google OAuth" value={oauthStatus?.hasDirectGoogleToken ? "Connected" : "Not connected"} />
-          <SettingRow label="GitHub OAuth" value={oauthStatus?.github?.connected ? oauthStatus.github.login ?? "Connected" : "Not connected"} />
-          <SettingRow label="Token storage" value="HTTP-only cookie in development" />
+          <SettingRow
+            label="Google OAuth"
+            value={
+              oauthStatus?.hasDirectGoogleToken ? "Connected" : "Not connected"
+            }
+          />
+          <SettingRow
+            label="GitHub OAuth"
+            value={
+              oauthStatus?.github?.connected
+                ? (oauthStatus.github.login ?? "Connected")
+                : "Not connected"
+            }
+          />
+          <SettingRow
+            label="Token storage"
+            value="HTTP-only cookie in development"
+          />
           <SettingRow label="High-impact actions" value="Approval required" />
           <SettingRow label="Long-term memory" value="Permission required" />
         </div>
@@ -6691,7 +8152,9 @@ function RightSidebar({
           </span>
         </div>
         <p className="text-sm leading-6 text-[var(--muted)]">
-          {briefing?.focus?.title ?? openTasks[0]?.title ?? "No current task. Add one from chat or Tasks."}
+          {briefing?.focus?.title ??
+            openTasks[0]?.title ??
+            "No current task. Add one from chat or Tasks."}
         </p>
       </section>
 
@@ -6710,12 +8173,16 @@ function RightSidebar({
           {
             label: "Calendar data",
             ready: Boolean(briefing?.calendar.ok),
-            value: briefing?.calendar.ok ? `${briefing.calendar.events.length} events` : "Unavailable",
+            value: briefing?.calendar.ok
+              ? `${briefing.calendar.events.length} events`
+              : "Unavailable",
           },
           {
             label: "Drive data",
             ready: Boolean(briefing?.drive.ok),
-            value: briefing?.drive.ok ? `${briefing.drive.files.length} files` : "Unavailable",
+            value: briefing?.drive.ok
+              ? `${briefing.drive.files.length} files`
+              : "Unavailable",
           },
         ].map((check) => (
           <SidebarStatus
@@ -6729,9 +8196,21 @@ function RightSidebar({
 
       <RailDisclosure icon={Cloud} title="Active integrations">
         <div className="space-y-2">
-          <SidebarStatus label="Google" ready={signedInToGoogle} value={oauthStatus?.googleEmail ?? "OAuth"} />
-          <SidebarStatus label="AI" ready={Boolean(aiStatus?.configured)} value={aiStatus?.configured ? `${aiStatus.label} key` : "Local"} />
-          <SidebarStatus label="Local store" ready value={`${openTasks.length} open tasks`} />
+          <SidebarStatus
+            label="Google"
+            ready={signedInToGoogle}
+            value={oauthStatus?.googleEmail ?? "OAuth"}
+          />
+          <SidebarStatus
+            label="AI"
+            ready={Boolean(aiStatus?.configured)}
+            value={aiStatus?.configured ? `${aiStatus.label} key` : "Local"}
+          />
+          <SidebarStatus
+            label="Local store"
+            ready
+            value={`${openTasks.length} open tasks`}
+          />
         </div>
       </RailDisclosure>
 
@@ -6753,7 +8232,10 @@ function RightSidebar({
                 : "Google Drive is not connected"
             }
           />
-          <NotificationLine icon={ListTodo} text={`${openTasks.length} tasks remain open`} />
+          <NotificationLine
+            icon={ListTodo}
+            text={`${openTasks.length} tasks remain open`}
+          />
         </div>
       </RailDisclosure>
     </aside>
@@ -6775,7 +8257,7 @@ function RailDisclosure({
 
   return (
     <section className={`${panelClass} overflow-hidden`}>
-      <button
+      <Button
         aria-expanded={open}
         className="group flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]"
         onClick={() => setOpen((current) => !current)}
@@ -6785,8 +8267,10 @@ function RailDisclosure({
           <Icon className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1 text-sm font-semibold">{title}</span>
-        <ChevronDown className={`h-4 w-4 text-[var(--muted)] transition ${open ? "rotate-180" : ""}`} />
-      </button>
+        <ChevronDown
+          className={`h-4 w-4 text-[var(--muted)] transition ${open ? "rotate-180" : ""}`}
+        />
+      </Button>
       <div className={`collapsible-content ${open ? "is-open" : ""}`}>
         <div className="border-t border-[var(--line)] p-4">{children}</div>
       </div>
@@ -6819,20 +8303,26 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
             const content = (
               <>
                 <span className="grid h-10 w-10 place-items-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
-                  <DriveFileGlyph className="h-5 w-5" mimeType={file.mimeType} />
+                  <DriveFileGlyph
+                    className="h-5 w-5"
+                    mimeType={file.mimeType}
+                  />
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{file.name}</p>
                   <p className="mt-1 text-xs text-[var(--muted)]">
-                    {driveFileType(file.mimeType)} by {file.owner ?? "Unknown owner"}
+                    {driveFileType(file.mimeType)} by{" "}
+                    {file.owner ?? "Unknown owner"}
                   </p>
                 </div>
-                <span className="text-xs text-[var(--muted)]">{formatFileTime(file.modifiedTime)}</span>
+                <span className="text-xs text-[var(--muted)]">
+                  {formatFileTime(file.modifiedTime)}
+                </span>
               </>
             );
 
             return file.webViewLink ? (
-              <a
+              <Link
                 className="interactive-row grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3"
                 href={file.webViewLink}
                 key={file.id ?? file.name}
@@ -6840,7 +8330,7 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
                 target="_blank"
               >
                 {content}
-              </a>
+              </Link>
             ) : (
               <div
                 className="interactive-row grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3"
@@ -6854,8 +8344,15 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
       ) : (
         <EmptyState
           icon={FolderOpen}
-          title={briefing?.google.connected ? "No Drive files loaded" : "Drive not connected"}
-          detail={briefing?.drive.reason ?? "Connect Google and refresh the workspace."}
+          title={
+            briefing?.google.connected
+              ? "No Drive files loaded"
+              : "Drive not connected"
+          }
+          detail={
+            briefing?.drive.reason ??
+            "Connect Google and refresh the workspace."
+          }
         />
       )}
     </section>
@@ -6891,48 +8388,56 @@ function CommandPalette({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm">
-      <div className={`${panelClass} w-full max-w-xl overflow-hidden`}>
-        <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">
-          <Search className="h-4 w-4 text-[var(--muted)]" />
-          <input
-            autoFocus
-            className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Search commands..."
-            value={query}
-          />
-          <button
-            className="grid h-8 w-8 place-items-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-soft)]"
-            onClick={() => setOpen(false)}
-            type="button"
-            title="Close"
+    <Modal isOpen onOpenChange={setOpen}>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container placement="top">
+          <Modal.Dialog
+            className={`${panelClass} mt-20 w-full max-w-xl overflow-hidden p-0`}
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="max-h-96 overflow-y-auto p-2">
-          {filtered.map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                className="flex h-12 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold hover:bg-[var(--surface-soft)]"
-                key={action.label}
-                onClick={() => run(action)}
+            <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">
+              <Search className="h-4 w-4 text-[var(--muted)]" />
+              <Input
+                autoFocus
+                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="Search commands..."
+                value={query}
+              />
+              <Button
+                className="grid h-8 w-8 place-items-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-soft)]"
+                onClick={() => setOpen(false)}
                 type="button"
+                title="Close"
               >
-                <Icon className="h-4 w-4 text-[var(--accent)]" />
-                {action.label}
-              </button>
-            );
-          })}
-          {filtered.length === 0 ? (
-            <div className="p-6 text-center text-sm text-[var(--muted)]">No matching commands.</div>
-          ) : null}
-        </div>
-      </div>
-    </div>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="max-h-96 overflow-y-auto p-2">
+              {filtered.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Button
+                    className="flex h-12 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold hover:bg-[var(--surface-soft)]"
+                    key={action.label}
+                    onClick={() => run(action)}
+                    type="button"
+                  >
+                    <Icon className="h-4 w-4 text-[var(--accent)]" />
+                    {action.label}
+                  </Button>
+                );
+              })}
+              {filtered.length === 0 ? (
+                <div className="p-6 text-center text-sm text-[var(--muted)]">
+                  No matching commands.
+                </div>
+              ) : null}
+            </div>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
 
@@ -6951,7 +8456,9 @@ function ToastStack({ toasts }: { toasts: Toast[] }) {
           key={toast.id}
         >
           <p className="text-sm font-semibold">{toast.title}</p>
-          {toast.detail ? <p className="mt-1 text-xs text-[var(--muted)]">{toast.detail}</p> : null}
+          {toast.detail ? (
+            <p className="mt-1 text-xs text-[var(--muted)]">{toast.detail}</p>
+          ) : null}
         </div>
       ))}
     </div>
@@ -6973,7 +8480,7 @@ function TaskContextMenu({
       style={{ left: contextMenu.x, top: contextMenu.y }}
       onClick={(event) => event.stopPropagation()}
     >
-      <button
+      <Button
         className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold hover:bg-[var(--surface-soft)]"
         onClick={() => {
           onComplete();
@@ -6983,15 +8490,15 @@ function TaskContextMenu({
       >
         <Check className="h-4 w-4 text-[var(--success)]" />
         Complete
-      </button>
-      <button
+      </Button>
+      <Button
         className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold hover:bg-[var(--surface-soft)]"
         onClick={onClose}
         type="button"
       >
         <X className="h-4 w-4 text-[var(--muted)]" />
         Close menu
-      </button>
+      </Button>
     </div>
   );
 }
@@ -7029,12 +8536,16 @@ function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-semibold uppercase text-[var(--muted)]">{label}</span>
-      <input
+      <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+        {label}
+      </span>
+      <Input
         autoComplete={autoComplete}
         className="h-11 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
         name={name}
-        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+        onChange={
+          onChange ? (event) => onChange(event.target.value) : undefined
+        }
         placeholder={placeholder}
         type={type}
         value={value}
@@ -7043,31 +8554,12 @@ function Field({
   );
 }
 
-function PreviewMetric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <Icon className="h-5 w-5 text-[var(--accent)]" />
-        <MoreHorizontal className="h-4 w-4 text-[var(--muted)]" />
-      </div>
-      <p className="text-xs font-semibold uppercase text-[var(--muted)]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
 function MiniControl({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
-      <p className="text-xs font-semibold uppercase text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+        {label}
+      </p>
       <p className="mt-1 truncate text-sm font-semibold">{value}</p>
     </div>
   );
@@ -7083,31 +8575,37 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <button
-      className="flex h-11 items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-left text-sm font-semibold"
-      onClick={() => onChange(!checked)}
-      type="button"
+    <Switch
+      className="h-11 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3"
+      isSelected={checked}
+      onChange={onChange}
     >
-      <span>{label}</span>
-      <span className={`relative h-6 w-11 rounded-full transition ${checked ? "bg-[var(--accent)]" : "bg-[var(--track)]"}`}>
-        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${checked ? "left-6" : "left-1"}`} />
-      </span>
-    </button>
+      <Switch.Content className="flex w-full items-center justify-between gap-3 text-sm font-semibold">
+        {label}
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+      </Switch.Content>
+    </Switch>
   );
 }
 
 function StatusBadge({ label, ready }: { label: string; ready: boolean }) {
   return (
-    <span
+    <Chip
       className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold ${
         ready
           ? "bg-[var(--success-soft)] text-[var(--success)]"
           : "bg-[var(--warning-soft)] text-[var(--warning)]"
       }`}
     >
-      {ready ? <Check className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+      {ready ? (
+        <Check className="h-3.5 w-3.5" />
+      ) : (
+        <AlertCircle className="h-3.5 w-3.5" />
+      )}
       {label}
-    </span>
+    </Chip>
   );
 }
 
@@ -7132,14 +8630,26 @@ function SidebarStatus({
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2">
       <span className="text-sm font-medium">{label}</span>
-      <span className={ready ? "text-xs font-semibold text-[var(--success)]" : "text-xs font-semibold text-[var(--warning)]"}>
+      <span
+        className={
+          ready
+            ? "text-xs font-semibold text-[var(--success)]"
+            : "text-xs font-semibold text-[var(--warning)]"
+        }
+      >
         {value}
       </span>
     </div>
   );
 }
 
-function NotificationLine({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
+function NotificationLine({
+  icon: Icon,
+  text,
+}: {
+  icon: LucideIcon;
+  text: string;
+}) {
   return (
     <div className="flex items-center gap-3 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2">
       <Icon className="h-4 w-4 text-[var(--accent)]" />
@@ -7181,15 +8691,20 @@ function priorityWeight(priority?: RelayTaskPriority) {
 }
 
 function priorityTone(priority?: RelayTaskPriority) {
-  if (priority === "urgent") return "bg-[var(--danger-soft)] text-[var(--danger)]";
-  if (priority === "high") return "bg-[var(--warning-soft)] text-[var(--warning)]";
-  if (priority === "low") return "bg-[var(--success-soft)] text-[var(--success)]";
+  if (priority === "urgent")
+    return "bg-[var(--danger-soft)] text-[var(--danger)]";
+  if (priority === "high")
+    return "bg-[var(--warning-soft)] text-[var(--warning)]";
+  if (priority === "low")
+    return "bg-[var(--success-soft)] text-[var(--success)]";
   return "bg-[var(--accent-soft)] text-[var(--accent)]";
 }
 
 function PriorityTag({ priority }: { priority?: RelayTaskPriority }) {
   return (
-    <span className={`inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-[11px] font-semibold ${priorityTone(priority)}`}>
+    <span
+      className={`inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-[11px] font-semibold ${priorityTone(priority)}`}
+    >
       {priorityLabel(priority)}
     </span>
   );
@@ -7241,10 +8756,14 @@ function isOverdue(value?: string | null) {
 
 function sortTasksByUrgency(items: RelayTask[]) {
   return [...items].sort((left, right) => {
-    const leftDue = parseEventDate(left.due)?.getTime() ?? Number.POSITIVE_INFINITY;
-    const rightDue = parseEventDate(right.due)?.getTime() ?? Number.POSITIVE_INFINITY;
-    const leftScore = priorityWeight(left.priority) + (isOverdue(left.due) ? 10 : 0);
-    const rightScore = priorityWeight(right.priority) + (isOverdue(right.due) ? 10 : 0);
+    const leftDue =
+      parseEventDate(left.due)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const rightDue =
+      parseEventDate(right.due)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const leftScore =
+      priorityWeight(left.priority) + (isOverdue(left.due) ? 10 : 0);
+    const rightScore =
+      priorityWeight(right.priority) + (isOverdue(right.due) ? 10 : 0);
     if (leftScore !== rightScore) return rightScore - leftScore;
     return leftDue - rightDue;
   });
@@ -7253,14 +8772,17 @@ function sortTasksByUrgency(items: RelayTask[]) {
 function googleTaskPriority(task: GoogleTask): RelayTaskPriority {
   const text = `${task.title} ${task.notes ?? ""}`.toLowerCase();
   if (text.includes("urgent") || isOverdue(task.due)) return "urgent";
-  if (text.includes("priority: high") || text.includes("high priority")) return "high";
-  if (text.includes("priority: low") || text.includes("low priority")) return "low";
+  if (text.includes("priority: high") || text.includes("high priority"))
+    return "high";
+  if (text.includes("priority: low") || text.includes("low priority"))
+    return "low";
   return "medium";
 }
 
 function githubUrgency(issue: GithubIssue) {
   const text = `${issue.title} ${issue.labels.join(" ")}`.toLowerCase();
-  if (/(security|critical|urgent|blocker|prod|production|crash)/.test(text)) return "Urgent";
+  if (/(security|critical|urgent|blocker|prod|production|crash)/.test(text))
+    return "Urgent";
   if (/(bug|broken|regression|hotfix)/.test(text)) return "High";
   if (/(question|docs|cleanup|chore)/.test(text)) return "Low";
   return "Normal";
@@ -7268,9 +8790,12 @@ function githubUrgency(issue: GithubIssue) {
 
 function githubUrgencyClass(issue: GithubIssue) {
   const urgency = githubUrgency(issue);
-  if (urgency === "Urgent") return "bg-[var(--danger-soft)] text-[var(--danger)]";
-  if (urgency === "High") return "bg-[var(--warning-soft)] text-[var(--warning)]";
-  if (urgency === "Low") return "bg-[var(--success-soft)] text-[var(--success)]";
+  if (urgency === "Urgent")
+    return "bg-[var(--danger-soft)] text-[var(--danger)]";
+  if (urgency === "High")
+    return "bg-[var(--warning-soft)] text-[var(--warning)]";
+  if (urgency === "Low")
+    return "bg-[var(--success-soft)] text-[var(--success)]";
   return "bg-[var(--accent-soft)] text-[var(--accent)]";
 }
 
@@ -7285,13 +8810,24 @@ function buildPlannerActions(
   const overdueTask = sortedTasks.find((task) => isOverdue(task.due));
   const nextEvent = briefing?.calendar.events
     .map((event) => ({ event, start: parseEventDate(event.start) }))
-    .filter((item): item is { event: CalendarEvent; start: Date } => Boolean(item.start))
+    .filter((item): item is { event: CalendarEvent; start: Date } =>
+      Boolean(item.start),
+    )
     .filter((item) => item.start.getTime() >= now.getTime())
-    .sort((left, right) => left.start.getTime() - right.start.getTime())[0]?.event;
-  const urgentIssue = briefing?.githubIssues?.issues.find((issue) => githubUrgency(issue) === "Urgent");
+    .sort(
+      (left, right) => left.start.getTime() - right.start.getTime(),
+    )[0]?.event;
+  const urgentIssue = briefing?.githubIssues?.issues.find(
+    (issue) => githubUrgency(issue) === "Urgent",
+  );
   const inboxMessage = briefing?.gmail?.messages[0];
   const recentFile = briefing?.drive.files[0];
-  const actions: Array<{ detail: string; icon: LucideIcon; onClick: () => void; title: string }> = [];
+  const actions: Array<{
+    detail: string;
+    icon: LucideIcon;
+    onClick: () => void;
+    title: string;
+  }> = [];
 
   if (overdueTask) {
     actions.push({
@@ -7321,7 +8857,9 @@ function buildPlannerActions(
       detail: `${urgentIssue.repositoryFullName ?? "GitHub"} #${urgentIssue.number}: ${urgentIssue.title}`,
       onClick: () => {
         setActiveView("github");
-        runPrompt(`What should I do about GitHub issue ${urgentIssue.repositoryFullName ?? ""} #${urgentIssue.number}?`);
+        runPrompt(
+          `What should I do about GitHub issue ${urgentIssue.repositoryFullName ?? ""} #${urgentIssue.number}?`,
+        );
       },
     });
   }
@@ -7331,7 +8869,10 @@ function buildPlannerActions(
       icon: Mail,
       title: "Triage latest email",
       detail: `${inboxMessage.from ?? "Gmail"}: ${inboxMessage.subject}`,
-      onClick: () => runPrompt(`Summarize this email and suggest a response: ${inboxMessage.subject}`),
+      onClick: () =>
+        runPrompt(
+          `Summarize this email and suggest a response: ${inboxMessage.subject}`,
+        ),
     });
   }
 
@@ -7363,25 +8904,55 @@ function buildPlannerActions(
 }
 
 function inferExecutionTrace(messages: Message[]) {
-  const latest = [...messages].reverse().find((message) => message.role === "user")?.content.toLowerCase() ?? "";
+  const latest =
+    [...messages]
+      .reverse()
+      .find((message) => message.role === "user")
+      ?.content.toLowerCase() ?? "";
 
   if (/(github|repo|repository|issue|pull request|pr )/.test(latest)) {
-    return ["Checking GitHub context", "Selecting repo tools", "Preparing issue workspace"];
+    return [
+      "Checking GitHub context",
+      "Selecting repo tools",
+      "Preparing issue workspace",
+    ];
   }
-  if (/(contact|contacts|person|people|phone|birthday|birthdays)/.test(latest)) {
-    return ["Reading Google Contacts", "Checking birthdays", "Preparing contact actions"];
+  if (
+    /(contact|contacts|person|people|phone|birthday|birthdays)/.test(latest)
+  ) {
+    return [
+      "Reading Google Contacts",
+      "Checking birthdays",
+      "Preparing contact actions",
+    ];
   }
   if (/(calendar|meeting|schedule|availability)/.test(latest)) {
-    return ["Fetching calendar events", "Checking task deadlines", "Building scheduling UI"];
+    return [
+      "Fetching calendar events",
+      "Checking task deadlines",
+      "Building scheduling UI",
+    ];
   }
   if (/(email|gmail|inbox|draft|reply)/.test(latest)) {
-    return ["Reading Gmail context", "Checking drafts", "Preparing email actions"];
+    return [
+      "Reading Gmail context",
+      "Checking drafts",
+      "Preparing email actions",
+    ];
   }
   if (/(drive|file|document|pdf)/.test(latest)) {
-    return ["Searching Drive files", "Reading metadata", "Preparing file preview"];
+    return [
+      "Searching Drive files",
+      "Reading metadata",
+      "Preparing file preview",
+    ];
   }
   if (/(task|todo|deadline|remind)/.test(latest)) {
-    return ["Reviewing task lists", "Ranking urgency", "Preparing task builder"];
+    return [
+      "Reviewing task lists",
+      "Ranking urgency",
+      "Preparing task builder",
+    ];
   }
 
   return ["Understanding intent", "Selecting tools", "Preparing workspace"];
@@ -7389,17 +8960,16 @@ function inferExecutionTrace(messages: Message[]) {
 
 function AvatarIcon({ role }: { role: Message["role"] }) {
   return (
-    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${role === "user" ? "bg-[var(--accent)] text-white" : "bg-[var(--accent-soft)] text-[var(--accent)]"}`}>
-      {role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+    <span
+      className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${role === "user" ? "bg-[var(--accent)] text-white" : "bg-[var(--accent-soft)] text-[var(--accent)]"}`}
+    >
+      {role === "user" ? (
+        <User className="h-4 w-4" />
+      ) : (
+        <Bot className="h-4 w-4" />
+      )}
     </span>
   );
-}
-
-function authLabel(mode: AuthMode) {
-  if (mode === "signup") return "Sign Up";
-  if (mode === "forgot") return "Reset";
-  if (mode === "verify") return "Verify";
-  return "Login";
 }
 
 function authActionLabel(mode: AuthMode) {
@@ -7438,16 +9008,26 @@ function parseAssistantUiRequests(content: string): {
 } {
   const requests: AssistantUiRequest[] = [];
   const markdown = content
-    .replace(/<need-more-info>([\s\S]*?)<\/need-more-info>/gi, (_match, detail: string) => {
-      const normalized = normalizeWhitespace(detail);
-      requests.push(inferAssistantUiRequest(normalized));
-      return "";
-    })
-    .replace(/<ui-component(?:\s+[^>]*)?>([\s\S]*?)<\/ui-component>/gi, (_match, detail: string) => {
-      const normalized = normalizeWhitespace(detail);
-      requests.push(inferAssistantUiRequest(normalized || "Choose the missing details to continue."));
-      return "";
-    })
+    .replace(
+      /<need-more-info>([\s\S]*?)<\/need-more-info>/gi,
+      (_match, detail: string) => {
+        const normalized = normalizeWhitespace(detail);
+        requests.push(inferAssistantUiRequest(normalized));
+        return "";
+      },
+    )
+    .replace(
+      /<ui-component(?:\s+[^>]*)?>([\s\S]*?)<\/ui-component>/gi,
+      (_match, detail: string) => {
+        const normalized = normalizeWhitespace(detail);
+        requests.push(
+          inferAssistantUiRequest(
+            normalized || "Choose the missing details to continue.",
+          ),
+        );
+        return "";
+      },
+    )
     .replace(/<\/?(?:need-more-info|ui-component)(?:\s+[^>]*)?>/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -7458,9 +9038,13 @@ function parseAssistantUiRequests(content: string): {
 function inferAssistantUiRequest(detail: string): AssistantUiRequest {
   const lower = detail.toLowerCase();
   const isTask = /\b(task|todo|to-do)\b/.test(lower);
-  const asksForIdentifier = /\b(id|identifier|which|select|specific)\b/.test(lower);
+  const asksForIdentifier = /\b(id|identifier|which|select|specific)\b/.test(
+    lower,
+  );
   const mentionsDueDate = /\b(due date|deadline|due)\b/.test(lower);
-  const shiftMatch = lower.match(/\b(\d+|one|two|three|a)\s+day[s]?\s+(earlier|sooner|before|later|after)\b/);
+  const shiftMatch = lower.match(
+    /\b(\d+|one|two|three|a)\s+day[s]?\s+(earlier|sooner|before|later|after)\b/,
+  );
   const shiftAmount = shiftMatch?.[1] ? wordNumberToInteger(shiftMatch[1]) : 1;
   const direction = shiftMatch?.[2];
   const daysDelta =
@@ -7497,7 +9081,10 @@ function inferAssistantUiRequest(detail: string): AssistantUiRequest {
   };
 }
 
-function stableUiRequestId(detail: string, action: AssistantUiRequest["action"]) {
+function stableUiRequestId(
+  detail: string,
+  action: AssistantUiRequest["action"],
+) {
   let hash = 0;
   const input = `${action}:${detail}`;
   for (let index = 0; index < input.length; index += 1) {
@@ -7524,16 +9111,24 @@ function inferTaskSurfaceContext(message: string): TaskSurfaceContext {
   const lower = text.toLowerCase();
   const context: TaskSurfaceContext = {};
   const reminderMatch =
-    text.match(/(?:remind(?:ing)? me to|reminder to|task (?:due .*? )?(?:to|for))\s+(.+)$/i) ??
-    text.match(/(?:create|add|make|save)\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?task(?:\s+due\s+\w+)?\s+(?:to|for)\s+(.+)$/i);
-  const completionMatch = text.match(/\b(?:i\s+)?(?:finished|completed|did)\s+(?:my\s+)?(.+?)\s+task\b/i);
+    text.match(
+      /(?:remind(?:ing)? me to|reminder to|task (?:due .*? )?(?:to|for))\s+(.+)$/i,
+    ) ??
+    text.match(
+      /(?:create|add|make|save)\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?task(?:\s+due\s+\w+)?\s+(?:to|for)\s+(.+)$/i,
+    );
+  const completionMatch = text.match(
+    /\b(?:i\s+)?(?:finished|completed|did)\s+(?:my\s+)?(.+?)\s+task\b/i,
+  );
 
   if (reminderMatch?.[1]) {
     context.title = cleanTaskTitle(reminderMatch[1]);
   }
 
   if (!context.title) {
-    const taskMatch = text.match(/\b(?:create|add|make|save)\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?task\s+(.+)$/i);
+    const taskMatch = text.match(
+      /\b(?:create|add|make|save)\s+(?:me\s+)?(?:a\s+)?(?:new\s+)?task\s+(.+)$/i,
+    );
     if (taskMatch?.[1]) context.title = cleanTaskTitle(taskMatch[1]);
   }
 
@@ -7562,7 +9157,9 @@ function inferTaskSurfaceContext(message: string): TaskSurfaceContext {
 
 function inferGeneratedSurface(
   message: string,
-): { surface: GeneratedSurface; context?: GeneratedSurfaceContext } | undefined {
+):
+  | { surface: GeneratedSurface; context?: GeneratedSurfaceContext }
+  | undefined {
   const text = message.toLowerCase();
   const wantsCalendarWrite =
     /\b(schedule|book|create|add|set up|set|plan)\b/.test(text) &&
@@ -7578,12 +9175,23 @@ function inferGeneratedSurface(
     return { surface: "schedule" };
   }
   if (wantsTaskWrite) {
-    return { surface: "task", context: { task: inferTaskSurfaceContext(message) } };
+    return {
+      surface: "task",
+      context: { task: inferTaskSurfaceContext(message) },
+    };
   }
-  if (text.includes("drive") || text.includes("file") || text.includes("document")) {
+  if (
+    text.includes("drive") ||
+    text.includes("file") ||
+    text.includes("document")
+  ) {
     return { surface: "files" };
   }
-  if (text.includes("remember") || text.includes("memory") || text.includes("preference")) {
+  if (
+    text.includes("remember") ||
+    text.includes("memory") ||
+    text.includes("preference")
+  ) {
     return { surface: "memory" };
   }
   if (wantsEmailDraft) {
@@ -7593,7 +9201,9 @@ function inferGeneratedSurface(
 }
 
 function inferContextWorkspaceMode(messages: Message[]): ContextWorkspaceMode {
-  const latest = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const latest =
+    [...messages].reverse().find((message) => message.role === "user")
+      ?.content ?? "";
   const text = latest.toLowerCase();
 
   if (
@@ -7604,12 +9214,24 @@ function inferContextWorkspaceMode(messages: Message[]): ContextWorkspaceMode {
     text.includes("birthday") ||
     text.includes("birthdays")
   ) {
-    return text.includes("birthday") || text.includes("birthdays") ? "contacts" : "calendar";
+    return text.includes("birthday") || text.includes("birthdays")
+      ? "contacts"
+      : "calendar";
   }
-  if (text.includes("task") || text.includes("todo") || text.includes("deadline") || text.includes("remind me")) {
+  if (
+    text.includes("task") ||
+    text.includes("todo") ||
+    text.includes("deadline") ||
+    text.includes("remind me")
+  ) {
     return "tasks";
   }
-  if (text.includes("drive") || text.includes("file") || text.includes("document") || text.includes("pdf")) {
+  if (
+    text.includes("drive") ||
+    text.includes("file") ||
+    text.includes("document") ||
+    text.includes("pdf")
+  ) {
     return "files";
   }
   if (
@@ -7622,7 +9244,11 @@ function inferContextWorkspaceMode(messages: Message[]): ContextWorkspaceMode {
   ) {
     return "github";
   }
-  if (text.includes("remember") || text.includes("memory") || text.includes("preference")) {
+  if (
+    text.includes("remember") ||
+    text.includes("memory") ||
+    text.includes("preference")
+  ) {
     return "memory";
   }
   if (
@@ -7634,7 +9260,12 @@ function inferContextWorkspaceMode(messages: Message[]): ContextWorkspaceMode {
   ) {
     return "contacts";
   }
-  if (text.includes("email") || text.includes("gmail") || text.includes("draft") || text.includes("inbox")) {
+  if (
+    text.includes("email") ||
+    text.includes("gmail") ||
+    text.includes("draft") ||
+    text.includes("inbox")
+  ) {
     return "email";
   }
 

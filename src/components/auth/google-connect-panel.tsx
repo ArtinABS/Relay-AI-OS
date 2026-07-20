@@ -2,6 +2,8 @@
 
 import { AlertCircle, LogIn, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Card } from "@heroui/react";
+import { Button } from "@/components/ui/relay-ui";
 
 type OAuthStatus = {
   hasGoogleOAuthConfig: boolean;
@@ -33,7 +35,7 @@ export function GoogleConnectPanel() {
   }, []);
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+    <Card className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Google OAuth</h2>
@@ -57,7 +59,9 @@ export function GoogleConnectPanel() {
                   </div>
                 ))}
               </div>
-              <div>Origin: {oauthStatus?.origin ?? "http://localhost:3000"}</div>
+              <div>
+                Origin: {oauthStatus?.origin ?? "http://localhost:3000"}
+              </div>
               <div>
                 Redirect URI:{" "}
                 {oauthStatus?.redirectUri ??
@@ -65,16 +69,14 @@ export function GoogleConnectPanel() {
               </div>
               <div className="mt-2">
                 First scopes:{" "}
-                {(oauthStatus?.requiredScopes ?? [
-                  "openid",
-                  "email",
-                  "profile",
-                ]).join(", ")}
+                {(
+                  oauthStatus?.requiredScopes ?? ["openid", "email", "profile"]
+                ).join(", ")}
               </div>
             </div>
           ) : null}
         </div>
-        <button
+        <Button
           className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-stone-950 px-4 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!configured && !signedIn}
           onClick={async () => {
@@ -94,8 +96,8 @@ export function GoogleConnectPanel() {
             <LogIn className="h-4 w-4" />
           )}
           {signedIn ? "Disconnect" : "Connect Google"}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }

@@ -4,6 +4,8 @@ import { Bot, Send, User } from "lucide-react";
 import { FormEvent, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Card } from "@heroui/react";
+import { Button, Input } from "@/components/ui/relay-ui";
 
 type Message = {
   role: "user" | "assistant";
@@ -54,7 +56,8 @@ export function LocalAgentChat() {
         ...current,
         {
           role: "assistant",
-          content: "The local agent route did not respond. Check the dev server logs.",
+          content:
+            "The local agent route did not respond. Check the dev server logs.",
         },
       ]);
     } finally {
@@ -67,7 +70,7 @@ export function LocalAgentChat() {
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white shadow-sm">
+    <Card className="rounded-lg border border-stone-200 bg-white p-0 shadow-sm">
       <div className="border-b border-stone-200 p-5">
         <h2 className="text-lg font-semibold">No-Key Local Agent</h2>
         <p className="mt-1 text-sm leading-6 text-stone-600">
@@ -75,14 +78,14 @@ export function LocalAgentChat() {
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {quickPrompts.map((prompt) => (
-            <button
+            <Button
               className="rounded-md border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-100"
               key={prompt}
               onClick={() => sendPrompt(prompt)}
               type="button"
             >
               {prompt}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -115,7 +118,9 @@ export function LocalAgentChat() {
                 message.content
               ) : (
                 <div className="markdown-content">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
                 </div>
               )}
             </div>
@@ -123,22 +128,25 @@ export function LocalAgentChat() {
         ))}
       </div>
 
-      <form className="flex gap-3 border-t border-stone-200 p-4" onSubmit={submit}>
-        <input
+      <form
+        className="flex gap-3 border-t border-stone-200 p-4"
+        onSubmit={submit}
+      >
+        <Input
           className="min-h-10 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none ring-stone-950 transition focus:ring-2"
           onChange={(event) => setInput(event.target.value)}
           placeholder="Ask OAuth status or calendar events..."
           value={input}
         />
-        <button
+        <Button
           className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-stone-950 text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={loading}
           type="submit"
           title="Send"
         >
           <Send className="h-4 w-4" />
-        </button>
+        </Button>
       </form>
-    </section>
+    </Card>
   );
 }
