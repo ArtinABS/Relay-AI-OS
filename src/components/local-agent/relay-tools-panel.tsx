@@ -8,7 +8,7 @@ import {
   StickyNote,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { Card, Link } from "@heroui/react";
+import { Card, Link, Surface } from "@heroui/react";
 import { Button, Input } from "@/components/ui/relay-ui";
 
 type RelayTask = {
@@ -141,116 +141,124 @@ export function RelayToolsPanel() {
 
   return (
     <section className="grid gap-5 lg:grid-cols-3">
-      <Card className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">Relay Status</h2>
-            <p className="mt-1 text-sm leading-6 text-stone-600">
-              Local tools are active. OAuth is optional for no-key tools.
-            </p>
+      <Card className="border border-separator bg-surface p-0 shadow-surface">
+        <Card.Content className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Relay Status</h2>
+              <p className="mt-1 text-sm leading-6 text-muted">
+                Local tools are active. OAuth is optional for no-key tools.
+              </p>
+            </div>
+            <Button
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-separator bg-surface-secondary text-muted transition hover:bg-surface-tertiary hover:text-foreground"
+              onClick={() => refresh()}
+              title="Refresh"
+              type="button"
+            >
+              <RefreshCcw className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 text-stone-600 transition hover:bg-stone-50"
-            onClick={() => refresh()}
-            title="Refresh"
-            type="button"
+
+          <div className="mt-5 grid gap-3 text-sm">
+            <StatusRow
+              label="Google OAuth"
+              value={
+                oauthStatus?.hasDirectGoogleToken
+                  ? (oauthStatus.googleEmail ?? "connected")
+                  : oauthStatus?.hasGoogleOAuthConfig
+                    ? "configured"
+                    : "missing credentials"
+              }
+            />
+            <StatusRow label="Open tasks" value={String(openTasks.length)} />
+            <StatusRow label="Notes" value={String(notes.length)} />
+            <StatusRow label="Focus" value={briefing?.focus?.title ?? "none"} />
+          </div>
+          <Link
+            className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-separator bg-surface-secondary px-3 text-sm font-medium text-foreground transition hover:bg-surface-tertiary"
+            href="/api/local-tools/export"
           >
-            <RefreshCcw className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="mt-5 grid gap-3 text-sm">
-          <StatusRow
-            label="Google OAuth"
-            value={
-              oauthStatus?.hasDirectGoogleToken
-                ? (oauthStatus.googleEmail ?? "connected")
-                : oauthStatus?.hasGoogleOAuthConfig
-                  ? "configured"
-                  : "missing credentials"
-            }
-          />
-          <StatusRow label="Open tasks" value={String(openTasks.length)} />
-          <StatusRow label="Notes" value={String(notes.length)} />
-          <StatusRow label="Focus" value={briefing?.focus?.title ?? "none"} />
-        </div>
-        <Link
-          className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-md border border-stone-200 px-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
-          href="/api/local-tools/export"
-        >
-          <Download className="h-4 w-4" />
-          Export JSON
-        </Link>
+            <Download className="h-4 w-4" />
+            Export JSON
+          </Link>
+        </Card.Content>
       </Card>
 
-      <Card className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-2">
-          <ListTodo className="h-5 w-5 text-emerald-700" />
-          <h2 className="text-lg font-semibold">Tasks</h2>
-        </div>
-        <form className="mt-4 flex gap-2" onSubmit={addTaskFromForm}>
-          <Input
-            className="h-10 min-w-0 flex-1 rounded-md border border-stone-300 px-3 text-sm outline-none focus:ring-2 focus:ring-stone-950"
-            onChange={(event) => setTaskTitle(event.target.value)}
-            placeholder="Add a task..."
-            value={taskTitle}
-          />
-          <Button className="h-10 rounded-md bg-stone-950 px-3 text-sm font-medium text-white">
-            Add
-          </Button>
-        </form>
-        <div className="mt-4 space-y-2">
-          {openTasks.slice(0, 5).map((task) => (
-            <div
-              className="flex items-center justify-between gap-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm"
-              key={task.id}
-            >
-              <span className="line-clamp-2">{task.title}</span>
-              <Button
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800"
-                onClick={() => markDone(task)}
-                title="Complete task"
-                type="button"
+      <Card className="border border-separator bg-surface p-0 shadow-surface">
+        <Card.Content className="p-5">
+          <div className="flex items-center gap-2">
+            <ListTodo className="h-5 w-5 text-success" />
+            <h2 className="text-lg font-semibold">Tasks</h2>
+          </div>
+          <form className="mt-4 flex gap-2" onSubmit={addTaskFromForm}>
+            <Input
+              className="h-10 min-w-0 flex-1 rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
+              onChange={(event) => setTaskTitle(event.target.value)}
+              placeholder="Add a task..."
+              value={taskTitle}
+            />
+            <Button className="h-10 rounded-xl bg-accent px-3 text-sm font-medium text-accent-foreground hover:bg-accent-hover">
+              Add
+            </Button>
+          </form>
+          <div className="mt-4 space-y-2">
+            {openTasks.slice(0, 5).map((task) => (
+              <Surface
+                className="flex items-center justify-between gap-3 rounded-xl border border-separator px-3 py-2 text-sm"
+                key={task.id}
+                variant="secondary"
               >
-                <Check className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-          {openTasks.length === 0 ? (
-            <p className="text-sm text-stone-500">No open tasks.</p>
-          ) : null}
-        </div>
+                <span className="line-clamp-2">{task.title}</span>
+                <Button
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success"
+                  onClick={() => markDone(task)}
+                  title="Complete task"
+                  type="button"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+              </Surface>
+            ))}
+            {openTasks.length === 0 ? (
+              <p className="text-sm text-muted">No open tasks.</p>
+            ) : null}
+          </div>
+        </Card.Content>
       </Card>
 
-      <Card className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-2">
-          <StickyNote className="h-5 w-5 text-sky-700" />
-          <h2 className="text-lg font-semibold">Notes</h2>
-        </div>
-        <form className="mt-4 flex gap-2" onSubmit={addNoteFromForm}>
-          <Input
-            className="h-10 min-w-0 flex-1 rounded-md border border-stone-300 px-3 text-sm outline-none focus:ring-2 focus:ring-stone-950"
-            onChange={(event) => setNoteBody(event.target.value)}
-            placeholder="Remember something..."
-            value={noteBody}
-          />
-          <Button className="h-10 rounded-md bg-stone-950 px-3 text-sm font-medium text-white">
-            Add
-          </Button>
-        </form>
-        <div className="mt-4 space-y-2">
-          {notes.slice(0, 5).map((note) => (
-            <div
-              className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-700"
-              key={note.id}
-            >
-              {note.body}
-            </div>
-          ))}
-          {notes.length === 0 ? (
-            <p className="text-sm text-stone-500">No notes yet.</p>
-          ) : null}
-        </div>
+      <Card className="border border-separator bg-surface p-0 shadow-surface">
+        <Card.Content className="p-5">
+          <div className="flex items-center gap-2">
+            <StickyNote className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold">Notes</h2>
+          </div>
+          <form className="mt-4 flex gap-2" onSubmit={addNoteFromForm}>
+            <Input
+              className="h-10 min-w-0 flex-1 rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
+              onChange={(event) => setNoteBody(event.target.value)}
+              placeholder="Remember something..."
+              value={noteBody}
+            />
+            <Button className="h-10 rounded-xl bg-accent px-3 text-sm font-medium text-accent-foreground hover:bg-accent-hover">
+              Add
+            </Button>
+          </form>
+          <div className="mt-4 space-y-2">
+            {notes.slice(0, 5).map((note) => (
+              <Surface
+                className="rounded-xl border border-separator px-3 py-2 text-sm leading-6 text-foreground"
+                key={note.id}
+                variant="secondary"
+              >
+                {note.body}
+              </Surface>
+            ))}
+            {notes.length === 0 ? (
+              <p className="text-sm text-muted">No notes yet.</p>
+            ) : null}
+          </div>
+        </Card.Content>
       </Card>
     </section>
   );
@@ -258,9 +266,12 @@ export function RelayToolsPanel() {
 
 function StatusRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-md border border-stone-200 bg-stone-50 px-3 py-2">
-      <span className="text-stone-600">{label}</span>
-      <span className="font-medium text-stone-950">{value}</span>
-    </div>
+    <Surface
+      className="flex items-center justify-between gap-3 rounded-xl border border-separator px-3 py-2"
+      variant="secondary"
+    >
+      <span className="text-muted">{label}</span>
+      <span className="truncate font-medium text-foreground">{value}</span>
+    </Surface>
   );
 }

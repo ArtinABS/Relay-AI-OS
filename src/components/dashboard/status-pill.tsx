@@ -1,20 +1,19 @@
-import { cn } from "@/lib/utils";
 import { Chip } from "@heroui/react";
 
-const statusStyles = {
-  ready: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  "google-auth": "border-sky-200 bg-sky-50 text-sky-800",
-  "approval-required": "border-amber-200 bg-amber-50 text-amber-800",
-  database: "border-violet-200 bg-violet-50 text-violet-800",
+const statusColors = {
+  ready: "success",
+  "google-auth": "accent",
+  "approval-required": "warning",
+  database: "default",
 } as const;
 
-export function StatusPill({ status }: { status: keyof typeof statusStyles }) {
+export function StatusPill({ status }: { status: keyof typeof statusColors }) {
   return (
     <Chip
-      className={cn(
-        "inline-flex h-7 items-center rounded-md border px-2.5 text-xs font-medium",
-        statusStyles[status],
-      )}
+      className="text-xs font-medium"
+      color={statusColors[status]}
+      size="sm"
+      variant="soft"
     >
       {status}
     </Chip>

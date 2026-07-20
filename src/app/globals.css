@@ -109,6 +109,112 @@ select:focus-visible {
   --shadow-strong: 0 30px 70px rgba(0, 0, 0, 0.34);
 }
 
+/*
+ * Relay workspace theme
+ * A quiet, high-information flight deck built on HeroUI's semantic tokens.
+ * The auth screen intentionally keeps its existing treatment; these tokens
+ * only apply after the user enters onboarding or the workspace.
+ */
+.relay-product-shell[data-theme="light"] {
+  --background: oklch(0.975 0.009 250);
+  --foreground: oklch(0.245 0.028 258);
+  --surface: oklch(0.995 0.003 250);
+  --surface-foreground: var(--foreground);
+  --surface-secondary: oklch(0.958 0.009 250);
+  --surface-secondary-foreground: var(--foreground);
+  --surface-tertiary: oklch(0.925 0.017 250);
+  --surface-tertiary-foreground: var(--foreground);
+  --overlay: oklch(0.995 0.003 250);
+  --overlay-foreground: var(--foreground);
+  --muted: oklch(0.54 0.025 258);
+  --default: oklch(0.935 0.012 250);
+  --default-foreground: var(--foreground);
+  --accent: oklch(0.585 0.19 255);
+  --accent-foreground: oklch(0.99 0.003 250);
+  --success: oklch(0.64 0.145 165);
+  --success-foreground: oklch(0.18 0.02 165);
+  --warning: oklch(0.75 0.145 75);
+  --warning-foreground: oklch(0.25 0.045 75);
+  --danger: oklch(0.62 0.2 25);
+  --danger-foreground: oklch(0.99 0.003 250);
+  --border: oklch(0.845 0.023 250);
+  --separator: oklch(0.91 0.014 250);
+  --field-background: oklch(0.995 0.003 250);
+  --field-foreground: var(--foreground);
+  --field-border: var(--separator);
+  --focus: var(--accent);
+  --link: var(--accent);
+  --app-bg: var(--background);
+  --sidebar: color-mix(in oklab, var(--surface) 82%, var(--background));
+  --surface-soft: var(--surface-secondary);
+  --surface-glass: color-mix(in oklab, var(--surface) 86%, transparent);
+  --text: var(--foreground);
+  --line: var(--separator);
+  --line-strong: var(--border);
+  --track: var(--default);
+  --accent-strong: var(--accent-hover);
+  --signal: oklch(0.62 0.13 185);
+  --signal-soft: color-mix(in oklab, var(--signal) 14%, transparent);
+  --violet: oklch(0.62 0.17 292);
+  --violet-soft: color-mix(in oklab, var(--violet) 14%, transparent);
+  --shadow: var(--surface-shadow);
+  --shadow-strong: var(--overlay-shadow);
+  --radius: 0.75rem;
+  background:
+    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 30rem),
+    var(--background);
+}
+
+.relay-product-shell[data-theme="dark"] {
+  --background: oklch(0.135 0.022 258);
+  --foreground: oklch(0.94 0.012 250);
+  --surface: oklch(0.18 0.024 258);
+  --surface-foreground: var(--foreground);
+  --surface-secondary: oklch(0.215 0.025 258);
+  --surface-secondary-foreground: var(--foreground);
+  --surface-tertiary: oklch(0.255 0.027 258);
+  --surface-tertiary-foreground: var(--foreground);
+  --overlay: oklch(0.195 0.025 258);
+  --overlay-foreground: var(--foreground);
+  --muted: oklch(0.71 0.024 252);
+  --default: oklch(0.255 0.025 258);
+  --default-foreground: var(--foreground);
+  --accent: oklch(0.72 0.15 252);
+  --accent-foreground: oklch(0.15 0.025 258);
+  --success: oklch(0.72 0.13 165);
+  --success-foreground: oklch(0.15 0.025 165);
+  --warning: oklch(0.8 0.13 78);
+  --warning-foreground: oklch(0.2 0.04 78);
+  --danger: oklch(0.7 0.18 25);
+  --danger-foreground: oklch(0.98 0.006 250);
+  --border: oklch(0.32 0.032 255);
+  --separator: oklch(0.265 0.026 255);
+  --field-background: oklch(0.205 0.025 258);
+  --field-foreground: var(--foreground);
+  --field-border: var(--separator);
+  --focus: var(--accent);
+  --link: var(--accent);
+  --app-bg: var(--background);
+  --sidebar: color-mix(in oklab, var(--surface) 88%, var(--background));
+  --surface-soft: var(--surface-secondary);
+  --surface-glass: color-mix(in oklab, var(--surface) 84%, transparent);
+  --text: var(--foreground);
+  --line: var(--separator);
+  --line-strong: var(--border);
+  --track: var(--default);
+  --accent-strong: var(--accent-hover);
+  --signal: oklch(0.73 0.12 185);
+  --signal-soft: color-mix(in oklab, var(--signal) 16%, transparent);
+  --violet: oklch(0.74 0.14 292);
+  --violet-soft: color-mix(in oklab, var(--violet) 16%, transparent);
+  --shadow: var(--surface-shadow);
+  --shadow-strong: var(--overlay-shadow);
+  --radius: 0.75rem;
+  background:
+    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 32rem),
+    var(--background);
+}
+
 .assistant-shell * {
   scrollbar-color: var(--line-strong) transparent;
   scrollbar-width: thin;
@@ -631,6 +737,165 @@ select:focus-visible {
   inset: 0;
   position: absolute;
   transform: translateX(-100%);
+}
+
+/* HeroUI composition refinements shared by every non-auth product surface. */
+.relay-product-shell .workspace-frame {
+  background: transparent;
+}
+
+.relay-product-shell .workspace-main {
+  background: color-mix(in oklab, var(--background) 94%, transparent);
+}
+
+.relay-product-shell .relay-page {
+  margin-inline: auto;
+  max-width: 1760px;
+  min-height: calc(100vh - 72px);
+}
+
+.relay-product-shell .relay-page--chat {
+  max-width: none;
+}
+
+.relay-product-shell .relay-panel,
+.relay-product-shell .card {
+  border-color: var(--separator);
+  box-shadow: var(--surface-shadow);
+}
+
+.relay-product-shell .relay-panel:hover,
+.relay-product-shell .hover-lift:hover {
+  border-color: var(--border);
+  box-shadow: var(--surface-shadow);
+  transform: translateY(-1px);
+}
+
+.relay-product-shell .relay-soft-panel {
+  border-color: var(--separator);
+}
+
+.relay-product-shell .sidebar-shell {
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--accent) 4%, transparent), transparent 18rem),
+    var(--sidebar);
+  border-right: 1px solid var(--separator);
+  box-shadow: none;
+}
+
+.relay-product-shell .relay-topbar {
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--separator) 80%, transparent);
+}
+
+.relay-product-shell .nav-item::before {
+  background: linear-gradient(180deg, var(--accent), var(--signal));
+  height: 52%;
+  left: 2px;
+  top: 24%;
+  width: 3px;
+}
+
+.relay-product-shell .button {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.relay-product-shell :is(.input, .textarea, .select__trigger) {
+  border: 1px solid var(--field-border);
+  box-shadow: none;
+}
+
+.relay-product-shell :is(.input, .textarea, .select__trigger):hover {
+  border-color: var(--field-border-hover);
+}
+
+.relay-product-shell :is(.input, .textarea, .select__trigger):focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.relay-product-shell .chip {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.relay-product-shell .command-hero {
+  background:
+    linear-gradient(115deg, oklch(0.23 0.055 255), oklch(0.205 0.05 235) 54%, oklch(0.19 0.045 205)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 40px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 60px color-mix(in oklab, var(--accent) 16%, transparent);
+}
+
+.relay-product-shell .command-hero::before {
+  background:
+    linear-gradient(90deg, transparent, color-mix(in oklab, var(--signal) 28%, transparent), transparent),
+    radial-gradient(circle at 82% 10%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 38%);
+}
+
+.relay-product-shell .command-hero::after {
+  display: none;
+}
+
+.relay-product-shell .ai-planner,
+.relay-product-shell .calendar-signal-strip {
+  background: var(--surface-secondary);
+}
+
+.relay-product-shell .profile-identity-band {
+  background:
+    linear-gradient(120deg, oklch(0.245 0.065 255), oklch(0.225 0.06 235) 58%, oklch(0.22 0.05 195)),
+    var(--surface);
+}
+
+.relay-product-shell .interactive-row:hover {
+  background: var(--surface-secondary);
+  border-color: var(--border);
+  transform: none;
+}
+
+.relay-product-shell .interactive-row::after,
+.relay-product-shell .shine-button::after {
+  display: none;
+}
+
+.relay-product-shell .surface-pop,
+.relay-product-shell .animate-fade-in,
+.relay-product-shell .animate-slide-up {
+  animation-duration: 180ms;
+}
+
+.relay-product-shell .markdown-content {
+  color: var(--foreground);
+}
+
+.relay-product-shell .markdown-content code {
+  background: var(--surface-tertiary);
+  border-color: var(--separator);
+}
+
+.relay-product-shell .markdown-content pre {
+  background: oklch(0.18 0.025 258);
+  border-color: color-mix(in oklab, white 10%, transparent);
+  color: oklch(0.93 0.012 250);
+}
+
+.relay-product-shell .hover-card-panel,
+.relay-product-shell .day-inspector-panel {
+  background: var(--overlay);
+  border-color: var(--border);
+  box-shadow: var(--overlay-shadow);
+}
+
+@media (max-width: 1023px) {
+  .relay-product-shell .relay-page {
+    min-height: calc(100vh - 64px);
+  }
+
+  .relay-product-shell .relay-topbar {
+    height: 64px;
+  }
 }
 
 @keyframes slide-up {

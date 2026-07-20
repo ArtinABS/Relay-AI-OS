@@ -4,7 +4,7 @@ import { Bot, Send, User } from "lucide-react";
 import { FormEvent, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Card } from "@heroui/react";
+import { Avatar, Card } from "@heroui/react";
 import { Button, Input } from "@/components/ui/relay-ui";
 
 type Message = {
@@ -70,27 +70,28 @@ export function LocalAgentChat() {
   }
 
   return (
-    <Card className="rounded-lg border border-stone-200 bg-white p-0 shadow-sm">
-      <div className="border-b border-stone-200 p-5">
+    <Card className="overflow-hidden border border-separator bg-surface p-0 shadow-surface">
+      <Card.Header className="block border-b border-separator p-5">
         <h2 className="text-lg font-semibold">No-Key Local Agent</h2>
-        <p className="mt-1 text-sm leading-6 text-stone-600">
+        <p className="mt-1 text-sm leading-6 text-muted">
           A limited conversational backend that uses your Google OAuth session.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {quickPrompts.map((prompt) => (
             <Button
-              className="rounded-md border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-100"
+              className="h-8 rounded-lg px-2.5 text-xs font-medium"
               key={prompt}
               onClick={() => sendPrompt(prompt)}
               type="button"
+              variant="secondary"
             >
               {prompt}
             </Button>
           ))}
         </div>
-      </div>
+      </Card.Header>
 
-      <div className="flex max-h-[420px] min-h-[300px] flex-col gap-4 overflow-y-auto p-5">
+      <Card.Content className="flex max-h-[420px] min-h-[300px] flex-col gap-4 overflow-y-auto p-5">
         {messages.map((message, index) => (
           <div
             key={`${message.role}-${index}`}
@@ -100,18 +101,25 @@ export function LocalAgentChat() {
                 : "mr-auto flex max-w-[85%] gap-3"
             }
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-stone-100 text-stone-700 ring-1 ring-stone-200">
-              {message.role === "user" ? (
-                <User className="h-4 w-4" />
-              ) : (
-                <Bot className="h-4 w-4" />
-              )}
-            </span>
+            <Avatar
+              className="shrink-0"
+              color="accent"
+              size="sm"
+              variant={message.role === "user" ? "default" : "soft"}
+            >
+              <Avatar.Fallback>
+                {message.role === "user" ? (
+                  <User className="h-4 w-4" />
+                ) : (
+                  <Bot className="h-4 w-4" />
+                )}
+              </Avatar.Fallback>
+            </Avatar>
             <div
               className={
                 message.role === "user"
-                  ? "whitespace-pre-wrap rounded-lg bg-stone-950 px-4 py-3 text-sm leading-6 text-white"
-                  : "rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-800"
+                  ? "whitespace-pre-wrap rounded-xl bg-accent px-4 py-3 text-sm leading-6 text-accent-foreground"
+                  : "rounded-xl border border-separator bg-surface-secondary px-4 py-3 text-sm leading-6 text-foreground"
               }
             >
               {message.role === "user" ? (
@@ -126,27 +134,26 @@ export function LocalAgentChat() {
             </div>
           </div>
         ))}
-      </div>
+      </Card.Content>
 
-      <form
-        className="flex gap-3 border-t border-stone-200 p-4"
-        onSubmit={submit}
-      >
-        <Input
-          className="min-h-10 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none ring-stone-950 transition focus:ring-2"
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Ask OAuth status or calendar events..."
-          value={input}
-        />
-        <Button
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-stone-950 text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={loading}
-          type="submit"
-          title="Send"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
+      <Card.Footer className="border-t border-separator p-4">
+        <form className="flex w-full gap-3" onSubmit={submit}>
+          <Input
+            className="min-h-10 flex-1 rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Ask OAuth status or calendar events..."
+            value={input}
+          />
+          <Button
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={loading}
+            type="submit"
+            title="Send"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </form>
+      </Card.Footer>
     </Card>
   );
 }

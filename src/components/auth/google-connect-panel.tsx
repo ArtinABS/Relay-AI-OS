@@ -2,7 +2,7 @@
 
 import { AlertCircle, LogIn, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card } from "@heroui/react";
+import { Card, Chip, Surface } from "@heroui/react";
 import { Button } from "@/components/ui/relay-ui";
 
 type OAuthStatus = {
@@ -35,11 +35,20 @@ export function GoogleConnectPanel() {
   }, []);
 
   return (
-    <Card className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="border border-separator bg-surface p-0 shadow-surface">
+      <Card.Content className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Google OAuth</h2>
-          <p className="mt-1 text-sm leading-6 text-stone-600">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Google OAuth</h2>
+            <Chip
+              color={signedIn ? "success" : "warning"}
+              size="sm"
+              variant="soft"
+            >
+              {signedIn ? "Connected" : configured ? "Ready" : "Setup needed"}
+            </Chip>
+          </div>
+          <p className="mt-1 text-sm leading-6 text-muted">
             {signedIn
               ? `Connected as ${oauthStatus?.googleEmail ?? "your Google account"}.`
               : configured
@@ -47,7 +56,10 @@ export function GoogleConnectPanel() {
                 : "Google sign-in needs GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and NEXTAUTH_SECRET in .env.local."}
           </p>
           {!configured ? (
-            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <Surface
+              className="mt-3 rounded-xl border border-warning/30 p-3 text-xs leading-5 text-warning"
+              variant="secondary"
+            >
               <div className="mb-1 flex items-center gap-2 font-semibold">
                 <AlertCircle className="h-4 w-4" />
                 OAuth setup needed
@@ -73,11 +85,11 @@ export function GoogleConnectPanel() {
                   oauthStatus?.requiredScopes ?? ["openid", "email", "profile"]
                 ).join(", ")}
               </div>
-            </div>
+            </Surface>
           ) : null}
         </div>
         <Button
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-stone-950 px-4 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!configured && !signedIn}
           onClick={async () => {
             if (signedIn) {
@@ -97,7 +109,7 @@ export function GoogleConnectPanel() {
           )}
           {signedIn ? "Disconnect" : "Connect Google"}
         </Button>
-      </div>
+      </Card.Content>
     </Card>
   );
 }

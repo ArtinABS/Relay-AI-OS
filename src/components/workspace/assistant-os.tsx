@@ -7,7 +7,19 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from "react";
-import { Card, Checkbox, Chip, Link, Modal, Switch } from "@heroui/react";
+import {
+  Avatar,
+  Card,
+  Checkbox,
+  Chip,
+  Disclosure,
+  Link,
+  Modal,
+  ProgressBar,
+  Skeleton,
+  Surface,
+  Switch,
+} from "@heroui/react";
 import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
 import {
   Activity,
@@ -19,7 +31,6 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
-  ChevronDown,
   Clock,
   Cloud,
   Columns3,
@@ -483,15 +494,15 @@ const integrationRows = [
 ];
 
 const panelClass =
-  "rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow)] transition duration-300 ease-out";
+  "relay-panel rounded-2xl border border-separator bg-surface shadow-surface transition duration-200 ease-out";
 const softPanelClass =
-  "rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] transition duration-300 ease-out";
+  "relay-soft-panel rounded-xl border border-separator bg-surface-secondary transition duration-200 ease-out";
 const iconButtonClass =
-  "interactive-control inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]";
+  "interactive-control inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-separator bg-surface-secondary text-muted transition hover:border-border-secondary hover:bg-accent-soft hover:text-accent";
 const primaryButtonClass =
-  "shine-button inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButtonClass =
-  "interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--text)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]";
+  "interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-separator bg-surface-secondary px-4 text-sm font-semibold text-foreground transition hover:border-border-secondary hover:bg-surface-tertiary";
 
 function createId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -1069,7 +1080,7 @@ export function AssistantOS() {
 
   return (
     <div
-      className={`assistant-shell ${theme} min-h-screen bg-[var(--app-bg)] text-[var(--text)] transition-colors duration-300`}
+      className={`assistant-shell ${theme} ${stage === "auth" ? "" : "relay-product-shell"} min-h-screen bg-[var(--app-bg)] text-[var(--text)] transition-colors duration-300`}
       data-theme={theme}
       onClick={() => setContextMenu(null)}
     >
@@ -1608,14 +1619,14 @@ function OnboardingExperience({
 
         <section className="grid gap-5 lg:grid-cols-[0.82fr_1.18fr]">
           <div className={`${panelClass} p-6`}>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold uppercase text-[var(--muted)]">
-              <LockKeyhole className="h-3.5 w-3.5 text-[var(--accent)]" />
+            <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-separator bg-surface-secondary px-3 py-1 text-xs font-semibold uppercase text-muted">
+              <LockKeyhole className="h-3.5 w-3.5 text-accent" />
               Onboarding
             </div>
             <h1 className="text-4xl font-semibold leading-tight">
               Connect the services your assistant can operate.
             </h1>
-            <p className="mt-4 text-base leading-7 text-[var(--muted)]">
+            <p className="mt-4 text-base leading-7 text-muted">
               The assistant runs in local mode now and upgrades to Google
               Workspace actions after OAuth consent.
             </p>
@@ -1623,12 +1634,12 @@ function OnboardingExperience({
             <div className="mt-6 space-y-3">
               {(oauthStatus?.checks ?? []).map((check) => (
                 <div
-                  className="flex items-center justify-between rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3"
+                  className="flex items-center justify-between rounded-lg border border-separator bg-surface-secondary px-4 py-3"
                   key={check.label}
                 >
                   <div>
                     <p className="text-sm font-semibold">{check.label}</p>
-                    <p className="text-xs text-[var(--muted)]">{check.where}</p>
+                    <p className="text-xs text-muted">{check.where}</p>
                   </div>
                   <StatusBadge
                     ready={check.ready}
@@ -1665,13 +1676,13 @@ function OnboardingExperience({
               return (
                 <article className={`${panelClass} p-5`} key={group.label}>
                   <div className="mb-5 flex items-start justify-between gap-4">
-                    <span className="grid h-11 w-11 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+                    <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent-soft text-accent">
                       <Icon className="h-5 w-5" />
                     </span>
                     <StatusBadge ready={group.ready} label={group.status} />
                   </div>
                   <h2 className="text-lg font-semibold">{group.label}</h2>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                  <p className="mt-2 text-sm leading-6 text-muted">
                     {group.detail}
                   </p>
                 </article>
@@ -1771,7 +1782,7 @@ function WorkspaceExperience({
 
   return (
     <div
-      className="min-h-screen transition-[grid-template-columns] duration-300 ease-out lg:grid"
+      className="workspace-frame min-h-screen transition-[grid-template-columns] duration-300 ease-out lg:grid"
       style={{
         gridTemplateColumns: showGlobalRightSidebar
           ? `${navCollapsed ? 76 : sidebarWidth}px minmax(0,1fr) 340px`
@@ -1789,7 +1800,7 @@ function WorkspaceExperience({
         width={sidebarWidth}
       />
 
-      <main className="min-w-0 border-l border-[var(--line)]">
+      <main className="workspace-main min-w-0 border-l border-separator">
         <TopBar
           activeView={activeView}
           aiStatus={aiStatus}
@@ -1803,7 +1814,11 @@ function WorkspaceExperience({
         />
 
         <div
-          className={activeView === "chat" ? "p-3 sm:p-4" : "p-5 sm:p-7 xl:p-9"}
+          className={
+            activeView === "chat"
+              ? "relay-page relay-page--chat p-3 sm:p-4"
+              : "relay-page p-4 sm:p-6 xl:p-8"
+          }
         >
           {activeView === "dashboard" ? (
             <DashboardView
@@ -1950,14 +1965,14 @@ function Sidebar({
     >
       <div className="mb-8 flex items-center justify-between">
         {collapsed ? (
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent)] text-sm font-bold text-white">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent text-sm font-bold text-white">
             R
           </span>
         ) : (
           <BrandMark />
         )}
         <Button
-          className="hidden h-9 w-9 items-center justify-center rounded-md text-[var(--muted)] transition hover:bg-[var(--surface-soft)] hover:text-[var(--text)] lg:inline-flex"
+          className="hidden h-9 w-9 items-center justify-center rounded-md text-muted transition hover:bg-surface-secondary hover:text-foreground lg:inline-flex"
           onClick={onToggleCollapsed}
           type="button"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -1965,7 +1980,7 @@ function Sidebar({
           <Columns3 className="h-4 w-4" />
         </Button>
         <Button
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--muted)] lg:hidden"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted lg:hidden"
           onClick={() => setMobileOpen(false)}
           type="button"
           title="Close"
@@ -1974,17 +1989,17 @@ function Sidebar({
         </Button>
       </div>
 
-      <nav className="space-y-1">
+      <nav className="space-y-1.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = activeView === item.id;
 
           return (
             <Button
-              className={`nav-item flex h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold transition ${
+              className={`nav-item flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
                 active
-                  ? "is-active bg-[var(--surface)] text-[var(--text)] shadow-sm"
-                  : "text-[var(--muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text)]"
+                  ? "is-active bg-surface text-foreground shadow-surface"
+                  : "text-muted hover:bg-surface-secondary hover:text-foreground"
               } ${collapsed ? "justify-center px-0" : ""}`}
               key={item.id}
               onClick={() => {
@@ -2004,10 +2019,10 @@ function Sidebar({
       {collapsed ? null : (
         <div className={`${softPanelClass} mt-auto p-4`}>
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <Zap className="h-4 w-4 text-[var(--warning)]" />
+            <Zap className="h-4 w-4 text-warning" />
             Automation guard
           </div>
-          <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+          <p className="mt-2 text-xs leading-5 text-muted">
             Sends, deletes, permission changes, and shared-doc edits require
             approval.
           </p>
@@ -2065,7 +2080,7 @@ function TopBar({
   const ActiveIcon = navItem?.icon;
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-[var(--line)] bg-[var(--surface-glass)] px-4 backdrop-blur-xl sm:px-5 xl:px-6">
+    <header className="relay-topbar sticky top-0 z-20 flex h-[72px] items-center justify-between gap-3 border-b border-separator bg-[var(--surface-glass)] px-4 backdrop-blur-xl sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <Button
           className={iconButtonClass + " lg:hidden"}
@@ -2077,14 +2092,12 @@ function TopBar({
         </Button>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            {ActiveIcon ? (
-              <ActiveIcon className="h-4 w-4 text-[var(--accent)]" />
-            ) : null}
+            {ActiveIcon ? <ActiveIcon className="h-4 w-4 text-accent" /> : null}
             <h1 className="truncate text-base font-semibold sm:text-lg">
               {navItem?.label ?? "Workspace"}
             </h1>
           </div>
-          <p className="hidden text-xs text-[var(--muted)] sm:block">
+          <p className="hidden text-xs text-muted sm:block">
             {aiStatus?.configured
               ? `${aiStatus.label} key set`
               : "Local agent active"}
@@ -2094,7 +2107,7 @@ function TopBar({
 
       <div className="flex min-w-0 items-center gap-2">
         <Button
-          className="hidden h-10 min-w-0 items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 text-left text-sm text-[var(--muted)] transition hover:border-[var(--line-strong)] sm:inline-flex lg:w-72"
+          className="hidden h-10 min-w-0 items-center gap-2 rounded-md border border-separator bg-surface px-3 text-left text-sm text-muted transition hover:border-border sm:inline-flex lg:w-72"
           onClick={() => setCommandOpen(true)}
           type="button"
         >
@@ -2241,12 +2254,19 @@ function DashboardSkeleton() {
   return (
     <section className="grid gap-5 md:grid-cols-3">
       {["Focus", "Timeline", "Inbox"].map((item) => (
-        <div className={`${softPanelClass} p-5`} key={item}>
-          <div className="skeleton h-4 w-24 rounded-full" />
-          <div className="skeleton mt-5 h-8 w-3/4 rounded-lg" />
-          <div className="skeleton mt-3 h-4 w-full rounded-full" />
-          <div className="skeleton mt-2 h-4 w-2/3 rounded-full" />
-        </div>
+        <Surface
+          className={`${softPanelClass} p-5`}
+          key={item}
+          variant="secondary"
+        >
+          <Skeleton
+            aria-label={`Loading ${item}`}
+            className="h-4 w-24 rounded-full"
+          />
+          <Skeleton className="mt-5 h-8 w-3/4 rounded-lg" />
+          <Skeleton className="mt-3 h-4 w-full rounded-full" />
+          <Skeleton className="mt-2 h-4 w-2/3 rounded-full" />
+        </Surface>
       ))}
     </section>
   );
@@ -2285,14 +2305,14 @@ function WeeklyCommandCalendar({
     <section className={`${panelClass} overflow-visible p-5 sm:p-6`}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold uppercase text-[var(--muted)]">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-separator bg-surface-secondary px-3 py-1 text-xs font-semibold uppercase text-muted">
             <span className="pulse-dot" />
             Next 7 days
           </div>
           <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">
             Weekly operating view
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
             Calendar, task deadlines, reminders, notes, and GitHub activity are
             grouped by day.
           </p>
@@ -2347,10 +2367,10 @@ function WeeklyCommandCalendar({
           return (
             <div className="day-inspector relative" key={dayKey}>
               <Button
-                className={`min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 hover:-translate-y-1 hover:shadow-[var(--shadow)] ${
+                className={`min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 hover:-translate-y-1 hover:shadow-surface ${
                   isToday
-                    ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                    : "border-[var(--line)] bg-[var(--surface-soft)] hover:border-[var(--line-strong)]"
+                    ? "border-[var(--accent)] bg-accent-soft"
+                    : "border-separator bg-surface-secondary hover:border-border"
                 }`}
                 onBlur={() => setActiveInspectorDay(null)}
                 onClick={() =>
@@ -2363,19 +2383,19 @@ function WeeklyCommandCalendar({
                 onPointerLeave={() => setActiveInspectorDay(null)}
                 type="button"
               >
-                <span className="block text-[11px] font-semibold uppercase text-[var(--muted)]">
+                <span className="block text-[11px] font-semibold uppercase text-muted">
                   {day.toLocaleDateString(undefined, { weekday: "short" })}
                 </span>
                 <span className="mt-1 block text-2xl font-semibold">
                   {day.getDate()}
                 </span>
-                <span className="mt-1 block text-xs text-[var(--muted)]">
+                <span className="mt-1 block text-xs text-muted">
                   {day.toLocaleDateString(undefined, { month: "short" })}
                 </span>
                 <div className="mt-4 space-y-2">
                   {dayEvents.slice(0, 2).map((event) => (
                     <span
-                      className="block truncate rounded-lg bg-[var(--surface)] px-2 py-1 text-xs font-semibold"
+                      className="block truncate rounded-lg bg-surface px-2 py-1 text-xs font-semibold"
                       key={event.id ?? `${event.title}-${event.start}`}
                     >
                       {formatEventTime(event.start)} · {event.title}
@@ -2383,7 +2403,7 @@ function WeeklyCommandCalendar({
                   ))}
                   {[...dayTasks, ...dayGoogleTasks].slice(0, 2).map((task) => (
                     <span
-                      className="flex items-center gap-2 truncate rounded-lg bg-[var(--surface)] px-2 py-1 text-xs font-semibold"
+                      className="flex items-center gap-2 truncate rounded-lg bg-surface px-2 py-1 text-xs font-semibold"
                       key={task.id ?? task.title}
                     >
                       <PriorityDot
@@ -2395,12 +2415,12 @@ function WeeklyCommandCalendar({
                     </span>
                   ))}
                   {count === 0 ? (
-                    <span className="block rounded-lg border border-dashed border-[var(--line)] px-2 py-2 text-xs text-[var(--muted)]">
+                    <span className="block rounded-lg border border-dashed border-separator px-2 py-2 text-xs text-muted">
                       No loaded items
                     </span>
                   ) : null}
                 </div>
-                <span className="mt-4 inline-flex rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
+                <span className="mt-4 inline-flex rounded-full bg-surface px-2 py-1 text-[11px] font-semibold text-muted">
                   {count} signal{count === 1 ? "" : "s"}
                 </span>
               </Button>
@@ -2448,7 +2468,7 @@ function DayInspector({
   return (
     <div
       aria-hidden={!active}
-      className={`day-inspector-panel pointer-events-none absolute left-0 top-[calc(100%+10px)] z-40 w-[min(380px,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-strong)] transition duration-200 md:left-auto md:right-0 ${
+      className={`day-inspector-panel pointer-events-none absolute left-0 top-[calc(100%+10px)] z-40 w-[min(380px,calc(100vw-2rem))] rounded-2xl border border-separator bg-surface p-4 shadow-overlay transition duration-200 md:left-auto md:right-0 ${
         active ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
       }`}
     >
@@ -2461,7 +2481,7 @@ function DayInspector({
               day: "numeric",
             })}
           </p>
-          <p className="text-xs text-[var(--muted)]">Day inspector</p>
+          <p className="text-xs text-muted">Day inspector</p>
         </div>
         <StatusBadge
           ready
@@ -2571,16 +2591,16 @@ function InspectorGroup({
   title: string;
 }) {
   return (
-    <div className="mb-3 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-[var(--muted)]">
-        <Icon className="h-3.5 w-3.5 text-[var(--accent)]" />
+    <div className="mb-3 rounded-xl border border-separator bg-surface-secondary p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-muted">
+        <Icon className="h-3.5 w-3.5 text-accent" />
         {title}
       </div>
       <div className="space-y-1.5">
         {items.length > 0 ? (
           items.slice(0, 4).map((item) => (
             <Button
-              className="pointer-events-auto grid w-full grid-cols-[1fr_auto] gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-[var(--surface)]"
+              className="pointer-events-auto grid w-full grid-cols-[1fr_auto] gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-surface"
               key={item.id}
               onClick={item.onClick}
               type="button"
@@ -2589,17 +2609,17 @@ function InspectorGroup({
                 <span className="block truncate text-xs font-semibold">
                   {item.title}
                 </span>
-                <span className="mt-0.5 block truncate text-[11px] text-[var(--muted)]">
+                <span className="mt-0.5 block truncate text-[11px] text-muted">
                   {item.detail}
                 </span>
               </span>
-              <span className="text-[11px] font-semibold text-[var(--accent)]">
+              <span className="text-[11px] font-semibold text-accent">
                 {item.action}
               </span>
             </Button>
           ))
         ) : (
-          <p className="px-2 py-1 text-xs text-[var(--muted)]">{empty}</p>
+          <p className="px-2 py-1 text-xs text-muted">{empty}</p>
         )}
       </div>
     </div>
@@ -2628,10 +2648,10 @@ function TaskSnapshot({
 
   return (
     <section className={`${panelClass} overflow-hidden`}>
-      <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] p-4">
+      <div className="flex items-start justify-between gap-3 border-b border-separator p-4">
         <div>
           <h2 className="text-lg font-semibold">Task snapshot</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             {overdueCount > 0
               ? `${overdueCount} overdue`
               : `${openTasks.length} local open`}{" "}
@@ -2646,7 +2666,7 @@ function TaskSnapshot({
           Review
         </Button>
       </div>
-      <div className="divide-y divide-[var(--line)]">
+      <div className="divide-y divide-separator">
         {sortedTasks.map((task) => (
           <HoverPreview
             detail={task.notes || "No notes saved for this task."}
@@ -2655,7 +2675,7 @@ function TaskSnapshot({
             title={task.title}
           >
             <Button
-              className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-[var(--accent-soft)]"
+              className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-accent-soft"
               onClick={() => void completeTask(task)}
               type="button"
             >
@@ -2664,12 +2684,12 @@ function TaskSnapshot({
                 <span className="block truncate text-sm font-semibold">
                   {task.title}
                 </span>
-                <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                <span className="mt-1 block truncate text-xs text-muted">
                   {task.due ? formatDueDate(task.due) : "No deadline"} ·{" "}
                   {task.notes || "No note"}
                 </span>
               </span>
-              <Check className="h-4 w-4 text-[var(--success)]" />
+              <Check className="h-4 w-4 text-success" />
             </Button>
           </HoverPreview>
         ))}
@@ -2698,10 +2718,10 @@ function GithubActivityPanel({
 
   return (
     <section className={`${panelClass} overflow-hidden`}>
-      <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] p-4">
+      <div className="flex items-start justify-between gap-3 border-b border-separator p-4">
         <div>
           <h2 className="text-lg font-semibold">GitHub activity</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             {briefing?.github?.connected
               ? `${issues.length} assigned issue${issues.length === 1 ? "" : "s"}`
               : "GitHub not connected"}
@@ -2715,7 +2735,7 @@ function GithubActivityPanel({
           Ask AI
         </Button>
       </div>
-      <div className="divide-y divide-[var(--line)]">
+      <div className="divide-y divide-separator">
         {issues.slice(0, 5).map((issue) => (
           <HoverPreview
             detail={`${issue.labels.join(", ") || "No labels"} · updated ${formatFileTime(issue.updatedAt)}`}
@@ -2736,7 +2756,7 @@ function GithubActivityPanel({
                 <span className="block truncate text-sm font-semibold">
                   {issue.title}
                 </span>
-                <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                <span className="mt-1 block truncate text-xs text-muted">
                   {issue.repositoryFullName ?? "Repository"} #{issue.number}
                 </span>
               </Button>
@@ -2801,12 +2821,12 @@ function AiActionPlanner({
     <section className={`${panelClass} ai-planner overflow-hidden p-5`}>
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold uppercase text-[var(--muted)]">
-            <Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-separator bg-surface-secondary px-3 py-1 text-xs font-semibold uppercase text-muted">
+            <Sparkles className="h-3.5 w-3.5 text-accent" />
             Executive decision layer
           </div>
           <h2 className="text-xl font-semibold">What to do next</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             Prioritized from live calendar, tasks, inbox, files, and GitHub
             signals.
           </p>
@@ -2821,19 +2841,19 @@ function AiActionPlanner({
           const Icon = action.icon;
           return (
             <Button
-              className="group rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-left transition hover:-translate-y-1 hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              className="group rounded-2xl border border-separator bg-surface p-4 text-left transition hover:-translate-y-1 hover:border-[var(--accent)] hover:bg-accent-soft"
               key={action.title}
               onClick={action.onClick}
               type="button"
             >
               <div className="mb-4 flex items-center justify-between">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] transition group-hover:bg-[var(--accent)] group-hover:text-white">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent transition group-hover:bg-accent group-hover:text-white">
                   <Icon className="h-4 w-4" />
                 </span>
-                <ArrowRight className="h-4 w-4 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--accent)]" />
+                <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-0.5 group-hover:text-accent" />
               </div>
               <p className="font-semibold">{action.title}</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              <p className="mt-2 text-sm leading-6 text-muted">
                 {action.detail}
               </p>
             </Button>
@@ -2912,7 +2932,7 @@ function InboxHighlights({
       <div className={`${panelClass} overflow-hidden`}>
         {items.length > 0 ? (
           <div className="grid min-h-80 xl:grid-cols-[minmax(0,1fr)_280px]">
-            <div className="divide-y divide-[var(--line)]">
+            <div className="divide-y divide-separator">
               {items.map((item) => (
                 <HoverPreview
                   detail={item.snippet}
@@ -2921,42 +2941,40 @@ function InboxHighlights({
                   title={item.person}
                 >
                   <Button
-                    className={`grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-[var(--accent-soft)] ${
-                      selected?.id === item.id ? "bg-[var(--accent-soft)]" : ""
+                    className={`grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-accent-soft ${
+                      selected?.id === item.id ? "bg-accent-soft" : ""
                     }`}
                     onClick={() => setSelectedId(item.id)}
                     type="button"
                   >
-                    <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--warning-soft)] text-[var(--warning)]">
+                    <span className="grid h-10 w-10 place-items-center rounded-lg bg-warning-soft text-warning">
                       <Mail className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold">
                         {item.title}
                       </span>
-                      <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                      <span className="mt-1 block truncate text-xs text-muted">
                         {item.person}
                       </span>
                     </span>
-                    <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
+                    <span className="rounded-full bg-surface px-2 py-1 text-[11px] font-semibold text-muted">
                       {item.kind}
                     </span>
                   </Button>
                 </HoverPreview>
               ))}
             </div>
-            <div className="border-t border-[var(--line)] bg-[var(--surface-soft)] p-4 xl:border-l xl:border-t-0">
+            <div className="border-t border-separator bg-surface-secondary p-4 xl:border-l xl:border-t-0">
               {selected ? (
                 <div className="animate-fade-in">
-                  <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <p className="text-xs font-semibold uppercase text-muted">
                     {selected.kind}
                   </p>
                   <h3 className="mt-2 text-base font-semibold leading-6">
                     {selected.title}
                   </h3>
-                  <p className="mt-2 text-sm text-[var(--muted)]">
-                    {selected.person}
-                  </p>
+                  <p className="mt-2 text-sm text-muted">{selected.person}</p>
                   <p className="mt-4 text-sm leading-6">{selected.snippet}</p>
                   <Button
                     className={primaryButtonClass + " mt-4 w-full"}
@@ -2999,17 +3017,21 @@ function ControlMetric({
   value: string;
 }) {
   return (
-    <article className="group rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--accent)] hover:shadow-[var(--shadow)]">
-      <div className="mb-5 flex items-center justify-between">
-        <Icon className="h-4 w-4 text-[var(--accent)]" />
-        <MoreHorizontal className="h-4 w-4 text-[var(--muted)] opacity-0 transition group-hover:opacity-100" />
-      </div>
-      <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-        {label}
-      </p>
-      <p className="mt-2 text-3xl font-semibold">{value}</p>
-      <p className="mt-1 text-sm text-[var(--muted)]">{detail}</p>
-    </article>
+    <Card className="group border border-separator bg-surface p-0 shadow-surface transition hover:border-border-secondary">
+      <Card.Content className="p-4">
+        <div className="mb-5 flex items-center justify-between">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">
+            <Icon className="h-4 w-4" />
+          </span>
+          <MoreHorizontal className="h-4 w-4 text-muted opacity-0 transition group-hover:opacity-100" />
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+          {label}
+        </p>
+        <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
+        <p className="mt-1 text-sm text-muted">{detail}</p>
+      </Card.Content>
+    </Card>
   );
 }
 
@@ -3027,7 +3049,7 @@ function SectionHeader({
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">
           <Icon className="h-4 w-4" />
         </span>
         <h2 className="text-lg font-semibold">{title}</h2>
@@ -3053,12 +3075,12 @@ function HoverPreview({
   return (
     <div className="hover-card group relative">
       {children}
-      <div className="hover-card-panel pointer-events-none absolute left-4 top-[calc(100%+8px)] z-30 w-72 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-sm opacity-0 shadow-[var(--shadow-strong)] transition duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+      <div className="hover-card-panel pointer-events-none absolute left-4 top-[calc(100%+8px)] z-30 w-72 rounded-xl border border-separator bg-surface p-3 text-sm opacity-0 shadow-overlay transition duration-200 group-hover:translate-y-0 group-hover:opacity-100">
         <p className="truncate font-semibold">{title}</p>
-        <p className="mt-1 text-xs font-semibold uppercase text-[var(--muted)]">
+        <p className="mt-1 text-xs font-semibold uppercase text-muted">
           {meta}
         </p>
-        <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--muted)]">
+        <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted">
           {detail}
         </p>
       </div>
@@ -3260,14 +3282,14 @@ function AgentConsole({
     <section
       className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden`}
     >
-      <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-5 py-4">
+      <div className="flex items-center justify-between gap-4 border-b border-separator px-5 py-4">
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-accent">
             <Bot className="h-5 w-5" />
           </span>
           <div>
             <h2 className="font-semibold">Executive assistant</h2>
-            <p className="text-xs text-[var(--muted)]">
+            <p className="text-xs text-muted">
               Neutral routing, generated UI, and session memory
             </p>
           </div>
@@ -3294,7 +3316,7 @@ function AgentConsole({
       </div>
 
       <form
-        className="border-t border-[var(--line)] p-4"
+        className="border-t border-separator p-4"
         id="agent-chat-form"
         onSubmit={submitMessage}
       >
@@ -3305,7 +3327,7 @@ function AgentConsole({
           ref={fileInputRef}
           type="file"
         />
-        <div className="flex gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-2">
+        <div className="flex gap-3 rounded-lg border border-separator bg-surface-secondary p-2">
           <Button
             className={
               iconButtonClass + " h-11 w-11 border-transparent bg-transparent"
@@ -3331,7 +3353,7 @@ function AgentConsole({
             )}
           </Button>
           <Input
-            className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-[var(--muted)]"
+            className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted"
             onChange={(event) => setInput(event.target.value)}
             placeholder="Ask the assistant to plan, schedule, draft, search, or remember..."
             value={input}
@@ -3360,7 +3382,7 @@ function AssistantThinkingCard({ messages }: { messages: Message[] }) {
   return (
     <div className="flex max-w-[85%] gap-3">
       <AvatarIcon role="assistant" />
-      <div className="surface-pop rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3 shadow-sm">
+      <div className="surface-pop rounded-xl border border-separator bg-surface-secondary px-4 py-3 shadow-sm">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <span className="flex items-center gap-1">
             <span className="thinking-dot" />
@@ -3372,10 +3394,10 @@ function AssistantThinkingCard({ messages }: { messages: Message[] }) {
         <div className="grid gap-2">
           {steps.map((step) => (
             <div
-              className="flex items-center gap-2 text-xs text-[var(--muted)]"
+              className="flex items-center gap-2 text-xs text-muted"
               key={step}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               {step}
             </div>
           ))}
@@ -3426,8 +3448,8 @@ function ChatMessage({
           <div
             className={
               fromUser
-                ? "rounded-xl bg-[var(--accent)] px-4 py-3 text-sm leading-6 text-white"
-                : "rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3 text-sm leading-6 text-[var(--text)]"
+                ? "rounded-xl bg-accent px-4 py-3 text-sm leading-6 text-white"
+                : "rounded-xl border border-separator bg-surface-secondary px-4 py-3 text-sm leading-6 text-foreground"
             }
           >
             {fromUser ? (
@@ -3438,7 +3460,7 @@ function ChatMessage({
           </div>
         ) : null}
         <div
-          className={`mt-1 text-xs text-[var(--muted)] ${fromUser ? "text-right" : ""}`}
+          className={`mt-1 text-xs text-muted ${fromUser ? "text-right" : ""}`}
         >
           {message.timestamp}
         </div>
@@ -3565,16 +3587,16 @@ function AssistantUiRequestCard({
   }
 
   return (
-    <div className="surface-pop max-w-2xl rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow)]">
+    <div className="surface-pop max-w-2xl rounded-2xl border border-separator bg-surface p-4 shadow-surface">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
           <Wand2 className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="font-semibold">Choose the missing detail</h3>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+              <p className="mt-1 text-sm leading-6 text-muted">
                 {request.detail}
               </p>
             </div>
@@ -3586,11 +3608,11 @@ function AssistantUiRequestCard({
               {candidateTasks.length > 0 ? (
                 <>
                   <label className="grid gap-1">
-                    <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                    <span className="text-xs font-semibold uppercase text-muted">
                       Task
                     </span>
                     <Select
-                      className="h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none transition focus:border-[var(--accent)]"
+                      className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none transition focus:border-[var(--accent)]"
                       onChange={(event) =>
                         setSelectedTaskId(event.target.value)
                       }
@@ -3606,12 +3628,12 @@ function AssistantUiRequestCard({
                       ))}
                     </Select>
                   </label>
-                  <div className="grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-sm sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                  <div className="grid gap-2 rounded-xl border border-separator bg-surface-secondary p-3 text-sm sm:grid-cols-[1fr_auto_1fr] sm:items-center">
                     <MiniControl
                       label="Current due date"
                       value={formatDateShort(selectedTask?.due)}
                     />
-                    <ArrowRight className="hidden h-4 w-4 text-[var(--muted)] sm:block" />
+                    <ArrowRight className="hidden h-4 w-4 text-muted sm:block" />
                     <MiniControl
                       label="New due date"
                       value={
@@ -3674,8 +3696,8 @@ function AssistantUiRequestCard({
             <p
               className={`mt-3 rounded-xl px-3 py-2 text-sm font-medium ${
                 status.tone === "success"
-                  ? "bg-[var(--success-soft)] text-[var(--success)]"
-                  : "bg-[var(--warning-soft)] text-[var(--warning)]"
+                  ? "bg-success-soft text-success"
+                  : "bg-warning-soft text-warning"
               }`}
             >
               {status.text}
@@ -3800,7 +3822,7 @@ function ContextWorkspace({
         >
           <Columns3 className="h-4 w-4" />
         </Button>
-        <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-accent">
           <Icon className="h-5 w-5" />
         </span>
         <div className="h-px w-full bg-[var(--line)]" />
@@ -3821,8 +3843,8 @@ function ContextWorkspace({
             <span
               className={`grid h-9 w-9 place-items-center rounded-md transition ${
                 item === mode
-                  ? "bg-[var(--accent)] text-white"
-                  : "bg-[var(--surface-soft)] text-[var(--muted)]"
+                  ? "bg-accent text-white"
+                  : "bg-surface-secondary text-muted"
               }`}
               key={item}
               title={contextWorkspaceMeta(item).label}
@@ -3845,16 +3867,14 @@ function ContextWorkspace({
         onPointerDown={startResize}
         role="separator"
       />
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] p-4">
+      <div className="flex items-center justify-between gap-3 border-b border-separator p-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-accent">
             <Icon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{meta.label}</p>
-            <p className="truncate text-xs text-[var(--muted)]">
-              {meta.detail}
-            </p>
+            <p className="truncate text-xs text-muted">{meta.detail}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -3877,16 +3897,22 @@ function ContextWorkspace({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-2">
-        <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+      <div className="flex items-center gap-3 border-b border-separator px-4 py-2">
+        <span className="text-xs font-semibold uppercase text-muted">
           AI selected
         </span>
-        <div className="min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--track)]">
-          <div className="animated-progress h-1.5 w-2/3 rounded-full bg-[var(--accent)]" />
-        </div>
-        <span className="text-xs font-semibold text-[var(--accent)]">
-          {meta.signal}
-        </span>
+        <ProgressBar
+          aria-label="AI context confidence"
+          className="min-w-0 flex-1"
+          color="accent"
+          size="sm"
+          value={67}
+        >
+          <ProgressBar.Track className="bg-[var(--track)]">
+            <ProgressBar.Fill className="animated-progress" />
+          </ProgressBar.Track>
+        </ProgressBar>
+        <span className="text-xs font-semibold text-accent">{meta.signal}</span>
       </div>
 
       <div
@@ -3935,8 +3961,8 @@ function ContextWorkspace({
         ) : null}
       </div>
 
-      <div className="border-t border-[var(--line)] px-4 py-3">
-        <label className="flex items-center gap-3 text-xs font-semibold text-[var(--muted)]">
+      <div className="border-t border-separator px-4 py-3">
+        <label className="flex items-center gap-3 text-xs font-semibold text-muted">
           Width
           <Input
             aria-label="Resize contextual workspace"
@@ -4012,7 +4038,7 @@ function FocusWorkspace({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">Current focus</h3>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-muted">
               {briefing?.focus?.title ?? "No local focus task selected yet."}
             </p>
           </div>
@@ -4055,23 +4081,23 @@ function FocusWorkspace({
           const Icon = action.icon;
           return (
             <Button
-              className="interactive-row grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-left transition hover:bg-[var(--accent-soft)]"
+              className="interactive-row grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-separator bg-surface-secondary p-3 text-left transition hover:bg-accent-soft"
               key={action.title}
               onClick={() => runPrompt(action.prompt)}
               type="button"
             >
-              <span className="grid h-10 w-10 place-items-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
+              <span className="grid h-10 w-10 place-items-center rounded-md bg-accent-soft text-accent">
                 <Icon className="h-4 w-4" />
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold">
                   {action.title}
                 </span>
-                <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                <span className="mt-1 block truncate text-xs text-muted">
                   {action.detail}
                 </span>
               </span>
-              <ArrowRight className="h-4 w-4 text-[var(--muted)]" />
+              <ArrowRight className="h-4 w-4 text-muted" />
             </Button>
           );
         })}
@@ -4218,7 +4244,7 @@ function CalendarWorkspace({
                 year: "numeric",
               })}
             </p>
-            <p className="text-xs text-[var(--muted)]">
+            <p className="text-xs text-muted">
               {briefing?.calendar.ok
                 ? "Google Calendar"
                 : (briefing?.calendar.reason ?? "Calendar not connected")}
@@ -4245,8 +4271,8 @@ function CalendarWorkspace({
             <Button
               className={`h-9 rounded-md text-xs font-semibold transition ${
                 view === option
-                  ? "bg-[var(--accent)] text-white"
-                  : "border border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  ? "bg-accent text-white"
+                  : "border border-separator bg-surface text-muted hover:border-[var(--accent)] hover:text-accent"
               }`}
               key={option}
               onClick={() => setView(option)}
@@ -4299,7 +4325,7 @@ function CalendarWorkspace({
 
       {view === "month" ? (
         <section className={softPanelClass + " overflow-hidden p-3"}>
-          <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase text-[var(--muted)]">
+          <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase text-muted">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
               <span key={day}>{day}</span>
             ))}
@@ -4312,10 +4338,10 @@ function CalendarWorkspace({
               const currentMonth = day.getMonth() === selectedDate.getMonth();
               return (
                 <Button
-                  className={`min-h-16 rounded-md border p-1.5 text-left transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] ${
+                  className={`min-h-16 rounded-md border p-1.5 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
                     sameCalendarDay(day, selectedDate)
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                      : "border-[var(--line)] bg-[var(--surface)]"
+                      ? "border-[var(--accent)] bg-accent-soft"
+                      : "border-separator bg-surface"
                   } ${currentMonth ? "" : "opacity-45"}`}
                   key={day.toISOString()}
                   onClick={() => {
@@ -4331,7 +4357,7 @@ function CalendarWorkspace({
                         { length: Math.min(3, dayCount) },
                         (_, index) => (
                           <span
-                            className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]"
+                            className="h-1.5 w-1.5 rounded-full bg-accent"
                             key={index}
                           />
                         ),
@@ -4406,7 +4432,7 @@ function CalendarSignalStrip({
   });
 
   return (
-    <section className="calendar-signal-strip grid gap-3 rounded-xl border border-[var(--line)] p-3 shadow-sm sm:grid-cols-3">
+    <section className="calendar-signal-strip grid gap-3 rounded-xl border border-separator p-3 shadow-sm sm:grid-cols-3">
       <MiniControl
         label="Selected"
         value={`${selectedLabel} · ${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"}`}
@@ -4459,20 +4485,20 @@ function WeekCalendar({
 
   return (
     <section className={softPanelClass + " overflow-hidden p-3"}>
-      <div className="grid grid-cols-[52px_repeat(7,minmax(86px,1fr))] border-b border-[var(--line)] pb-2">
+      <div className="grid grid-cols-[52px_repeat(7,minmax(86px,1fr))] border-b border-separator pb-2">
         <span />
         {weekDays.map((day) => (
           <Button
-            className={`rounded-xl px-2 py-2 text-left transition hover:bg-[var(--accent-soft)] ${
+            className={`rounded-xl px-2 py-2 text-left transition hover:bg-accent-soft ${
               sameCalendarDay(day, selectedDate)
-                ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                ? "bg-accent-soft text-accent"
                 : ""
             }`}
             key={day.toISOString()}
             onClick={() => onSelectDate(day)}
             type="button"
           >
-            <span className="block text-[10px] font-semibold uppercase text-[var(--muted)]">
+            <span className="block text-[10px] font-semibold uppercase text-muted">
               {day.toLocaleDateString(undefined, { weekday: "short" })}
             </span>
             <span className="mt-1 block text-lg font-semibold">
@@ -4486,14 +4512,14 @@ function WeekCalendar({
           {hours.map((hour) => (
             <div className="contents" key={hour}>
               <div
-                className="border-t border-[var(--line)] pt-1 text-[10px] font-semibold text-[var(--muted)]"
+                className="border-t border-separator pt-1 text-[10px] font-semibold text-muted"
                 style={{ height: hourHeight }}
               >
                 {formatHour(hour)}
               </div>
               {weekDays.map((day) => (
                 <Button
-                  className="border-l border-t border-[var(--line)] text-left transition hover:bg-[var(--accent-soft)]"
+                  className="border-l border-t border-separator text-left transition hover:bg-accent-soft"
                   key={`${day.toISOString()}-${hour}`}
                   onClick={() => onSlotClick(day, hour)}
                   onDragOver={(event) => event.preventDefault()}
@@ -4585,7 +4611,7 @@ function CalendarEventBlock({
         title={event.title}
       >
         <Button
-          className="h-full w-full overflow-hidden rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] p-2 text-left text-xs shadow-sm transition hover:-translate-y-0.5 hover:bg-[var(--surface)]"
+          className="h-full w-full overflow-hidden rounded-xl border border-[var(--accent)] bg-accent-soft p-2 text-left text-xs shadow-sm transition hover:-translate-y-0.5 hover:bg-surface"
           draggable={Boolean(event.id)}
           onClick={onClick}
           onDragStart={(dragEvent) => {
@@ -4598,7 +4624,7 @@ function CalendarEventBlock({
           type="button"
         >
           <span className="block truncate font-semibold">{event.title}</span>
-          <span className="mt-0.5 block truncate text-[var(--muted)]">
+          <span className="mt-0.5 block truncate text-muted">
             {formatEventTime(event.start)}
           </span>
         </Button>
@@ -4640,13 +4666,13 @@ function DayCalendar({
         <div className="space-y-0">
           {hours.map((hour) => (
             <Button
-              className="grid border-t border-[var(--line)] text-left transition hover:bg-[var(--accent-soft)]"
+              className="grid border-t border-separator text-left transition hover:bg-accent-soft"
               key={hour}
               onClick={() => onSlotClick(hour)}
               style={{ height: hourHeight }}
               type="button"
             >
-              <span className="-mt-2 w-12 bg-[var(--surface-soft)] pr-2 text-[10px] font-semibold text-[var(--muted)]">
+              <span className="-mt-2 w-12 bg-surface-secondary pr-2 text-[10px] font-semibold text-muted">
                 {formatHour(hour)}
               </span>
             </Button>
@@ -4686,14 +4712,14 @@ function DayCalendar({
                   title={event.title}
                 >
                   <Button
-                    className="h-full w-full overflow-hidden rounded-lg border border-[var(--accent)] bg-[var(--accent-soft)] p-2 text-left text-xs shadow-sm transition hover:bg-[var(--surface)]"
+                    className="h-full w-full overflow-hidden rounded-lg border border-[var(--accent)] bg-accent-soft p-2 text-left text-xs shadow-sm transition hover:bg-surface"
                     onClick={() => onEventClick(event)}
                     type="button"
                   >
                     <span className="block truncate font-semibold">
                       {event.title}
                     </span>
-                    <span className="mt-0.5 block truncate text-[var(--muted)]">
+                    <span className="mt-0.5 block truncate text-muted">
                       {formatEventTime(event.start)} -{" "}
                       {formatEventTime(event.end)}
                     </span>
@@ -4705,7 +4731,7 @@ function DayCalendar({
         </div>
       </div>
       {events.length === 0 ? (
-        <p className="mt-3 text-center text-sm text-[var(--muted)]">
+        <p className="mt-3 text-center text-sm text-muted">
           No events loaded for this day.
         </p>
       ) : null}
@@ -4755,7 +4781,7 @@ function CalendarEventEditor({
                 <h3 className="text-lg font-semibold">
                   {action.mode === "edit" ? "Edit event" : "Add event"}
                 </h3>
-                <p className="mt-1 text-sm text-[var(--muted)]">
+                <p className="mt-1 text-sm text-muted">
                   {action.mode === "edit"
                     ? "Update the real Google Calendar event."
                     : "Create a real Google Calendar event."}
@@ -4772,11 +4798,11 @@ function CalendarEventEditor({
             </div>
             <div className="space-y-3">
               <label className="space-y-1">
-                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                <span className="text-xs font-semibold uppercase text-muted">
                   Title
                 </span>
                 <Input
-                  className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                   onChange={(event) =>
                     onChange({ ...action, title: event.target.value })
                   }
@@ -4785,22 +4811,22 @@ function CalendarEventEditor({
               </label>
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <span className="text-xs font-semibold uppercase text-muted">
                     Date
                   </span>
                   <Input
-                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                     onChange={(event) => updateDateTime(event.target.value)}
                     type="date"
                     value={date}
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <span className="text-xs font-semibold uppercase text-muted">
                     Time
                   </span>
                   <Input
-                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                     onChange={(event) =>
                       updateDateTime(date, event.target.value)
                     }
@@ -4809,11 +4835,11 @@ function CalendarEventEditor({
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <span className="text-xs font-semibold uppercase text-muted">
                     Min
                   </span>
                   <Input
-                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                     min={15}
                     onChange={(event) =>
                       updateDateTime(date, time, Number(event.target.value))
@@ -4826,11 +4852,11 @@ function CalendarEventEditor({
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <span className="text-xs font-semibold uppercase text-muted">
                     Attendees
                   </span>
                   <Input
-                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none placeholder:text-muted focus:border-[var(--accent)]"
                     onChange={(event) =>
                       onChange({ ...action, attendees: event.target.value })
                     }
@@ -4839,11 +4865,11 @@ function CalendarEventEditor({
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <span className="text-xs font-semibold uppercase text-muted">
                     Reminder
                   </span>
                   <Select
-                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                     onChange={(event) =>
                       onChange({
                         ...action,
@@ -4864,11 +4890,11 @@ function CalendarEventEditor({
                 </label>
               </div>
               <label className="space-y-1">
-                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                <span className="text-xs font-semibold uppercase text-muted">
                   Location
                 </span>
                 <Input
-                  className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+                  className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none placeholder:text-muted focus:border-[var(--accent)]"
                   onChange={(event) =>
                     onChange({ ...action, location: event.target.value })
                   }
@@ -4877,11 +4903,11 @@ function CalendarEventEditor({
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                <span className="text-xs font-semibold uppercase text-muted">
                   Notes
                 </span>
                 <TextArea
-                  className="min-h-24 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+                  className="min-h-24 w-full resize-y rounded-lg border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-[var(--accent)]"
                   onChange={(event) =>
                     onChange({ ...action, notes: event.target.value })
                   }
@@ -4971,7 +4997,7 @@ function TaskWorkspace({
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="font-semibold">Open tasks</h3>
-            <p className="text-xs text-[var(--muted)]">
+            <p className="text-xs text-muted">
               {tasks.length} local total, {taskColumns.length} columns,{" "}
               {openGoogleTasks.length} Google open
             </p>
@@ -4984,12 +5010,12 @@ function TaskWorkspace({
         <div className="space-y-2">
           {openTasks.slice(0, 5).map((task) => (
             <Button
-              className="interactive-row flex w-full items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left"
+              className="interactive-row flex w-full items-center gap-3 rounded-lg border border-separator bg-surface p-3 text-left"
               key={task.id}
               onClick={() => completeTask(task)}
               type="button"
             >
-              <Check className="h-4 w-4 text-[var(--success)]" />
+              <Check className="h-4 w-4 text-success" />
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">
                 {task.title}
               </span>
@@ -4998,23 +5024,23 @@ function TaskWorkspace({
           ))}
           {openGoogleTasks.slice(0, 6).map((task) => (
             <Button
-              className="interactive-row flex w-full items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left"
+              className="interactive-row flex w-full items-center gap-3 rounded-lg border border-separator bg-surface p-3 text-left"
               key={`${task.taskListId}-${task.id}`}
               onClick={() => void completeGoogleTask(task)}
               type="button"
             >
-              <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />
+              <CheckCircle2 className="h-4 w-4 text-accent" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">
                   {task.title}
                 </span>
-                <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                <span className="mt-1 block truncate text-xs text-muted">
                   {task.due
                     ? `Due ${formatEventTime(task.due)}`
                     : (task.taskListTitle ?? "Google Tasks")}
                 </span>
               </span>
-              <span className="text-xs text-[var(--muted)]">Google</span>
+              <span className="text-xs text-muted">Google</span>
             </Button>
           ))}
         </div>
@@ -5029,7 +5055,7 @@ function TaskWorkspace({
           />
         ) : null}
         {googleStatus ? (
-          <p className="mt-3 text-sm text-[var(--muted)]">{googleStatus}</p>
+          <p className="mt-3 text-sm text-muted">{googleStatus}</p>
         ) : null}
       </section>
     </div>
@@ -5075,11 +5101,11 @@ function MemoryWorkspace({
         <div className="space-y-2">
           {notes.slice(0, 8).map((note) => (
             <div
-              className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3"
+              className="rounded-lg border border-separator bg-surface p-3"
               key={note.id}
             >
               <p className="text-sm leading-5">{note.body}</p>
-              <p className="mt-2 text-xs text-[var(--muted)]">
+              <p className="mt-2 text-xs text-muted">
                 {formatFileTime(note.createdAt)}
               </p>
             </div>
@@ -5123,7 +5149,7 @@ function ContactsWorkspace({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">Google Contacts</h3>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-muted">
               {briefing?.contacts?.ok
                 ? "Saved contacts, birthdays, emails, phones, and organizations."
                 : (briefing?.contacts?.reason ??
@@ -5166,7 +5192,7 @@ function ContactsWorkspace({
           <div className="space-y-2">
             {birthdayContacts.map((contact) => (
               <Button
-                className="interactive-row flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--accent-soft)]"
+                className="interactive-row flex w-full items-center justify-between gap-3 rounded-lg border border-separator bg-surface p-3 text-left transition hover:bg-accent-soft"
                 key={`${contact.resourceName}-birthday`}
                 onClick={() =>
                   runPrompt(
@@ -5179,11 +5205,11 @@ function ContactsWorkspace({
                   <span className="block truncate text-sm font-semibold">
                     {contact.displayName}
                   </span>
-                  <span className="mt-1 block text-xs text-[var(--muted)]">
+                  <span className="mt-1 block text-xs text-muted">
                     {contact.birthday}
                   </span>
                 </span>
-                <Bell className="h-4 w-4 text-[var(--muted)]" />
+                <Bell className="h-4 w-4 text-muted" />
               </Button>
             ))}
           </div>
@@ -5195,12 +5221,12 @@ function ContactsWorkspace({
         <div className="space-y-2">
           {contacts.slice(0, 8).map((contact) => (
             <Button
-              className="interactive-row grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--accent-soft)]"
+              className="interactive-row grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-separator bg-surface p-3 text-left transition hover:bg-accent-soft"
               key={contact.resourceName ?? contact.displayName}
               onClick={() => runPrompt(`Open contact ${contact.displayName}`)}
               type="button"
             >
-              <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent)]">
+              <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-accent-soft text-sm font-semibold text-accent">
                 {contact.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -5216,14 +5242,14 @@ function ContactsWorkspace({
                 <span className="block truncate text-sm font-semibold">
                   {contact.displayName}
                 </span>
-                <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                <span className="mt-1 block truncate text-xs text-muted">
                   {contact.emails[0] ??
                     contact.phoneNumbers[0] ??
                     contact.organization ??
                     "No contact method"}
                 </span>
               </span>
-              <ArrowRight className="h-4 w-4 text-[var(--muted)]" />
+              <ArrowRight className="h-4 w-4 text-muted" />
             </Button>
           ))}
         </div>
@@ -5356,7 +5382,7 @@ function ScheduleComposer({
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold">Meeting details</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             Create a real Google Calendar event after approval.
           </p>
         </div>
@@ -5367,11 +5393,11 @@ function ScheduleComposer({
       </div>
       <div className="grid gap-3">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+          <span className="text-xs font-semibold uppercase text-muted">
             Title
           </span>
           <Input
-            className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setSummary(event.target.value)}
             placeholder="What should the meeting be called?"
             value={summary}
@@ -5379,33 +5405,33 @@ function ScheduleComposer({
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            <span className="text-xs font-semibold uppercase text-muted">
               Date
             </span>
             <Input
-              className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+              className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
               onChange={(event) => setDate(event.target.value)}
               type="date"
               value={date}
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            <span className="text-xs font-semibold uppercase text-muted">
               Time
             </span>
             <Input
-              className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+              className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
               onChange={(event) => setTime(event.target.value)}
               type="time"
               value={time}
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            <span className="text-xs font-semibold uppercase text-muted">
               Duration
             </span>
             <Select
-              className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+              className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
               onChange={(event) => setDuration(Number(event.target.value))}
               value={duration}
             >
@@ -5416,11 +5442,11 @@ function ScheduleComposer({
             </Select>
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+            <span className="text-xs font-semibold uppercase text-muted">
               Timezone
             </span>
             <Input
-              className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+              className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
               onChange={(event) => setTimeZone(event.target.value)}
               value={timeZone}
             />
@@ -5465,8 +5491,8 @@ function ScheduleComposer({
         <p
           className={
             status.ok
-              ? "mt-3 text-sm font-medium text-[var(--success)]"
-              : "mt-3 text-sm font-medium text-[var(--warning)]"
+              ? "mt-3 text-sm font-medium text-success"
+              : "mt-3 text-sm font-medium text-warning"
           }
         >
           {status.message}
@@ -5576,22 +5602,22 @@ function TaskComposer({
       }}
     >
       <div className="mb-4 flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--success-soft)] text-[var(--success)]">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-success-soft text-success">
           <ListTodo className="h-5 w-5" />
         </span>
         <div>
           <h3 className="font-semibold">Task builder</h3>
-          <p className="text-sm text-[var(--muted)]">
+          <p className="text-sm text-muted">
             Prefilled from your request. Adjust only what changed.
           </p>
         </div>
       </div>
       {initialContext?.relatedCompletionHint ? (
-        <div className="mb-4 rounded-xl border border-[var(--warning)] bg-[var(--warning-soft)] p-3">
-          <p className="text-sm font-semibold text-[var(--warning)]">
+        <div className="mb-4 rounded-xl border border-warning bg-warning-soft p-3">
+          <p className="text-sm font-semibold text-warning">
             Existing task reference
           </p>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             Possible completed task: {initialContext.relatedCompletionHint}.
             Confirm before I modify it.
           </p>
@@ -5613,21 +5639,21 @@ function TaskComposer({
       ) : null}
       <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+          <span className="text-xs font-semibold uppercase text-muted">
             Task
           </span>
           <Input
-            className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setTitle(event.target.value)}
             value={title}
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+          <span className="text-xs font-semibold uppercase text-muted">
             Priority
           </span>
           <Select
-            className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) =>
               setPriority(event.target.value as RelayTaskPriority)
             }
@@ -5642,22 +5668,22 @@ function TaskComposer({
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr]">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+          <span className="text-xs font-semibold uppercase text-muted">
             Due date
           </span>
           <Input
-            className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setDue(event.target.value)}
             type="date"
             value={due}
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+          <span className="text-xs font-semibold uppercase text-muted">
             Notes
           </span>
           <Input
-            className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Context, project, or reminder details"
             value={notes}
@@ -5687,7 +5713,7 @@ function TaskComposer({
       </Button>
       {status ? (
         <p
-          className={`mt-3 text-sm font-medium ${status.ok ? "text-[var(--success)]" : "text-[var(--warning)]"}`}
+          className={`mt-3 text-sm font-medium ${status.ok ? "text-success" : "text-warning"}`}
         >
           {status.message}
         </p>
@@ -5766,7 +5792,7 @@ function FileGeneratedSurface() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="font-semibold">Drive organizer</h3>
-          <p className="text-sm text-[var(--muted)]">
+          <p className="text-sm text-muted">
             Real recent files from Google Drive.
           </p>
         </div>
@@ -5784,28 +5810,28 @@ function FileGeneratedSurface() {
         </Button>
       </div>
       {result?.ok && result.files.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-[var(--line)]">
+        <div className="overflow-hidden rounded-lg border border-separator">
           {result.files.map((file) => {
             const row = (
               <>
                 <DriveFileGlyph
-                  className="h-4 w-4 text-[var(--accent)]"
+                  className="h-4 w-4 text-accent"
                   mimeType={file.mimeType}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{file.name}</p>
-                  <p className="text-xs text-[var(--muted)]">
+                  <p className="text-xs text-muted">
                     {driveFileType(file.mimeType)} by{" "}
                     {file.owner ?? "Unknown owner"}
                   </p>
                 </div>
-                <ExternalLink className="h-4 w-4 text-[var(--muted)]" />
+                <ExternalLink className="h-4 w-4 text-muted" />
               </>
             );
 
             return file.webViewLink ? (
               <Link
-                className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3 transition hover:bg-[var(--accent-soft)] last:border-b-0"
+                className="flex items-center gap-3 border-b border-separator px-4 py-3 transition hover:bg-accent-soft last:border-b-0"
                 href={file.webViewLink}
                 key={file.id ?? file.name}
                 rel="noreferrer"
@@ -5815,7 +5841,7 @@ function FileGeneratedSurface() {
               </Link>
             ) : (
               <div
-                className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3 last:border-b-0"
+                className="flex items-center gap-3 border-b border-separator px-4 py-3 last:border-b-0"
                 key={file.id ?? file.name}
               >
                 {row}
@@ -5849,19 +5875,19 @@ function MemoryPermissionSurface({
   return (
     <div className={`${panelClass} mt-3 max-w-2xl p-4`}>
       <div className="mb-4 flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--warning-soft)] text-[var(--warning)]">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-warning-soft text-warning">
           <Brain className="h-5 w-5" />
         </span>
         <div>
           <h3 className="font-semibold">Memory request</h3>
-          <p className="text-sm text-[var(--muted)]">
+          <p className="text-sm text-muted">
             Long-term memory requires approval.
           </p>
         </div>
       </div>
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-sm leading-6">
+      <div className="rounded-lg border border-separator bg-surface-secondary p-3 text-sm leading-6">
         <TextArea
-          className="min-h-24 w-full resize-y bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
+          className="min-h-24 w-full resize-y bg-transparent text-sm outline-none placeholder:text-muted"
           onChange={(event) => setMemory(event.target.value)}
           placeholder="Write the exact preference, project fact, contact note, or habit to remember."
           value={memory}
@@ -5949,7 +5975,7 @@ function EmailApprovalSurface({
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="font-semibold">Email draft</h3>
-          <p className="text-sm text-[var(--muted)]">
+          <p className="text-sm text-muted">
             Creates a Gmail draft when a recipient is provided.
           </p>
         </div>
@@ -5958,13 +5984,11 @@ function EmailApprovalSurface({
           label={approved ? "Approved" : "Pending"}
         />
       </div>
-      <div className="space-y-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-4 text-sm leading-6">
+      <div className="space-y-3 rounded-lg border border-separator bg-surface-secondary p-4 text-sm leading-6">
         <label className="block space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
-            To
-          </span>
+          <span className="text-xs font-semibold uppercase text-muted">To</span>
           <Input
-            className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-md border border-separator bg-surface px-3 text-sm outline-none focus:border-[var(--accent)]"
             disabled={!editing}
             onChange={(event) => setTo(event.target.value)}
             placeholder="person@example.com"
@@ -5972,22 +5996,22 @@ function EmailApprovalSurface({
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+          <span className="text-xs font-semibold uppercase text-muted">
             Subject
           </span>
           <Input
-            className="h-10 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-md border border-separator bg-surface px-3 text-sm outline-none focus:border-[var(--accent)]"
             disabled={!editing}
             onChange={(event) => setSubject(event.target.value)}
             value={subject}
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+          <span className="text-xs font-semibold uppercase text-muted">
             Body
           </span>
           <TextArea
-            className="min-h-28 w-full resize-y rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+            className="min-h-28 w-full resize-y rounded-md border border-separator bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-[var(--accent)]"
             disabled={!editing}
             onChange={(event) => setBody(event.target.value)}
             placeholder="Write or ask the assistant to draft the email body."
@@ -6018,9 +6042,7 @@ function EmailApprovalSurface({
         </Button>
       </div>
       {status ? (
-        <p className="mt-3 text-sm font-medium text-[var(--warning)]">
-          {status}
-        </p>
+        <p className="mt-3 text-sm font-medium text-warning">{status}</p>
       ) : null}
     </div>
   );
@@ -6134,7 +6156,7 @@ function TasksView({
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold">Task board</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-muted">
               Editable local Kanban columns with deadline-aware cards.
             </p>
           </div>
@@ -6160,7 +6182,7 @@ function TasksView({
 
         <div className="mb-4 flex gap-2">
           <Input
-            className="h-10 min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+            className="h-10 min-w-0 flex-1 rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none placeholder:text-muted focus:border-[var(--accent)]"
             onChange={(event) => setNewColumnTitle(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void addColumn();
@@ -6211,7 +6233,7 @@ function TasksView({
                   <div className="mb-3 flex items-center gap-2">
                     {renamingColumn === column.id ? (
                       <Input
-                        className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-2 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                        className="h-9 min-w-0 flex-1 rounded-lg border border-separator bg-surface px-2 text-sm font-semibold outline-none focus:border-[var(--accent)]"
                         onChange={(event) => setRenameValue(event.target.value)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter")
@@ -6232,7 +6254,7 @@ function TasksView({
                         {column.title}
                       </Button>
                     )}
-                    <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
+                    <span className="rounded-full bg-surface px-2 py-1 text-[11px] font-semibold text-muted">
                       {columnTasks.length}
                     </span>
                     <Button
@@ -6278,7 +6300,7 @@ function TasksView({
                       />
                     ))}
                     {columnTasks.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-[var(--line)] p-5 text-center text-sm text-[var(--muted)]">
+                      <div className="rounded-xl border border-dashed border-separator p-5 text-center text-sm text-muted">
                         Drop tasks here
                       </div>
                     ) : null}
@@ -6293,9 +6315,9 @@ function TasksView({
       <section
         className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
       >
-        <div className="border-b border-[var(--line)] p-5">
+        <div className="border-b border-separator p-5">
           <h2 className="text-lg font-semibold">Global task view</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             Sorted by urgency and deadline proximity.
           </p>
         </div>
@@ -6303,7 +6325,7 @@ function TasksView({
           <div className="space-y-3">
             {sortedLocalTasks.map((task) => (
               <Button
-                className="interactive-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-left"
+                className="interactive-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-separator bg-surface-secondary p-3 text-left"
                 key={task.id}
                 onClick={() => void completeTask(task)}
                 type="button"
@@ -6313,17 +6335,17 @@ function TasksView({
                   <span className="block truncate text-sm font-semibold">
                     {task.title}
                   </span>
-                  <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                  <span className="mt-1 block truncate text-xs text-muted">
                     {task.due ? formatDueDate(task.due) : "No deadline"} ·{" "}
                     {task.notes || "No notes"}
                   </span>
                 </span>
-                <Check className="h-4 w-4 text-[var(--success)]" />
+                <Check className="h-4 w-4 text-success" />
               </Button>
             ))}
             {googleTasks.map((task) => (
               <Button
-                className="interactive-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-left"
+                className="interactive-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-separator bg-surface-secondary p-3 text-left"
                 key={`${task.taskListId}-${task.id ?? task.title}`}
                 onClick={() => void completeGoogleTask(task)}
                 type="button"
@@ -6333,14 +6355,14 @@ function TasksView({
                   <span className="block truncate text-sm font-semibold">
                     {task.title}
                   </span>
-                  <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+                  <span className="mt-1 block truncate text-xs text-muted">
                     {task.due
                       ? formatDueDate(task.due)
                       : (task.taskListTitle ?? "Google Tasks")}{" "}
                     · {task.notes || "No notes"}
                   </span>
                 </span>
-                <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />
+                <CheckCircle2 className="h-4 w-4 text-accent" />
               </Button>
             ))}
             {sortedLocalTasks.length === 0 && googleTasks.length === 0 ? (
@@ -6387,7 +6409,7 @@ function TaskKanbanCard({
       title={task.title}
     >
       <article
-        className="interactive-row rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 shadow-sm"
+        className="interactive-row rounded-xl border border-separator bg-surface p-3 shadow-sm"
         draggable
         onContextMenu={(event: MouseEvent<HTMLElement>) => {
           event.preventDefault();
@@ -6409,10 +6431,10 @@ function TaskKanbanCard({
           </Button>
         </div>
         <p className="text-sm font-semibold leading-5">{task.title}</p>
-        <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--muted)]">
+        <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted">
           {task.notes || "No notes"}
         </p>
-        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-[var(--muted)]">
+        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted">
           <span>{task.due ? formatDueDate(task.due) : "No due date"}</span>
           <MoreHorizontal className="h-4 w-4" />
         </div>
@@ -6464,7 +6486,7 @@ function TaskCreationModal({
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold">Add task</h3>
-                <p className="mt-1 text-sm text-[var(--muted)]">
+                <p className="mt-1 text-sm text-muted">
                   Create a local task with real metadata.
                 </p>
               </div>
@@ -6479,43 +6501,43 @@ function TaskCreationModal({
             </div>
             <div className="space-y-3">
               <label className="space-y-1">
-                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                <span className="text-xs font-semibold uppercase text-muted">
                   Title
                 </span>
                 <Input
-                  className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                   onChange={(event) => setTitle(event.target.value)}
                   value={title}
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                <span className="text-xs font-semibold uppercase text-muted">
                   Notes
                 </span>
                 <TextArea
-                  className="min-h-24 w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                  className="min-h-24 w-full resize-y rounded-lg border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
                   onChange={(event) => setNotes(event.target.value)}
                   value={notes}
                 />
               </label>
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <span className="text-xs font-semibold uppercase text-muted">
                     Due
                   </span>
                   <Input
-                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                     onChange={(event) => setDue(event.target.value)}
                     type="date"
                     value={due}
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <span className="text-xs font-semibold uppercase text-muted">
                     Priority
                   </span>
                   <Select
-                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                     onChange={(event) =>
                       setPriority(event.target.value as RelayTaskPriority)
                     }
@@ -6528,11 +6550,11 @@ function TaskCreationModal({
                   </Select>
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  <span className="text-xs font-semibold uppercase text-muted">
                     Column
                   </span>
                   <Select
-                    className="h-10 w-full rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
                     onChange={(event) => setColumnId(event.target.value)}
                     value={columnId}
                   >
@@ -6628,11 +6650,11 @@ function FilesView({
       <section
         className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
       >
-        <div className="border-b border-[var(--line)] p-5">
+        <div className="border-b border-separator p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold">Drive browser</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-muted">
                 {briefing?.google.connected
                   ? "Browse and search real Google Drive files."
                   : "Connect Google Drive to browse files."}
@@ -6654,10 +6676,10 @@ function FilesView({
               void searchFiles();
             }}
           >
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3">
-              <Search className="h-4 w-4 text-[var(--muted)]" />
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-separator bg-surface-secondary px-3">
+              <Search className="h-4 w-4 text-muted" />
               <Input
-                className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
+                className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search Drive files and folders..."
                 value={query}
@@ -6678,31 +6700,31 @@ function FilesView({
           </form>
         </div>
 
-        <div className="recent-file-strip border-b border-[var(--line)] px-5 py-3">
+        <div className="recent-file-strip border-b border-separator px-5 py-3">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {initialFiles.slice(0, 8).map((file) => (
               <Button
-                className="interactive-control flex min-w-52 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-left"
+                className="interactive-control flex min-w-52 items-center gap-2 rounded-xl border border-separator bg-surface-secondary px-3 py-2 text-left"
                 key={file.id ?? file.name}
                 onClick={() => setSelectedFileId(file.id ?? file.name)}
                 type="button"
               >
                 <DriveFileGlyph
-                  className="h-4 w-4 shrink-0 text-[var(--accent)]"
+                  className="h-4 w-4 shrink-0 text-accent"
                   mimeType={file.mimeType}
                 />
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-semibold">
                     {file.name}
                   </span>
-                  <span className="block truncate text-[11px] text-[var(--muted)]">
+                  <span className="block truncate text-[11px] text-muted">
                     {formatFileTime(file.modifiedTime)}
                   </span>
                 </span>
               </Button>
             ))}
             {initialFiles.length === 0 ? (
-              <span className="text-sm text-[var(--muted)]">
+              <span className="text-sm text-muted">
                 {briefing?.drive.reason ?? "No recent files loaded."}
               </span>
             ) : null}
@@ -6711,7 +6733,7 @@ function FilesView({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {status ? (
-            <p className="mb-3 rounded-lg border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]">
+            <p className="mb-3 rounded-lg border border-warning bg-warning-soft px-3 py-2 text-sm text-warning">
               {status}
             </p>
           ) : null}
@@ -6730,27 +6752,27 @@ function FilesView({
                 <Button
                   className={`interactive-row rounded-2xl border p-4 text-left ${
                     selectedFileId === (file.id ?? file.name)
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                      : "border-[var(--line)] bg-[var(--surface-soft)]"
+                      ? "border-[var(--accent)] bg-accent-soft"
+                      : "border-separator bg-surface-secondary"
                   }`}
                   onClick={() => setSelectedFileId(file.id ?? file.name)}
                   type="button"
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-soft text-accent">
                       <DriveFileGlyph
                         className="h-5 w-5"
                         mimeType={file.mimeType}
                       />
                     </span>
-                    <span className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]">
+                    <span className="rounded-full bg-surface px-2 py-1 text-[11px] font-semibold text-muted">
                       {driveFileType(file.mimeType)}
                     </span>
                   </div>
                   <p className="line-clamp-3 text-sm font-semibold leading-5">
                     {file.name}
                   </p>
-                  <p className="mt-2 truncate text-xs text-[var(--muted)]">
+                  <p className="mt-2 truncate text-xs text-muted">
                     {file.owner ?? "Unknown owner"}
                   </p>
                 </Button>
@@ -6778,9 +6800,9 @@ function FilesView({
       <section
         className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
       >
-        <div className="border-b border-[var(--line)] p-5">
+        <div className="border-b border-separator p-5">
           <h2 className="text-lg font-semibold">Quick preview</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             Open, download, or ask AI about the selected file.
           </p>
         </div>
@@ -6813,8 +6835,8 @@ function FilePreviewCard({
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-soft)] p-5">
-        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+      <div className="rounded-2xl border border-separator bg-surface-secondary p-5">
+        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent">
           <DriveFileGlyph className="h-6 w-6" mimeType={file.mimeType} />
         </span>
         <h3 className="mt-4 text-lg font-semibold leading-6">{file.name}</h3>
@@ -6957,9 +6979,9 @@ function GithubView({
       <section
         className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
       >
-        <div className="border-b border-[var(--line)] p-5">
+        <div className="border-b border-separator p-5">
           <h2 className="text-lg font-semibold">Repositories</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             {signedInToGithub
               ? `${repositories.length} recent repos`
               : "Connect GitHub to browse repositories."}
@@ -6968,10 +6990,10 @@ function GithubView({
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {repositories.map((repo) => (
             <Button
-              className={`mb-2 w-full rounded-xl border p-3 text-left transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] ${
+              className={`mb-2 w-full rounded-xl border p-3 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
                 selectedRepo?.id === repo.id
-                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                  : "border-[var(--line)] bg-[var(--surface-soft)]"
+                  ? "border-[var(--accent)] bg-accent-soft"
+                  : "border-separator bg-surface-secondary"
               }`}
               key={repo.id}
               onClick={() => setSelectedRepoName(repo.fullName)}
@@ -6980,7 +7002,7 @@ function GithubView({
               <span className="block truncate text-sm font-semibold">
                 {repo.fullName}
               </span>
-              <span className="mt-1 block truncate text-xs text-[var(--muted)]">
+              <span className="mt-1 block truncate text-xs text-muted">
                 {repo.language ?? "No language"} · {repo.openIssues} open
               </span>
             </Button>
@@ -7005,13 +7027,13 @@ function GithubView({
       <section
         className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
       >
-        <div className="border-b border-[var(--line)] p-5">
+        <div className="border-b border-separator p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <h2 className="truncate text-xl font-semibold">
                 {selectedRepo?.fullName ?? "Repository workspace"}
               </h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-muted">
                 {selectedRepo?.description ??
                   "Select a repository to inspect its issues and pull requests."}
               </p>
@@ -7054,7 +7076,7 @@ function GithubView({
             </div>
           ) : null}
           {githubStatus ? (
-            <p className="mt-3 rounded-lg border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]">
+            <p className="mt-3 rounded-lg border border-warning bg-warning-soft px-3 py-2 text-sm text-warning">
               {githubStatus}
             </p>
           ) : null}
@@ -7083,9 +7105,9 @@ function GithubView({
       <section
         className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
       >
-        <div className="border-b border-[var(--line)] p-5">
+        <div className="border-b border-separator p-5">
           <h2 className="text-lg font-semibold">Repo Q&A</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             Ask the assistant with repository context attached.
           </p>
         </div>
@@ -7096,7 +7118,7 @@ function GithubView({
             "What changed recently?",
           ].map((prompt) => (
             <Button
-              className="interactive-row w-full rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-left text-sm font-semibold"
+              className="interactive-row w-full rounded-xl border border-separator bg-surface-secondary p-3 text-left text-sm font-semibold"
               key={prompt}
               onClick={() => askRepo(prompt)}
               type="button"
@@ -7106,7 +7128,7 @@ function GithubView({
           ))}
         </div>
         <form
-          className="border-t border-[var(--line)] p-4"
+          className="border-t border-separator p-4"
           onSubmit={(event) => {
             event.preventDefault();
             if (!question.trim()) return;
@@ -7114,9 +7136,9 @@ function GithubView({
             setQuestion("");
           }}
         >
-          <div className="flex gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-2">
+          <div className="flex gap-2 rounded-xl border border-separator bg-surface-secondary p-2">
             <Input
-              className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-[var(--muted)]"
+              className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted"
               onChange={(event) => setQuestion(event.target.value)}
               placeholder="Ask about this repo..."
               value={question}
@@ -7154,7 +7176,7 @@ function GithubIssueList({
       <div className="space-y-3">
         {issues.map((issue) => (
           <div
-            className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3"
+            className="rounded-xl border border-separator bg-surface-secondary p-3"
             key={issue.id}
           >
             <div className="mb-2 flex items-start justify-between gap-3">
@@ -7170,7 +7192,7 @@ function GithubIssueList({
                 <span className="block line-clamp-3 text-sm font-semibold leading-5">
                   {issue.title}
                 </span>
-                <span className="mt-1 block text-xs text-[var(--muted)]">
+                <span className="mt-1 block text-xs text-muted">
                   #{issue.number} · {formatFileTime(issue.updatedAt)}
                 </span>
               </Button>
@@ -7192,7 +7214,7 @@ function GithubIssueList({
               </span>
               {issue.labels.slice(0, 3).map((label) => (
                 <span
-                  className="rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)]"
+                  className="rounded-full bg-surface px-2 py-1 text-[11px] font-semibold text-muted"
                   key={label}
                 >
                   {label}
@@ -7229,7 +7251,7 @@ function GithubPullList({
       <div className="space-y-3">
         {pullRequests.map((pullRequest) => (
           <div
-            className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-3"
+            className="rounded-xl border border-separator bg-surface-secondary p-3"
             key={pullRequest.id}
           >
             <div className="mb-2 flex items-start justify-between gap-3">
@@ -7245,7 +7267,7 @@ function GithubPullList({
                 <span className="block line-clamp-3 text-sm font-semibold leading-5">
                   {pullRequest.title}
                 </span>
-                <span className="mt-1 block text-xs text-[var(--muted)]">
+                <span className="mt-1 block text-xs text-muted">
                   #{pullRequest.number} ·{" "}
                   {formatFileTime(pullRequest.updatedAt)}
                 </span>
@@ -7261,11 +7283,11 @@ function GithubPullList({
               </Link>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)]">
+              <span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent">
                 {pullRequest.state}
               </span>
               {pullRequest.draft ? (
-                <span className="rounded-full bg-[var(--warning-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--warning)]">
+                <span className="rounded-full bg-warning-soft px-2 py-1 text-[11px] font-semibold text-warning">
                   draft
                 </span>
               ) : null}
@@ -7303,13 +7325,13 @@ function GithubWorkspace({
             <h3 className="truncate font-semibold">
               {selectedRepo?.fullName ?? "GitHub context"}
             </h3>
-            <p className="mt-1 truncate text-xs text-[var(--muted)]">
+            <p className="mt-1 truncate text-xs text-muted">
               {briefing?.github?.connected
                 ? `${repositories.length} repos loaded`
                 : "GitHub not connected"}
             </p>
           </div>
-          <GitBranch className="h-4 w-4 text-[var(--accent)]" />
+          <GitBranch className="h-4 w-4 text-accent" />
         </div>
         <div className="grid gap-2">
           <Button
@@ -7356,7 +7378,7 @@ function MemoryView({
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Memory vault</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-muted">
               Preferences, projects, contacts, and habits.
             </p>
           </div>
@@ -7366,11 +7388,11 @@ function MemoryView({
           {notes.length > 0 ? (
             notes.slice(0, 8).map((note) => (
               <div
-                className="rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-4"
+                className="rounded-lg border border-separator bg-surface-secondary p-4"
                 key={note.id}
               >
                 <p className="text-sm leading-6">{note.body}</p>
-                <p className="mt-2 text-xs text-[var(--muted)]">
+                <p className="mt-2 text-xs text-muted">
                   {new Date(note.createdAt).toLocaleString()}
                 </p>
               </div>
@@ -7460,13 +7482,13 @@ function IntegrationsView({
           return (
             <article className={`${panelClass} p-5`} key={integration.name}>
               <div className="mb-5 flex items-start justify-between">
-                <span className="grid h-11 w-11 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+                <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent-soft text-accent">
                   <Icon className="h-5 w-5" />
                 </span>
                 <StatusBadge ready={ready} label={statusLabel} />
               </div>
               <h3 className="font-semibold">{integration.name}</h3>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              <p className="mt-2 text-sm leading-6 text-muted">
                 {isGoogle
                   ? integration.implemented
                     ? "Uses your connected Google OAuth session."
@@ -7508,21 +7530,19 @@ function IntegrationConnectPanel({
     <section className={`${panelClass} p-5`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
             <Icon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
             <h2 className="text-xl font-semibold">{name}</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-muted">
               {signedIn
                 ? `Connected as ${connectedLabel}`
                 : configured
                   ? "OAuth app configured"
                   : disconnectedLabel}
             </p>
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-              {description}
-            </p>
+            <p className="mt-2 text-xs leading-5 text-muted">{description}</p>
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -7604,7 +7624,7 @@ function ProfileView({
           <div className="profile-identity-band p-6 sm:p-7">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex min-w-0 items-center gap-4">
-                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/90 text-xl font-semibold text-[var(--accent)] shadow-lg shadow-black/10">
+                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/90 text-xl font-semibold text-accent shadow-lg shadow-black/10">
                   {initials}
                 </span>
                 <div className="min-w-0">
@@ -7676,11 +7696,11 @@ function ProfileView({
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold">Connected identities</h3>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-muted">
                 Manage the accounts this assistant can use.
               </p>
             </div>
-            <Link2 className="h-5 w-5 text-[var(--accent)]" />
+            <Link2 className="h-5 w-5 text-accent" />
           </div>
           <div className="space-y-3">
             <ProfileConnectionRow
@@ -7714,12 +7734,12 @@ function ProfileView({
 
         <div className={`${panelClass} p-5`}>
           <div className="mb-5 flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--warning-soft)] text-[var(--warning)]">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-warning-soft text-warning">
               <Database className="h-5 w-5" />
             </span>
             <div>
               <h3 className="text-lg font-semibold">Account persistence</h3>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-muted">
                 What is real in this deployment.
               </p>
             </div>
@@ -7748,8 +7768,8 @@ function ProfileView({
           <p
             className={`mt-4 rounded-xl border p-4 text-sm leading-6 ${
               usingPostgres
-                ? "border-[var(--success)]/30 bg-[var(--success-soft)] text-[var(--success)]"
-                : "border-[var(--warning)]/30 bg-[var(--warning-soft)] text-[var(--warning)]"
+                ? "border-success/30 bg-success-soft text-success"
+                : "border-warning/30 bg-warning-soft text-warning"
             }`}
           >
             {usingPostgres
@@ -7837,12 +7857,12 @@ function ProfilePasswordPanel({
   return (
     <section className={`${panelClass} p-5`}>
       <div className="mb-5 flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent">
           <KeyRound className="h-5 w-5" />
         </span>
         <div>
           <h3 className="text-lg font-semibold">Security</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             Change password or end this browser session.
           </p>
         </div>
@@ -7878,7 +7898,7 @@ function ProfilePasswordPanel({
         />
         {message ? (
           <p
-            className={`rounded-lg p-3 text-sm font-medium ${message.tone === "success" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--warning-soft)] text-[var(--warning)]"}`}
+            className={`rounded-lg p-3 text-sm font-medium ${message.tone === "success" ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}
           >
             {message.text}
           </p>
@@ -7897,7 +7917,7 @@ function ProfilePasswordPanel({
         </Button>
       </form>
 
-      <div className="mt-4 border-t border-[var(--line)] pt-4">
+      <div className="mt-4 border-t border-separator pt-4">
         <Button
           className={secondaryButtonClass + " w-full"}
           disabled={signingOut}
@@ -7912,7 +7932,7 @@ function ProfilePasswordPanel({
           Sign out
         </Button>
         {!canChangePassword ? (
-          <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+          <p className="mt-3 text-xs leading-5 text-muted">
             Password changes require an active email/password session.
             OAuth-only users can manage connected accounts below.
           </p>
@@ -7940,17 +7960,15 @@ function ProfileConnectionRow({
   signedIn: boolean;
 }) {
   return (
-    <div className="hover-lift rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] p-4 transition">
+    <div className="hover-lift rounded-xl border border-separator bg-surface-secondary p-4 transition">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
             <Icon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
             <p className="font-semibold">{name}</p>
-            <p className="mt-1 truncate text-sm text-[var(--muted)]">
-              {detail}
-            </p>
+            <p className="mt-1 truncate text-sm text-muted">{detail}</p>
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -8022,12 +8040,12 @@ function SettingsView({
     <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
       <section className={`${panelClass} p-5`}>
         <div className="mb-5 flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-accent">
             <Bot className="h-5 w-5" />
           </span>
           <div>
             <h2 className="text-xl font-semibold">AI provider</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-muted">
               {aiStatus?.configured
                 ? `${aiStatus.label} key is present`
                 : "Local mode"}
@@ -8053,11 +8071,11 @@ function SettingsView({
           />
           <SettingRow label="Regional fallback" value="Gemini when available" />
         </div>
-        <div className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3">
+        <div className="mt-5 rounded-lg border border-separator bg-surface-secondary p-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold">Live provider check</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
+              <p className="mt-1 text-xs text-muted">
                 Confirms the server key can make a real model call.
               </p>
             </div>
@@ -8079,8 +8097,8 @@ function SettingsView({
             <p
               className={
                 providerHealth.ok
-                  ? "mt-3 text-sm font-medium text-[var(--success)]"
-                  : "mt-3 text-sm font-medium text-[var(--warning)]"
+                  ? "mt-3 text-sm font-medium text-success"
+                  : "mt-3 text-sm font-medium text-warning"
               }
             >
               {providerHealth.ok ? "Connected: " : "Provider issue: "}
@@ -8092,12 +8110,12 @@ function SettingsView({
 
       <section className={`${panelClass} p-5`}>
         <div className="mb-5 flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--success-soft)] text-[var(--success)]">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-success-soft text-success">
             <ShieldCheck className="h-5 w-5" />
           </span>
           <div>
             <h2 className="text-xl font-semibold">Security posture</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
+            <p className="mt-1 text-sm text-muted">
               Human approval and scoped OAuth.
             </p>
           </div>
@@ -8143,15 +8161,15 @@ function RightSidebar({
   signedInToGoogle: boolean;
 }) {
   return (
-    <aside className="hidden min-h-screen flex-col gap-4 bg-[var(--surface-soft)] p-4 xl:flex">
+    <aside className="hidden min-h-screen flex-col gap-4 bg-surface-secondary p-4 xl:flex">
       <section className={`${panelClass} hover-lift p-4`}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-semibold">Current task</h2>
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
+          <span className="grid h-8 w-8 place-items-center rounded-md bg-accent-soft text-accent">
             <Clock className="h-4 w-4" />
           </span>
         </div>
-        <p className="text-sm leading-6 text-[var(--muted)]">
+        <p className="text-sm leading-6 text-muted">
           {briefing?.focus?.title ??
             openTasks[0]?.title ??
             "No current task. Add one from chat or Tasks."}
@@ -8256,25 +8274,26 @@ function RailDisclosure({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className={`${panelClass} overflow-hidden`}>
-      <Button
-        aria-expanded={open}
-        className="group flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]"
-        onClick={() => setOpen((current) => !current)}
-        type="button"
-      >
-        <span className="grid h-8 w-8 place-items-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] transition group-hover:bg-[var(--accent)] group-hover:text-white">
-          <Icon className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1 text-sm font-semibold">{title}</span>
-        <ChevronDown
-          className={`h-4 w-4 text-[var(--muted)] transition ${open ? "rotate-180" : ""}`}
-        />
-      </Button>
-      <div className={`collapsible-content ${open ? "is-open" : ""}`}>
-        <div className="border-t border-[var(--line)] p-4">{children}</div>
-      </div>
-    </section>
+    <Disclosure
+      className={`${panelClass} overflow-hidden`}
+      isExpanded={open}
+      onExpandedChange={setOpen}
+    >
+      <Disclosure.Heading>
+        <Disclosure.Trigger className="group flex w-full items-center gap-3 rounded-none px-4 py-3 text-left transition hover:bg-accent-soft">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent-soft text-accent transition group-hover:bg-accent group-hover:text-accent-foreground">
+            <Icon className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 text-sm font-semibold">{title}</span>
+          <Disclosure.Indicator className="h-4 w-4 text-muted" />
+        </Disclosure.Trigger>
+      </Disclosure.Heading>
+      <Disclosure.Content>
+        <Disclosure.Body className="border-t border-separator p-4">
+          {children}
+        </Disclosure.Body>
+      </Disclosure.Content>
+    </Disclosure>
   );
 }
 
@@ -8286,7 +8305,7 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Recent files</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-1 text-sm text-muted">
             {briefing?.google.connected
               ? "Loaded from Google Drive."
               : "Connect Google Drive to list real files."}
@@ -8302,7 +8321,7 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
           {files.map((file) => {
             const content = (
               <>
-                <span className="grid h-10 w-10 place-items-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
+                <span className="grid h-10 w-10 place-items-center rounded-md bg-accent-soft text-accent">
                   <DriveFileGlyph
                     className="h-5 w-5"
                     mimeType={file.mimeType}
@@ -8310,12 +8329,12 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{file.name}</p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
+                  <p className="mt-1 text-xs text-muted">
                     {driveFileType(file.mimeType)} by{" "}
                     {file.owner ?? "Unknown owner"}
                   </p>
                 </div>
-                <span className="text-xs text-[var(--muted)]">
+                <span className="text-xs text-muted">
                   {formatFileTime(file.modifiedTime)}
                 </span>
               </>
@@ -8323,7 +8342,7 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
 
             return file.webViewLink ? (
               <Link
-                className="interactive-row grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3"
+                className="interactive-row grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-separator bg-surface-secondary p-3"
                 href={file.webViewLink}
                 key={file.id ?? file.name}
                 rel="noreferrer"
@@ -8333,7 +8352,7 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
               </Link>
             ) : (
               <div
-                className="interactive-row grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-3"
+                className="interactive-row grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-lg border border-separator bg-surface-secondary p-3"
                 key={file.id ?? file.name}
               >
                 {content}
@@ -8394,18 +8413,18 @@ function CommandPalette({
           <Modal.Dialog
             className={`${panelClass} mt-20 w-full max-w-xl overflow-hidden p-0`}
           >
-            <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">
-              <Search className="h-4 w-4 text-[var(--muted)]" />
+            <div className="flex items-center gap-3 border-b border-separator px-4 py-3">
+              <Search className="h-4 w-4 text-muted" />
               <Input
                 autoFocus
-                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
+                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Search commands..."
                 value={query}
               />
               <Button
-                className="grid h-8 w-8 place-items-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-soft)]"
+                className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-surface-secondary"
                 onClick={() => setOpen(false)}
                 type="button"
                 title="Close"
@@ -8418,18 +8437,18 @@ function CommandPalette({
                 const Icon = action.icon;
                 return (
                   <Button
-                    className="flex h-12 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold hover:bg-[var(--surface-soft)]"
+                    className="flex h-12 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold hover:bg-surface-secondary"
                     key={action.label}
                     onClick={() => run(action)}
                     type="button"
                   >
-                    <Icon className="h-4 w-4 text-[var(--accent)]" />
+                    <Icon className="h-4 w-4 text-accent" />
                     {action.label}
                   </Button>
                 );
               })}
               {filtered.length === 0 ? (
-                <div className="p-6 text-center text-sm text-[var(--muted)]">
+                <div className="p-6 text-center text-sm text-muted">
                   No matching commands.
                 </div>
               ) : null}
@@ -8457,7 +8476,7 @@ function ToastStack({ toasts }: { toasts: Toast[] }) {
         >
           <p className="text-sm font-semibold">{toast.title}</p>
           {toast.detail ? (
-            <p className="mt-1 text-xs text-[var(--muted)]">{toast.detail}</p>
+            <p className="mt-1 text-xs text-muted">{toast.detail}</p>
           ) : null}
         </div>
       ))}
@@ -8481,22 +8500,22 @@ function TaskContextMenu({
       onClick={(event) => event.stopPropagation()}
     >
       <Button
-        className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold hover:bg-[var(--surface-soft)]"
+        className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold hover:bg-surface-secondary"
         onClick={() => {
           onComplete();
           onClose();
         }}
         type="button"
       >
-        <Check className="h-4 w-4 text-[var(--success)]" />
+        <Check className="h-4 w-4 text-success" />
         Complete
       </Button>
       <Button
-        className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold hover:bg-[var(--surface-soft)]"
+        className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold hover:bg-surface-secondary"
         onClick={onClose}
         type="button"
       >
-        <X className="h-4 w-4 text-[var(--muted)]" />
+        <X className="h-4 w-4 text-muted" />
         Close menu
       </Button>
     </div>
@@ -8506,12 +8525,12 @@ function TaskContextMenu({
 function BrandMark() {
   return (
     <div className="flex items-center gap-3">
-      <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent)] text-white shadow-lg shadow-black/10">
+      <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent text-white shadow-lg shadow-black/10">
         <Sparkles className="h-5 w-5" />
       </span>
       <div>
         <p className="text-base font-semibold leading-5">Relay</p>
-        <p className="text-xs text-[var(--muted)]">Personal AI OS</p>
+        <p className="text-xs text-muted">Personal AI OS</p>
       </div>
     </div>
   );
@@ -8536,12 +8555,12 @@ function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-semibold uppercase text-[var(--muted)]">
+      <span className="text-xs font-semibold uppercase text-muted">
         {label}
       </span>
       <Input
         autoComplete={autoComplete}
-        className="h-11 w-full rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-sm outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+        className="h-11 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none transition placeholder:text-muted focus:border-[var(--accent)]"
         name={name}
         onChange={
           onChange ? (event) => onChange(event.target.value) : undefined
@@ -8556,12 +8575,13 @@ function Field({
 
 function MiniControl({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-3">
-      <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-        {label}
-      </p>
+    <Surface
+      className="rounded-xl border border-separator px-3 py-3"
+      variant="secondary"
+    >
+      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold">{value}</p>
-    </div>
+    </Surface>
   );
 }
 
@@ -8576,7 +8596,7 @@ function ToggleRow({
 }) {
   return (
     <Switch
-      className="h-11 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-3"
+      className="h-11 rounded-lg border border-separator bg-surface-secondary px-3"
       isSelected={checked}
       onChange={onChange}
     >
@@ -8594,9 +8614,7 @@ function StatusBadge({ label, ready }: { label: string; ready: boolean }) {
   return (
     <Chip
       className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold ${
-        ready
-          ? "bg-[var(--success-soft)] text-[var(--success)]"
-          : "bg-[var(--warning-soft)] text-[var(--warning)]"
+        ready ? "bg-success-soft text-success" : "bg-warning-soft text-warning"
       }`}
     >
       {ready ? (
@@ -8611,10 +8629,13 @@ function StatusBadge({ label, ready }: { label: string; ready: boolean }) {
 
 function SettingRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3">
-      <span className="text-sm text-[var(--muted)]">{label}</span>
+    <Surface
+      className="flex items-center justify-between gap-4 rounded-xl border border-separator px-4 py-3"
+      variant="secondary"
+    >
+      <span className="text-sm text-muted">{label}</span>
       <span className="text-right text-sm font-semibold">{value}</span>
-    </div>
+    </Surface>
   );
 }
 
@@ -8628,18 +8649,20 @@ function SidebarStatus({
   value: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2">
+    <Surface
+      className="flex items-center justify-between gap-3 rounded-xl border border-separator px-3 py-2"
+      variant="secondary"
+    >
       <span className="text-sm font-medium">{label}</span>
-      <span
-        className={
-          ready
-            ? "text-xs font-semibold text-[var(--success)]"
-            : "text-xs font-semibold text-[var(--warning)]"
-        }
+      <Chip
+        className="text-xs font-semibold"
+        color={ready ? "success" : "warning"}
+        size="sm"
+        variant="soft"
       >
         {value}
-      </span>
-    </div>
+      </Chip>
+    </Surface>
   );
 }
 
@@ -8651,10 +8674,13 @@ function NotificationLine({
   text: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2">
-      <Icon className="h-4 w-4 text-[var(--accent)]" />
+    <Surface
+      className="flex items-center gap-3 rounded-xl border border-separator px-3 py-2"
+      variant="secondary"
+    >
+      <Icon className="h-4 w-4 text-accent" />
       <span>{text}</span>
-    </div>
+    </Surface>
   );
 }
 
@@ -8668,11 +8694,16 @@ function EmptyState({
   title: string;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-[var(--line-strong)] bg-[var(--surface-soft)] p-8 text-center">
-      <Icon className="mx-auto h-8 w-8 text-[var(--muted)]" />
+    <Surface
+      className="rounded-xl border border-dashed border-border p-8 text-center"
+      variant="secondary"
+    >
+      <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-surface text-muted shadow-sm">
+        <Icon className="h-5 w-5" />
+      </span>
       <p className="mt-3 font-semibold">{title}</p>
-      <p className="mt-1 text-sm text-[var(--muted)]">{detail}</p>
-    </div>
+      <p className="mt-1 text-sm text-muted">{detail}</p>
+    </Surface>
   );
 }
 
@@ -8691,22 +8722,21 @@ function priorityWeight(priority?: RelayTaskPriority) {
 }
 
 function priorityTone(priority?: RelayTaskPriority) {
-  if (priority === "urgent")
-    return "bg-[var(--danger-soft)] text-[var(--danger)]";
-  if (priority === "high")
-    return "bg-[var(--warning-soft)] text-[var(--warning)]";
-  if (priority === "low")
-    return "bg-[var(--success-soft)] text-[var(--success)]";
-  return "bg-[var(--accent-soft)] text-[var(--accent)]";
+  if (priority === "urgent") return "bg-danger-soft text-danger";
+  if (priority === "high") return "bg-warning-soft text-warning";
+  if (priority === "low") return "bg-success-soft text-success";
+  return "bg-accent-soft text-accent";
 }
 
 function PriorityTag({ priority }: { priority?: RelayTaskPriority }) {
   return (
-    <span
+    <Chip
       className={`inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-[11px] font-semibold ${priorityTone(priority)}`}
+      size="sm"
+      variant="soft"
     >
       {priorityLabel(priority)}
-    </span>
+    </Chip>
   );
 }
 
@@ -8718,7 +8748,7 @@ function PriorityDot({ priority }: { priority?: RelayTaskPriority }) {
         ? "bg-[var(--warning)]"
         : priority === "low"
           ? "bg-[var(--success)]"
-          : "bg-[var(--accent)]";
+          : "bg-accent";
 
   return <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} />;
 }
@@ -8790,13 +8820,10 @@ function githubUrgency(issue: GithubIssue) {
 
 function githubUrgencyClass(issue: GithubIssue) {
   const urgency = githubUrgency(issue);
-  if (urgency === "Urgent")
-    return "bg-[var(--danger-soft)] text-[var(--danger)]";
-  if (urgency === "High")
-    return "bg-[var(--warning-soft)] text-[var(--warning)]";
-  if (urgency === "Low")
-    return "bg-[var(--success-soft)] text-[var(--success)]";
-  return "bg-[var(--accent-soft)] text-[var(--accent)]";
+  if (urgency === "Urgent") return "bg-danger-soft text-danger";
+  if (urgency === "High") return "bg-warning-soft text-warning";
+  if (urgency === "Low") return "bg-success-soft text-success";
+  return "bg-accent-soft text-accent";
 }
 
 function buildPlannerActions(
@@ -8960,15 +8987,21 @@ function inferExecutionTrace(messages: Message[]) {
 
 function AvatarIcon({ role }: { role: Message["role"] }) {
   return (
-    <span
-      className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${role === "user" ? "bg-[var(--accent)] text-white" : "bg-[var(--accent-soft)] text-[var(--accent)]"}`}
+    <Avatar
+      aria-label={role === "user" ? "You" : "Relay assistant"}
+      className="shrink-0"
+      color="accent"
+      size="sm"
+      variant={role === "user" ? "default" : "soft"}
     >
-      {role === "user" ? (
-        <User className="h-4 w-4" />
-      ) : (
-        <Bot className="h-4 w-4" />
-      )}
-    </span>
+      <Avatar.Fallback>
+        {role === "user" ? (
+          <User className="h-4 w-4" />
+        ) : (
+          <Bot className="h-4 w-4" />
+        )}
+      </Avatar.Fallback>
+    </Avatar>
   );
 }
 

@@ -3,6 +3,7 @@
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { Check, ShieldAlert, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Chip, Surface } from "@heroui/react";
 
 import { toolCatalog } from "@/lib/tools/catalog";
 
@@ -15,7 +16,10 @@ export function WorkspaceCopilotActions() {
   const dashboardState = useMemo(
     () => ({
       app: "Daily Work Agent",
-      connectedSurfaces: toolCatalog.map(({ name, status }) => ({ name, status })),
+      connectedSurfaces: toolCatalog.map(({ name, status }) => ({
+        name,
+        status,
+      })),
       approvalPolicy:
         "Ask for confirmation before sending email, changing files, editing shared docs, or changing calendar state.",
       lastApproval,
@@ -24,7 +28,8 @@ export function WorkspaceCopilotActions() {
   );
 
   useCopilotReadable({
-    description: "Current Daily Work Agent dashboard state and approval policy.",
+    description:
+      "Current Daily Work Agent dashboard state and approval policy.",
     value: dashboardState,
   });
 
@@ -54,16 +59,19 @@ export function WorkspaceCopilotActions() {
         },
       ],
       render: ({ args, status }) => (
-        <div className="my-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-stone-950 shadow-sm">
+        <Surface
+          className="my-3 rounded-xl border border-warning/30 p-4 text-sm text-foreground shadow-surface"
+          variant="secondary"
+        >
           <div className="flex items-center gap-2 font-semibold">
-            <ShieldAlert className="h-4 w-4 text-amber-700" />
+            <ShieldAlert className="h-4 w-4 text-warning" />
             {args.title ?? "Approval request"}
           </div>
-          <p className="mt-2 leading-6 text-stone-700">{args.details}</p>
-          <div className="mt-3 inline-flex rounded-md bg-white px-2 py-1 text-xs font-medium text-amber-800">
+          <p className="mt-2 leading-6 text-muted">{args.details}</p>
+          <Chip className="mt-3" color="warning" size="sm" variant="soft">
             {status === "complete" ? "Decision recorded" : args.riskLevel}
-          </div>
-        </div>
+          </Chip>
+        </Surface>
       ),
       handler: async ({ title }) => {
         const approved = window.confirm(`Approve this action?\n\n${title}`);
@@ -87,10 +95,13 @@ export function WorkspaceCopilotActions() {
         },
       ],
       render: ({ args }) => (
-        <div className="my-3 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+        <Surface
+          className="my-3 flex items-start gap-3 rounded-xl border border-success/30 p-4 text-sm text-success"
+          variant="secondary"
+        >
           <Check className="mt-0.5 h-4 w-4" />
           <span>{args.task}</span>
-        </div>
+        </Surface>
       ),
       handler: async ({ task }) => ({ focused: task }),
     },
@@ -100,7 +111,8 @@ export function WorkspaceCopilotActions() {
   useCopilotAction(
     {
       name: "show_blocked_action",
-      description: "Show that an action is blocked by missing credentials or permissions.",
+      description:
+        "Show that an action is blocked by missing credentials or permissions.",
       parameters: [
         {
           name: "reason",
@@ -110,10 +122,13 @@ export function WorkspaceCopilotActions() {
         },
       ],
       render: ({ args }) => (
-        <div className="my-3 flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-950">
+        <Surface
+          className="my-3 flex items-start gap-3 rounded-xl border border-danger/30 p-4 text-sm text-danger"
+          variant="secondary"
+        >
           <X className="mt-0.5 h-4 w-4" />
           <span>{args.reason}</span>
-        </div>
+        </Surface>
       ),
       handler: async ({ reason }) => ({ blocked: true, reason }),
     },
