@@ -583,22 +583,6 @@ select:focus-visible {
   transform: translateY(-1px);
 }
 
-.hover-card-panel {
-  transform: translateY(4px) scale(0.98);
-}
-
-.hover-card:hover .hover-card-panel {
-  transform: translateY(0) scale(1);
-}
-
-.day-inspector-panel {
-  transform: translateY(8px) scale(0.985);
-}
-
-.day-inspector:hover .day-inspector-panel {
-  transform: translateY(0) scale(1);
-}
-
 .ai-planner {
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--surface) 86%, var(--accent-soft)), var(--surface)),
@@ -800,6 +784,38 @@ select:focus-visible {
   letter-spacing: -0.01em;
 }
 
+/*
+ * HeroUI buttons are intentionally compact inline-flex controls. Relay also
+ * uses pressable rows and cards, so those layouts opt into an explicit
+ * content-control contract instead of inheriting the compact button geometry.
+ */
+.relay-product-shell :is(.button, .link).grid {
+  display: grid;
+}
+
+.relay-product-shell .button.relay-content-card,
+.relay-product-shell .button.relay-content-row,
+.relay-product-shell .button.relay-event-card {
+  align-items: stretch;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 0;
+  white-space: normal;
+  width: 100%;
+}
+
+.relay-product-shell .button.relay-content-card,
+.relay-product-shell .button.relay-content-row {
+  height: auto;
+}
+
+.relay-product-shell .relay-tooltip-trigger {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
 .relay-product-shell :is(.input, .textarea, .select__trigger) {
   border: 1px solid var(--field-border);
   box-shadow: none;
@@ -879,13 +895,6 @@ select:focus-visible {
   background: oklch(0.18 0.025 258);
   border-color: color-mix(in oklab, white 10%, transparent);
   color: oklch(0.93 0.012 250);
-}
-
-.relay-product-shell .hover-card-panel,
-.relay-product-shell .day-inspector-panel {
-  background: var(--overlay);
-  border-color: var(--border);
-  box-shadow: var(--overlay-shadow);
 }
 
 @media (max-width: 1023px) {

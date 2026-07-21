@@ -19,6 +19,7 @@ import {
   Skeleton,
   Surface,
   Switch,
+  Tooltip,
 } from "@heroui/react";
 import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
 import {
@@ -2365,22 +2366,15 @@ function WeeklyCommandCalendar({
           const inspectorActive = activeInspectorDay === dayKey;
 
           return (
-            <div className="day-inspector relative" key={dayKey}>
+            <div className="min-w-0" key={dayKey}>
               <Button
-                className={`min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 hover:-translate-y-1 hover:shadow-surface ${
+                aria-pressed={inspectorActive}
+                className={`relay-content-card week-day-card min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 hover:-translate-y-1 hover:shadow-surface ${
                   isToday
                     ? "border-[var(--accent)] bg-accent-soft"
                     : "border-separator bg-surface-secondary hover:border-border"
                 }`}
-                onBlur={() => setActiveInspectorDay(null)}
-                onClick={() =>
-                  runPrompt(
-                    `Inspect my schedule and deadlines for ${day.toDateString()}`,
-                  )
-                }
-                onFocus={() => setActiveInspectorDay(dayKey)}
-                onPointerEnter={() => setActiveInspectorDay(dayKey)}
-                onPointerLeave={() => setActiveInspectorDay(null)}
+                onClick={() => setActiveInspectorDay(dayKey)}
                 type="button"
               >
                 <span className="block text-[11px] font-semibold uppercase text-muted">
@@ -2433,6 +2427,7 @@ function WeeklyCommandCalendar({
                 githubIssues={dayIssues}
                 googleTasks={dayGoogleTasks}
                 notes={dayNotes}
+                onClose={() => setActiveInspectorDay(null)}
                 runPrompt={runPrompt}
                 tasks={dayTasks}
               />
@@ -2452,6 +2447,7 @@ function DayInspector({
   githubIssues,
   googleTasks,
   notes,
+  onClose,
   runPrompt,
   tasks,
 }: {
@@ -2462,114 +2458,127 @@ function DayInspector({
   githubIssues: GithubIssue[];
   googleTasks: GoogleTask[];
   notes: RelayNote[];
+  onClose: () => void;
   runPrompt: (prompt: string) => void;
   tasks: RelayTask[];
 }) {
   return (
-    <div
-      aria-hidden={!active}
-      className={`day-inspector-panel pointer-events-none absolute left-0 top-[calc(100%+10px)] z-40 w-[min(380px,calc(100vw-2rem))] rounded-2xl border border-separator bg-surface p-4 shadow-overlay transition duration-200 md:left-auto md:right-0 ${
-        active ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-      }`}
-    >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold">
-            {date.toLocaleDateString(undefined, {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
-          </p>
-          <p className="text-xs text-muted">Day inspector</p>
-        </div>
-        <StatusBadge
-          ready
-          label={`${events.length + tasks.length + googleTasks.length + githubIssues.length} active`}
-        />
-      </div>
+    <Modal isOpen={active} onOpenChange={(open) => !open && onClose()}>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container placement="center" scroll="inside" size="lg">
+          <Modal.Dialog
+            className={`${panelClass} max-h-[min(760px,calc(100vh-2rem))] w-full overflow-y-auto p-5`}
+          >
+            <Modal.CloseTrigger />
+            <div className="pr-8">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">
+                    {date.toLocaleDateString(undefined, {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                  <p className="text-xs text-muted">Day inspector</p>
+                </div>
+                <StatusBadge
+                  ready
+                  label={`${events.length + tasks.length + googleTasks.length + githubIssues.length} active`}
+                />
+              </div>
 
-      <InspectorGroup
-        empty="No loaded events."
-        icon={CalendarDays}
-        items={events.map((event) => ({
-          id: event.id ?? `${event.title}-${event.start}`,
-          title: event.title,
-          detail: `${formatEventTime(event.start)}${event.end ? ` - ${formatEventTime(event.end)}` : ""}`,
-          action: "Edit",
-          onClick: () =>
-            runPrompt(`Edit ${event.title} on ${date.toDateString()}`),
-        }))}
-        title="Events"
-      />
-      <InspectorGroup
-        empty="No task deadlines."
-        icon={ListTodo}
-        items={[
-          ...tasks.map((task) => ({
-            id: task.id,
-            title: task.title,
-            detail: task.notes || priorityLabel(task.priority),
-            action: "Complete",
-            onClick: () => void completeTask(task),
-          })),
-          ...googleTasks.map((task) => ({
-            id: task.id ?? task.title,
-            title: task.title,
-            detail: task.notes || task.taskListTitle || "Google Tasks",
-            action: "Plan",
-            onClick: () => runPrompt(`Plan ${task.title}`),
-          })),
-        ]}
-        title="Tasks"
-      />
-      <InspectorGroup
-        empty="No GitHub activity for this day."
-        icon={GitBranch}
-        items={githubIssues.map((issue) => ({
-          id: String(issue.id),
-          title: issue.title,
-          detail: `${issue.repositoryFullName ?? "GitHub"} #${issue.number} · ${githubUrgency(issue)}`,
-          action: "Review",
-          onClick: () =>
-            runPrompt(
-              `Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`,
-            ),
-        }))}
-        title="GitHub"
-      />
-      <InspectorGroup
-        empty="No notes captured."
-        icon={Brain}
-        items={notes.map((note) => ({
-          id: note.id,
-          title: note.body,
-          detail: formatFileTime(note.createdAt),
-          action: "Use",
-          onClick: () => runPrompt(`Use this memory: ${note.body}`),
-        }))}
-        title="Notes"
-      />
+              <InspectorGroup
+                empty="No loaded events."
+                icon={CalendarDays}
+                items={events.map((event) => ({
+                  id: event.id ?? `${event.title}-${event.start}`,
+                  title: event.title,
+                  detail: `${formatEventTime(event.start)}${event.end ? ` - ${formatEventTime(event.end)}` : ""}`,
+                  action: "Edit",
+                  onClick: () =>
+                    runPrompt(`Edit ${event.title} on ${date.toDateString()}`),
+                }))}
+                title="Events"
+              />
+              <InspectorGroup
+                empty="No task deadlines."
+                icon={ListTodo}
+                items={[
+                  ...tasks.map((task) => ({
+                    id: task.id,
+                    title: task.title,
+                    detail: task.notes || priorityLabel(task.priority),
+                    action: "Complete",
+                    onClick: () => void completeTask(task),
+                  })),
+                  ...googleTasks.map((task) => ({
+                    id: task.id ?? task.title,
+                    title: task.title,
+                    detail: task.notes || task.taskListTitle || "Google Tasks",
+                    action: "Plan",
+                    onClick: () => runPrompt(`Plan ${task.title}`),
+                  })),
+                ]}
+                title="Tasks"
+              />
+              <InspectorGroup
+                empty="No GitHub activity for this day."
+                icon={GitBranch}
+                items={githubIssues.map((issue) => ({
+                  id: String(issue.id),
+                  title: issue.title,
+                  detail: `${issue.repositoryFullName ?? "GitHub"} #${issue.number} · ${githubUrgency(issue)}`,
+                  action: "Review",
+                  onClick: () =>
+                    runPrompt(
+                      `Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`,
+                    ),
+                }))}
+                title="GitHub"
+              />
+              <InspectorGroup
+                empty="No notes captured."
+                icon={Brain}
+                items={notes.map((note) => ({
+                  id: note.id,
+                  title: note.body,
+                  detail: formatFileTime(note.createdAt),
+                  action: "Use",
+                  onClick: () => runPrompt(`Use this memory: ${note.body}`),
+                }))}
+                title="Notes"
+              />
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button
-          className={secondaryButtonClass + " pointer-events-auto h-9 px-3"}
-          onClick={() =>
-            runPrompt(`Reschedule items on ${date.toDateString()}`)
-          }
-          type="button"
-        >
-          Reschedule
-        </Button>
-        <Button
-          className={primaryButtonClass + " pointer-events-auto h-9 px-3"}
-          onClick={() => runPrompt(`Create a task due ${date.toDateString()}`)}
-          type="button"
-        >
-          Add task
-        </Button>
-      </div>
-    </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Button
+                  className={
+                    secondaryButtonClass + " pointer-events-auto h-9 px-3"
+                  }
+                  onClick={() =>
+                    runPrompt(`Reschedule items on ${date.toDateString()}`)
+                  }
+                  type="button"
+                >
+                  Reschedule
+                </Button>
+                <Button
+                  className={
+                    primaryButtonClass + " pointer-events-auto h-9 px-3"
+                  }
+                  onClick={() =>
+                    runPrompt(`Create a task due ${date.toDateString()}`)
+                  }
+                  type="button"
+                >
+                  Add task
+                </Button>
+              </div>
+            </div>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }
 
@@ -2745,7 +2754,7 @@ function GithubActivityPanel({
           >
             <div className="grid grid-cols-[1fr_auto] gap-3 p-4">
               <Button
-                className="min-w-0 text-left"
+                className="relay-content-row min-w-0 text-left"
                 onClick={() =>
                   runPrompt(
                     `Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`,
@@ -2841,7 +2850,7 @@ function AiActionPlanner({
           const Icon = action.icon;
           return (
             <Button
-              className="group rounded-2xl border border-separator bg-surface p-4 text-left transition hover:-translate-y-1 hover:border-[var(--accent)] hover:bg-accent-soft"
+              className="relay-content-card group rounded-2xl border border-separator bg-surface p-4 text-left transition hover:-translate-y-1 hover:border-[var(--accent)] hover:bg-accent-soft"
               key={action.title}
               onClick={action.onClick}
               type="button"
@@ -3073,9 +3082,15 @@ function HoverPreview({
   title: string;
 }) {
   return (
-    <div className="hover-card group relative">
-      {children}
-      <div className="hover-card-panel pointer-events-none absolute left-4 top-[calc(100%+8px)] z-30 w-72 rounded-xl border border-separator bg-surface p-3 text-sm opacity-0 shadow-overlay transition duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+    <Tooltip closeDelay={100} delay={550}>
+      <Tooltip.Trigger className="relay-tooltip-trigger block h-full min-w-0 w-full">
+        {children}
+      </Tooltip.Trigger>
+      <Tooltip.Content
+        className="w-72 border border-border bg-overlay p-3 text-sm shadow-overlay"
+        placement="bottom start"
+        showArrow
+      >
         <p className="truncate font-semibold">{title}</p>
         <p className="mt-1 text-xs font-semibold uppercase text-muted">
           {meta}
@@ -3083,8 +3098,8 @@ function HoverPreview({
         <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted">
           {detail}
         </p>
-      </div>
-    </div>
+      </Tooltip.Content>
+    </Tooltip>
   );
 }
 
@@ -4338,7 +4353,7 @@ function CalendarWorkspace({
               const currentMonth = day.getMonth() === selectedDate.getMonth();
               return (
                 <Button
-                  className={`min-h-16 rounded-md border p-1.5 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
+                  className={`relay-content-card min-h-16 rounded-md border p-1.5 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
                     sameCalendarDay(day, selectedDate)
                       ? "border-[var(--accent)] bg-accent-soft"
                       : "border-separator bg-surface"
@@ -4611,7 +4626,7 @@ function CalendarEventBlock({
         title={event.title}
       >
         <Button
-          className="h-full w-full overflow-hidden rounded-xl border border-[var(--accent)] bg-accent-soft p-2 text-left text-xs shadow-sm transition hover:-translate-y-0.5 hover:bg-surface"
+          className="relay-event-card h-full w-full overflow-hidden rounded-xl border border-[var(--accent)] bg-accent-soft p-2 text-left text-xs shadow-sm transition hover:-translate-y-0.5 hover:bg-surface"
           draggable={Boolean(event.id)}
           onClick={onClick}
           onDragStart={(dragEvent) => {
@@ -4712,7 +4727,7 @@ function DayCalendar({
                   title={event.title}
                 >
                   <Button
-                    className="h-full w-full overflow-hidden rounded-lg border border-[var(--accent)] bg-accent-soft p-2 text-left text-xs shadow-sm transition hover:bg-surface"
+                    className="relay-event-card h-full w-full overflow-hidden rounded-lg border border-[var(--accent)] bg-accent-soft p-2 text-left text-xs shadow-sm transition hover:bg-surface"
                     onClick={() => onEventClick(event)}
                     type="button"
                   >
@@ -6750,7 +6765,7 @@ function FilesView({
                 title={file.name}
               >
                 <Button
-                  className={`interactive-row rounded-2xl border p-4 text-left ${
+                  className={`relay-content-card interactive-row rounded-2xl border p-4 text-left ${
                     selectedFileId === (file.id ?? file.name)
                       ? "border-[var(--accent)] bg-accent-soft"
                       : "border-separator bg-surface-secondary"
@@ -6990,7 +7005,7 @@ function GithubView({
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {repositories.map((repo) => (
             <Button
-              className={`mb-2 w-full rounded-xl border p-3 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
+              className={`relay-content-card mb-2 w-full rounded-xl border p-3 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
                 selectedRepo?.id === repo.id
                   ? "border-[var(--accent)] bg-accent-soft"
                   : "border-separator bg-surface-secondary"
@@ -7181,7 +7196,7 @@ function GithubIssueList({
           >
             <div className="mb-2 flex items-start justify-between gap-3">
               <Button
-                className="min-w-0 text-left"
+                className="relay-content-row min-w-0 text-left"
                 onClick={() =>
                   runPrompt(
                     `Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`,
@@ -7256,7 +7271,7 @@ function GithubPullList({
           >
             <div className="mb-2 flex items-start justify-between gap-3">
               <Button
-                className="min-w-0 text-left"
+                className="relay-content-row min-w-0 text-left"
                 onClick={() =>
                   runPrompt(
                     `Summarize GitHub pull request ${pullRequest.repositoryFullName} #${pullRequest.number}`,
