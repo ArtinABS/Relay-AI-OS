@@ -793,6 +793,18 @@ select:focus-visible {
   display: grid;
 }
 
+.relay-product-shell .button.grid.w-full,
+.relay-product-shell .button.interactive-row.w-full {
+  height: auto;
+  white-space: normal;
+}
+
+.relay-product-shell .link.grid {
+  min-width: 0;
+  white-space: normal;
+  width: 100%;
+}
+
 .relay-product-shell .button.relay-content-card,
 .relay-product-shell .button.relay-content-row,
 .relay-product-shell .button.relay-event-card {
@@ -811,8 +823,18 @@ select:focus-visible {
 
 .relay-product-shell .relay-tooltip-trigger {
   display: block;
-  height: 100%;
   min-width: 0;
+  width: 100%;
+}
+
+.relay-product-shell .calendar-event-position > .relay-tooltip-trigger {
+  height: 100%;
+}
+
+.relay-product-shell .button.relay-calendar-slot {
+  border-radius: 0;
+  justify-content: flex-start;
+  padding: 0;
   width: 100%;
 }
 

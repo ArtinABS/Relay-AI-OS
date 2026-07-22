@@ -31,13 +31,16 @@ type ButtonProps = Omit<HeroButtonProps, "isDisabled"> &
  * existing utility classes; call sites can opt into HeroUI variants directly.
  */
 export function Button({
+  "aria-label": ariaLabel,
   disabled,
   isDisabled,
+  title,
   variant = "ghost",
   ...props
 }: ButtonProps) {
   return (
     <HeroButton
+      aria-label={ariaLabel ?? title}
       isDisabled={isDisabled ?? disabled}
       variant={variant}
       {...props}

@@ -495,9 +495,9 @@ const integrationRows = [
 ];
 
 const panelClass =
-  "relay-panel rounded-2xl border border-separator bg-surface shadow-surface transition duration-200 ease-out";
+  "relay-panel min-w-0 rounded-2xl border border-separator bg-surface shadow-surface transition duration-200 ease-out";
 const softPanelClass =
-  "relay-soft-panel rounded-xl border border-separator bg-surface-secondary transition duration-200 ease-out";
+  "relay-soft-panel min-w-0 rounded-xl border border-separator bg-surface-secondary transition duration-200 ease-out";
 const iconButtonClass =
   "interactive-control inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-separator bg-surface-secondary text-muted transition hover:border-border-secondary hover:bg-accent-soft hover:text-accent";
 const primaryButtonClass =
@@ -3083,7 +3083,7 @@ function HoverPreview({
 }) {
   return (
     <Tooltip closeDelay={100} delay={550}>
-      <Tooltip.Trigger className="relay-tooltip-trigger block h-full min-w-0 w-full">
+      <Tooltip.Trigger className="relay-tooltip-trigger block min-w-0 w-full">
         {children}
       </Tooltip.Trigger>
       <Tooltip.Content
@@ -4284,7 +4284,7 @@ function CalendarWorkspace({
         <div className="grid grid-cols-3 gap-2">
           {(["day", "week", "month"] as const).map((option) => (
             <Button
-              className={`h-9 rounded-md text-xs font-semibold transition ${
+              className={`h-9 w-full rounded-md text-xs font-semibold transition ${
                 view === option
                   ? "bg-accent text-white"
                   : "border border-separator bg-surface text-muted hover:border-[var(--accent)] hover:text-accent"
@@ -4504,7 +4504,7 @@ function WeekCalendar({
         <span />
         {weekDays.map((day) => (
           <Button
-            className={`rounded-xl px-2 py-2 text-left transition hover:bg-accent-soft ${
+            className={`relay-content-card rounded-xl px-2 py-2 text-left transition hover:bg-accent-soft ${
               sameCalendarDay(day, selectedDate)
                 ? "bg-accent-soft text-accent"
                 : ""
@@ -4534,7 +4534,7 @@ function WeekCalendar({
               </div>
               {weekDays.map((day) => (
                 <Button
-                  className="border-l border-t border-separator text-left transition hover:bg-accent-soft"
+                  className="relay-calendar-slot border-l border-t border-separator text-left transition hover:bg-accent-soft"
                   key={`${day.toISOString()}-${hour}`}
                   onClick={() => onSlotClick(day, hour)}
                   onDragOver={(event) => event.preventDefault()}
@@ -4614,7 +4614,7 @@ function CalendarEventBlock({
 
   return (
     <div
-      className="pointer-events-auto absolute left-1 right-1"
+      className="calendar-event-position pointer-events-auto absolute left-1 right-1"
       style={{
         top: Math.max(0, top),
         height,
@@ -4681,7 +4681,7 @@ function DayCalendar({
         <div className="space-y-0">
           {hours.map((hour) => (
             <Button
-              className="grid border-t border-separator text-left transition hover:bg-accent-soft"
+              className="relay-calendar-slot grid border-t border-separator text-left transition hover:bg-accent-soft"
               key={hour}
               onClick={() => onSlotClick(hour)}
               style={{ height: hourHeight }}
@@ -4714,7 +4714,7 @@ function DayCalendar({
 
             return (
               <div
-                className="absolute left-0 right-1"
+                className="calendar-event-position absolute left-0 right-1"
                 key={event.id ?? `${event.title}-${event.start}`}
                 style={{
                   top: Math.max(0, top),
