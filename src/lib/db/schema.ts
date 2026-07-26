@@ -1,7 +1,6 @@
 import {
   boolean,
   index,
-  integer,
   jsonb,
   pgTable,
   text,
@@ -38,25 +37,6 @@ export const integrations = pgTable(
       table.userId,
       table.provider,
     ),
-  }),
-);
-
-export const tasks = pgTable(
-  "tasks",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-    title: text("title").notNull(),
-    status: text("status").notNull().default("open"),
-    priority: integer("priority").notNull().default(3),
-    source: text("source").notNull().default("manual"),
-    dueAt: timestamp("due_at", { withTimezone: true }),
-    metadata: jsonb("metadata").notNull().default({}),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => ({
-    userStatusIdx: index("tasks_user_status_idx").on(table.userId, table.status),
   }),
 );
 

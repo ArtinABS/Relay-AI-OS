@@ -19,11 +19,9 @@ import {
 } from "@/lib/google/workspace";
 import { listScheduledEmails } from "@/lib/local-store/scheduled-emails";
 import { listNotes } from "@/lib/local-store/notes";
-import { listTasks } from "@/lib/local-store/tasks";
 
 export async function GET() {
-  const [tasks, notes, directTokens, githubTokens, scheduledEmails] = await Promise.all([
-    listTasks(),
+  const [notes, directTokens, githubTokens, scheduledEmails] = await Promise.all([
     listNotes(),
     getDirectGoogleTokens(),
     getDirectGithubTokens(),
@@ -31,7 +29,6 @@ export async function GET() {
   ]);
   const google = getGoogleSetupStatus();
   const github = getGithubSetupStatus();
-  const openTasks = tasks.filter((task) => !task.completed);
   const connected = Boolean(directTokens?.accessToken || directTokens?.refreshToken);
   const githubConnected = Boolean(githubTokens?.accessToken);
   const [calendar, drive, googleTasks, gmail, gmailDrafts, contacts] = directTokens && connected
@@ -122,6 +119,11 @@ export async function GET() {
           contacts: [],
         },
       ];
+  const allGoogleTasks = googleTasks.tasks;
+  const openTasks = allGoogleTasks.filter((task) => task.status !== "completed");
+  const completedTasks = allGoogleTasks.filter(
+    (task) => task.status === "completed",
+  );
   const [githubRepositories, githubIssues, githubPullRequests] = githubTokens && githubConnected
     ? await Promise.all([
         listGithubRepositoriesForUser(githubTokens, 8).catch((error) => ({
@@ -175,7 +177,7 @@ export async function GET() {
     recentNotes: notes.slice(0, 5),
     counts: {
       openTasks: openTasks.length,
-      completedTasks: tasks.length - openTasks.length,
+      completedTasks: completedTasks.length,
       notes: notes.length,
     },
     google: {

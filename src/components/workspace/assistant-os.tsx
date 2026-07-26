@@ -9,18 +9,24 @@ import type {
 } from "react";
 import {
   Avatar,
+  Calendar,
   Card,
   Checkbox,
   Chip,
+  DateField,
+  DatePicker,
   Disclosure,
+  Label,
   Link,
   Modal,
   ProgressBar,
+  ScrollShadow,
   Skeleton,
   Surface,
   Switch,
   Tooltip,
 } from "@heroui/react";
+import { parseDate, type DateValue } from "@internationalized/date";
 import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
 import {
   Activity,
@@ -106,6 +112,8 @@ type RelayTask = {
   due?: string | null;
   priority?: RelayTaskPriority;
   columnId?: string | null;
+  taskListId?: string | null;
+  taskListTitle?: string | null;
 };
 
 type TaskColumn = {
@@ -124,6 +132,16 @@ type AddTaskInput =
       priority?: RelayTaskPriority;
       columnId?: string | null;
     };
+
+type GoogleTaskPriority = "low" | "medium" | "high";
+
+type GoogleTaskInput = {
+  title: string;
+  notes: string | null;
+  due: string | null;
+  priority: GoogleTaskPriority;
+  taskListId: string | null;
+};
 
 type RelayNote = {
   id: string;
@@ -504,6 +522,9 @@ const primaryButtonClass =
   "inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButtonClass =
   "interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-separator bg-surface-secondary px-4 text-sm font-semibold text-foreground transition hover:border-border-secondary hover:bg-surface-tertiary";
+const calendarStartHour = 7;
+const calendarEndHour = 24;
+const calendarHourHeight = 56;
 
 function createId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -688,14 +709,12 @@ export function AssistantOS() {
 
   async function refreshWorkspace() {
     const [
-      tasksResponse,
       notesResponse,
       oauthResponse,
       passwordResponse,
       briefingResponse,
       aiResponse,
     ] = await Promise.all([
-      fetch("/api/local-tools/tasks"),
       fetch("/api/local-tools/notes"),
       fetch("/api/oauth/status"),
       fetch("/api/auth/password/status"),
@@ -703,18 +722,45 @@ export function AssistantOS() {
       fetch("/api/ai/status"),
     ]);
 
-    const tasksData = (await tasksResponse.json()) as {
-      tasks: RelayTask[];
-      columns?: TaskColumn[];
-    };
     const notesData = (await notesResponse.json()) as { notes: RelayNote[] };
     const oauthData = (await oauthResponse.json()) as OAuthStatus;
     const passwordData = (await passwordResponse.json()) as PasswordAuthStatus;
     const briefingData = (await briefingResponse.json()) as Briefing;
     const aiData = (await aiResponse.json()) as AiStatus;
 
-    setTasks(tasksData.tasks);
-    setTaskColumns(tasksData.columns ?? []);
+    const googleTasks = briefingData.googleTasks?.tasks ?? [];
+    const mappedTasks: RelayTask[] = googleTasks
+      .filter((task): task is GoogleTask & { id: string } => Boolean(task.id))
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        completed: task.status === "completed",
+        createdAt: task.updated ?? new Date().toISOString(),
+        completedAt: task.completed ?? undefined,
+        updatedAt: task.updated ?? undefined,
+        notes: googleTaskNotes(task.notes),
+        due: task.due,
+        priority: googleTaskPriority(task),
+        columnId: task.taskListId,
+        taskListId: task.taskListId,
+        taskListTitle: task.taskListTitle,
+      }));
+    const mappedColumns: TaskColumn[] = (
+      briefingData.googleTasks?.taskLists ?? []
+    )
+      .filter(
+        (taskList): taskList is { id: string; title: string } =>
+          Boolean(taskList.id),
+      )
+      .map((taskList, index) => ({
+        id: taskList.id,
+        title: taskList.title,
+        order: index,
+        createdAt: new Date(0).toISOString(),
+      }));
+
+    setTasks(mappedTasks);
+    setTaskColumns(mappedColumns);
     setNotes(notesData.notes);
     setOauthStatus(oauthData);
     setPasswordAuth(passwordData);
@@ -727,30 +773,43 @@ export function AssistantOS() {
     const trimmed = parsed.title.trim();
     if (!trimmed) return;
 
-    await fetch("/api/local-tools/tasks", {
+    const response = await fetch("/api/google/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        action: "add",
+        action: "create",
         title: trimmed,
         notes: parsed.notes,
         due: parsed.due,
-        priority: parsed.priority,
-        columnId: parsed.columnId,
+        priority:
+          parsed.priority === "urgent" ? "high" : (parsed.priority ?? "medium"),
+        taskListId: parsed.columnId,
       }),
     });
+    if (!response.ok) {
+      const data = (await response.json()) as { reason?: string };
+      throw new Error(data.reason ?? "Google Tasks could not create this task.");
+    }
     await refreshWorkspace();
-    addToast("Task created", trimmed, "success");
+    addToast("Google Task created", trimmed, "success");
   }
 
   async function completeTask(task: RelayTask) {
-    await fetch("/api/local-tools/tasks", {
+    const response = await fetch("/api/google/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "complete", identifier: task.id }),
+      body: JSON.stringify({
+        action: "complete",
+        id: task.id,
+        taskListId: task.taskListId ?? task.columnId,
+      }),
     });
+    if (!response.ok) {
+      const data = (await response.json()) as { reason?: string };
+      throw new Error(data.reason ?? "Google Tasks could not complete this task.");
+    }
     await refreshWorkspace();
-    addToast("Task completed", task.title, "success");
+    addToast("Google Task completed", task.title, "success");
   }
 
   async function addMemory(body: string) {
@@ -1962,7 +2021,7 @@ function Sidebar({
 }) {
   const content = (
     <aside
-      className={`sidebar-shell relative flex h-full flex-col bg-[var(--sidebar)] py-5 transition-all duration-300 ease-out ${collapsed ? "px-3" : "px-4"}`}
+      className={`sidebar-shell relative flex h-full flex-col bg-[var(--sidebar)] py-5 text-left transition-all duration-300 ease-out ${collapsed ? "px-3" : "px-4"}`}
     >
       <div className="mb-8 flex items-center justify-between">
         {collapsed ? (
@@ -2001,7 +2060,9 @@ function Sidebar({
                 active
                   ? "is-active bg-surface text-foreground shadow-surface"
                   : "text-muted hover:bg-surface-secondary hover:text-foreground"
-              } ${collapsed ? "justify-center px-0" : ""}`}
+              } ${
+                collapsed ? "justify-center px-0" : "justify-start text-left"
+              }`}
               key={item.id}
               onClick={() => {
                 setActiveView(item.id);
@@ -2017,18 +2078,6 @@ function Sidebar({
         })}
       </nav>
 
-      {collapsed ? null : (
-        <div className={`${softPanelClass} mt-auto p-4`}>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Zap className="h-4 w-4 text-warning" />
-            Automation guard
-          </div>
-          <p className="mt-2 text-xs leading-5 text-muted">
-            Sends, deletes, permission changes, and shared-doc edits require
-            approval.
-          </p>
-        </div>
-      )}
       {!collapsed ? (
         <Input
           aria-label="Resize sidebar"
@@ -2663,7 +2712,7 @@ function TaskSnapshot({
           <p className="mt-1 text-sm text-muted">
             {overdueCount > 0
               ? `${overdueCount} overdue`
-              : `${openTasks.length} local open`}{" "}
+              : `${openTasks.length} open in Google Tasks`}{" "}
             · {googleTasks.length} Google open
           </p>
         </div>
@@ -2706,7 +2755,7 @@ function TaskSnapshot({
           <EmptyState
             icon={ListTodo}
             title={
-              tasks.length > 0 ? "All local tasks completed" : "No local tasks"
+              tasks.length > 0 ? "All Google Tasks completed" : "No Google Tasks"
             }
             detail="Create tasks from chat or the Tasks tab."
           />
@@ -3144,18 +3193,27 @@ function ChatView({
   taskColumns: TaskColumn[];
   tasks: RelayTask[];
 }) {
+  const showContextWorkspace = false;
   const [workspaceCollapsed, setWorkspaceCollapsed] = useState(false);
   const [workspaceWidth, setWorkspaceWidth] = useState(430);
   const mode = inferContextWorkspaceMode(messages);
 
   return (
     <div
-      className="flex h-[calc(100vh-96px)] min-h-0 flex-col gap-4 overflow-hidden transition-[grid-template-columns] duration-300 ease-out xl:grid"
-      style={{
-        gridTemplateColumns: workspaceCollapsed
-          ? "minmax(0,1fr) 64px"
-          : `minmax(0,1fr) minmax(360px,${workspaceWidth}px)`,
-      }}
+      className={`h-[calc(100vh-96px)] min-h-0 overflow-hidden ${
+        showContextWorkspace
+          ? "flex flex-col gap-4 transition-[grid-template-columns] duration-300 ease-out xl:grid"
+          : ""
+      }`}
+      style={
+        showContextWorkspace
+          ? {
+              gridTemplateColumns: workspaceCollapsed
+                ? "minmax(0,1fr) 64px"
+                : `minmax(0,1fr) minmax(360px,${workspaceWidth}px)`,
+            }
+          : undefined
+      }
     >
       <AgentConsole
         addMemory={addMemory}
@@ -3170,23 +3228,25 @@ function ChatView({
         setInput={setInput}
         submitMessage={submitMessage}
       />
-      <ContextWorkspace
-        addTask={addTask}
-        briefing={briefing}
-        collapsed={workspaceCollapsed}
-        completeTask={completeTask}
-        mode={mode}
-        notes={notes}
-        onToggleCollapsed={() => setWorkspaceCollapsed((current) => !current)}
-        openTasks={openTasks}
-        refreshWorkspace={refreshWorkspace}
-        runPrompt={runPrompt}
-        setWidth={setWorkspaceWidth}
-        signedInToGoogle={signedInToGoogle}
-        taskColumns={taskColumns}
-        tasks={tasks}
-        width={workspaceWidth}
-      />
+      {showContextWorkspace ? (
+        <ContextWorkspace
+          addTask={addTask}
+          briefing={briefing}
+          collapsed={workspaceCollapsed}
+          completeTask={completeTask}
+          mode={mode}
+          notes={notes}
+          onToggleCollapsed={() => setWorkspaceCollapsed((current) => !current)}
+          openTasks={openTasks}
+          refreshWorkspace={refreshWorkspace}
+          runPrompt={runPrompt}
+          setWidth={setWorkspaceWidth}
+          signedInToGoogle={signedInToGoogle}
+          taskColumns={taskColumns}
+          tasks={tasks}
+          width={workspaceWidth}
+        />
+      ) : null}
     </div>
   );
 }
@@ -3294,9 +3354,7 @@ function AgentConsole({
   }, [messages, loading]);
 
   return (
-    <section
-      className={`${panelClass} flex h-full min-h-0 flex-col overflow-hidden`}
-    >
+    <section className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-4 border-b border-separator px-5 py-4">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-accent">
@@ -3330,11 +3388,7 @@ function AgentConsole({
         {loading ? <AssistantThinkingCard messages={messages} /> : null}
       </div>
 
-      <form
-        className="border-t border-separator p-4"
-        id="agent-chat-form"
-        onSubmit={submitMessage}
-      >
+      <form className="px-1 py-4" id="agent-chat-form" onSubmit={submitMessage}>
         <Input
           className="hidden"
           multiple
@@ -3342,7 +3396,7 @@ function AgentConsole({
           ref={fileInputRef}
           type="file"
         />
-        <div className="flex gap-3 rounded-lg border border-separator bg-surface-secondary p-2">
+        <div className="flex items-center gap-2">
           <Button
             className={
               iconButtonClass + " h-11 w-11 border-transparent bg-transparent"
@@ -3479,7 +3533,10 @@ function ChatMessage({
         >
           {message.timestamp}
         </div>
-        {message.surface && message.surfaceStatus !== "done" ? (
+        {message.surface &&
+        message.surface !== "schedule" &&
+        message.surface !== "task" &&
+        message.surfaceStatus !== "done" ? (
           <GeneratedMessageSurface
             addMemory={addMemory}
             addTask={addTask}
@@ -3564,31 +3621,32 @@ function AssistantUiRequestCard({
     setStatus(null);
 
     try {
-      const response = await fetch("/api/local-tools/tasks", {
+      const response = await fetch("/api/google/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "update",
           id: selectedTask.id,
+          taskListId: selectedTask.taskListId ?? selectedTask.columnId,
           due: shiftedDue.toISOString(),
         }),
       });
       const data = (await response.json()) as {
-        task?: RelayTask | null;
-        error?: string;
+        ok?: boolean;
+        reason?: string;
       };
 
-      if (!response.ok || !data.task) {
+      if (!response.ok || !data.ok) {
         setStatus({
           tone: "warning",
-          text: data.error ?? "I could not update that task.",
+          text: data.reason ?? "I could not update that Google Task.",
         });
         return;
       }
 
       await refreshWorkspace();
       onComplete(
-        `Updated "${data.task.title}" due date to ${formatDateShort(data.task.due)}.`,
+        `Updated "${selectedTask.title}" due date to ${formatDateShort(shiftedDue.toISOString())}.`,
       );
       setStatus({ tone: "success", text: "Task updated." });
     } catch (error) {
@@ -3689,7 +3747,7 @@ function AssistantUiRequestCard({
               ) : (
                 <EmptyState
                   icon={ListTodo}
-                  title="No open local tasks"
+                  title="No open Google Tasks"
                   detail="Create or sync tasks first, then I can attach this action to the right item."
                 />
               )}
@@ -4129,7 +4187,7 @@ function CalendarWorkspace({
   refreshWorkspace: () => Promise<void>;
 }) {
   const events = briefing?.calendar.events ?? [];
-  const [view, setView] = useState<"day" | "week" | "month">("week");
+  const [view, setView] = useState<"day" | "week" | "month">("month");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [calendarAction, setCalendarAction] = useState<CalendarAction | null>(
     null,
@@ -4234,88 +4292,80 @@ function CalendarWorkspace({
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <section className={softPanelClass + " p-3"}>
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <Button
-            className={iconButtonClass}
-            onClick={() =>
-              setSelectedDate(
-                addDays(
-                  selectedDate,
-                  view === "month" ? -30 : view === "week" ? -7 : -1,
-                ),
-              )
-            }
-            type="button"
-            title="Previous"
-          >
-            <ArrowRight className="h-4 w-4 rotate-180" />
-          </Button>
-          <div className="min-w-0 text-center">
-            <p className="truncate text-sm font-semibold">
-              {selectedDate.toLocaleDateString(undefined, {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
-            <p className="text-xs text-muted">
-              {briefing?.calendar.ok
-                ? "Google Calendar"
-                : (briefing?.calendar.reason ?? "Calendar not connected")}
-            </p>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className={softPanelClass + " p-3"}>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <Button
+              className={iconButtonClass}
+              onClick={() =>
+                setSelectedDate(shiftCalendarDate(selectedDate, view, -1))
+              }
+              type="button"
+              title="Previous"
+            >
+              <ArrowRight className="h-4 w-4 rotate-180" />
+            </Button>
+            <div className="min-w-0 text-center">
+              <p className="truncate text-sm font-semibold">
+                {selectedDate.toLocaleDateString(undefined, {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </p>
+              <p className="text-xs text-muted">
+                {briefing?.calendar.ok
+                  ? "Google Calendar"
+                  : (briefing?.calendar.reason ?? "Calendar not connected")}
+              </p>
+            </div>
+            <Button
+              className={iconButtonClass}
+              onClick={() =>
+                setSelectedDate(shiftCalendarDate(selectedDate, view, 1))
+              }
+              type="button"
+              title="Next"
+            >
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {(["day", "week", "month"] as const).map((option) => (
+              <Button
+                className={`h-9 w-full rounded-md text-xs font-semibold transition ${
+                  view === option
+                    ? "bg-accent text-white"
+                    : "border border-separator bg-surface text-muted hover:border-[var(--accent)] hover:text-accent"
+                }`}
+                key={option}
+                onClick={() => setView(option)}
+                type="button"
+              >
+                {option[0].toUpperCase() + option.slice(1)}
+              </Button>
+            ))}
           </div>
           <Button
-            className={iconButtonClass}
+            className={`${primaryButtonClass} mt-3 w-full`}
             onClick={() =>
-              setSelectedDate(
-                addDays(
-                  selectedDate,
-                  view === "month" ? 30 : view === "week" ? 7 : 1,
-                ),
-              )
+              openSlot(selectedDate, Math.max(9, new Date().getHours() + 1))
             }
             type="button"
-            title="Next"
           >
-            <ArrowRight className="h-4 w-4" />
+            <Plus className="h-4 w-4" />
+            Add event
           </Button>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {(["day", "week", "month"] as const).map((option) => (
-            <Button
-              className={`h-9 w-full rounded-md text-xs font-semibold transition ${
-                view === option
-                  ? "bg-accent text-white"
-                  : "border border-separator bg-surface text-muted hover:border-[var(--accent)] hover:text-accent"
-              }`}
-              key={option}
-              onClick={() => setView(option)}
-              type="button"
-            >
-              {option[0].toUpperCase() + option.slice(1)}
-            </Button>
-          ))}
-        </div>
-        <Button
-          className={`${primaryButtonClass} mt-3 w-full`}
-          onClick={() =>
-            openSlot(selectedDate, Math.max(9, new Date().getHours() + 1))
-          }
-          type="button"
-        >
-          <Plus className="h-4 w-4" />
-          Add event
-        </Button>
-      </section>
+        </section>
 
-      <CalendarSignalStrip
-        briefing={briefing}
-        dayEvents={dayEvents}
-        events={events}
-        selectedDate={selectedDate}
-        view={view}
-      />
+        <CalendarSignalStrip
+          briefing={briefing}
+          dayEvents={dayEvents}
+          events={events}
+          selectedDate={selectedDate}
+          view={view}
+        />
+      </div>
 
       {view === "day" ? (
         <DayCalendar
@@ -4351,21 +4401,35 @@ function CalendarWorkspace({
                 sameCalendarDay(parseEventDate(event.start), day),
               ).length;
               const currentMonth = day.getMonth() === selectedDate.getMonth();
+              const isSelected = sameCalendarDay(day, selectedDate);
+              const isToday = sameCalendarDay(day, new Date());
               return (
                 <Button
                   className={`relay-content-card min-h-16 rounded-md border p-1.5 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
-                    sameCalendarDay(day, selectedDate)
+                    isSelected
                       ? "border-[var(--accent)] bg-accent-soft"
                       : "border-separator bg-surface"
                   } ${currentMonth ? "" : "opacity-45"}`}
                   key={day.toISOString()}
-                  onClick={() => {
-                    setSelectedDate(day);
-                    setView("day");
-                  }}
+                  onClick={() => setSelectedDate(day)}
                   type="button"
                 >
-                  <span className="text-xs font-semibold">{day.getDate()}</span>
+                  <span className="flex items-center justify-between gap-1">
+                    <span
+                      className={`grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${
+                        isToday
+                          ? "bg-accent text-accent-foreground shadow-sm"
+                          : ""
+                      }`}
+                    >
+                      {day.getDate()}
+                    </span>
+                    {isToday ? (
+                      <span className="text-[9px] font-semibold uppercase tracking-wide text-accent">
+                        Today
+                      </span>
+                    ) : null}
+                  </span>
                   {dayCount > 0 ? (
                     <span className="mt-2 flex gap-1">
                       {Array.from(
@@ -4491,36 +4555,50 @@ function WeekCalendar({
   selectedDate: Date;
   weekDays: Date[];
 }) {
-  const hours = Array.from({ length: 14 }, (_, index) => index + 7);
-  const hourHeight = 56;
+  const hours = Array.from(
+    { length: calendarEndHour - calendarStartHour },
+    (_, index) => index + calendarStartHour,
+  );
+  const hourHeight = calendarHourHeight;
   const now = new Date();
   const showNow = weekDays.some((day) => sameCalendarDay(day, now));
   const nowTop =
-    ((now.getHours() * 60 + now.getMinutes() - 7 * 60) / 60) * hourHeight;
+    ((now.getHours() * 60 + now.getMinutes() - calendarStartHour * 60) / 60) *
+    hourHeight;
 
   return (
     <section className={softPanelClass + " overflow-hidden p-3"}>
       <div className="grid grid-cols-[52px_repeat(7,minmax(86px,1fr))] border-b border-separator pb-2">
         <span />
-        {weekDays.map((day) => (
-          <Button
-            className={`relay-content-card rounded-xl px-2 py-2 text-left transition hover:bg-accent-soft ${
-              sameCalendarDay(day, selectedDate)
-                ? "bg-accent-soft text-accent"
-                : ""
-            }`}
-            key={day.toISOString()}
-            onClick={() => onSelectDate(day)}
-            type="button"
-          >
-            <span className="block text-[10px] font-semibold uppercase text-muted">
-              {day.toLocaleDateString(undefined, { weekday: "short" })}
-            </span>
-            <span className="mt-1 block text-lg font-semibold">
-              {day.getDate()}
-            </span>
-          </Button>
-        ))}
+        {weekDays.map((day) => {
+          const isSelected = sameCalendarDay(day, selectedDate);
+          const isToday = sameCalendarDay(day, now);
+
+          return (
+            <Button
+              className={`relay-content-card rounded-xl px-2 py-2 text-left transition hover:bg-accent-soft ${
+                isSelected ? "bg-accent-soft text-accent" : ""
+              }`}
+              key={day.toISOString()}
+              onClick={() => onSelectDate(day)}
+              type="button"
+            >
+              <span className="flex items-center justify-between gap-1 text-[10px] font-semibold uppercase text-muted">
+                {day.toLocaleDateString(undefined, { weekday: "short" })}
+                {isToday ? (
+                  <span className="text-[9px] text-accent">Today</span>
+                ) : null}
+              </span>
+              <span
+                className={`mt-1 grid h-8 w-8 place-items-center rounded-full text-lg font-semibold ${
+                  isToday ? "bg-accent text-accent-foreground shadow-sm" : ""
+                }`}
+              >
+                {day.getDate()}
+              </span>
+            </Button>
+          );
+        })}
       </div>
       <div className="relative max-h-[620px] overflow-auto">
         <div className="grid grid-cols-[52px_repeat(7,minmax(86px,1fr))]">
@@ -4609,7 +4687,7 @@ function CalendarEventBlock({
     startMinutes + 20,
     end.getHours() * 60 + end.getMinutes(),
   );
-  const top = ((startMinutes - 7 * 60) / 60) * hourHeight;
+  const top = ((startMinutes - calendarStartHour * 60) / 60) * hourHeight;
   const height = Math.max(34, ((endMinutes - startMinutes) / 60) * hourHeight);
 
   return (
@@ -4659,8 +4737,11 @@ function DayCalendar({
   onSlotClick: (hour: number) => void;
   selectedDate: Date;
 }) {
-  const hours = Array.from({ length: 14 }, (_, index) => index + 7);
-  const hourHeight = 56;
+  const hours = Array.from(
+    { length: calendarEndHour - calendarStartHour },
+    (_, index) => index + calendarStartHour,
+  );
+  const hourHeight = calendarHourHeight;
 
   return (
     <section className={softPanelClass + " overflow-hidden p-3"}>
@@ -4706,7 +4787,8 @@ function DayCalendar({
               startMinutes + 20,
               end.getHours() * 60 + end.getMinutes(),
             );
-            const top = ((startMinutes - 7 * 60) / 60) * hourHeight;
+            const top =
+              ((startMinutes - calendarStartHour * 60) / 60) * hourHeight;
             const height = Math.max(
               34,
               ((endMinutes - startMinutes) / 60) * hourHeight,
@@ -5013,13 +5095,13 @@ function TaskWorkspace({
           <div>
             <h3 className="font-semibold">Open tasks</h3>
             <p className="text-xs text-muted">
-              {tasks.length} local total, {taskColumns.length} columns,{" "}
+              {tasks.length} Google total, {taskColumns.length} task lists,{" "}
               {openGoogleTasks.length} Google open
             </p>
           </div>
           <StatusBadge
             ready={Boolean(briefing?.googleTasks?.ok)}
-            label={briefing?.googleTasks?.ok ? "Google ready" : "Local"}
+            label={briefing?.googleTasks?.ok ? "Google ready" : "Connect Google"}
           />
         </div>
         <div className="space-y-2">
@@ -5536,7 +5618,6 @@ function TaskComposer({
   );
   const [due, setDue] = useState(initialContext?.due ?? "");
   const [notes, setNotes] = useState(initialContext?.notes ?? "");
-  const [syncGoogle, setSyncGoogle] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(
     null,
@@ -5557,44 +5638,12 @@ function TaskComposer({
         priority,
       });
 
-      if (syncGoogle) {
-        const response = await fetch("/api/google/tasks", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "create",
-            title: trimmed,
-            notes: notes.trim() || undefined,
-            due: due ? new Date(`${due}T12:00:00`).toISOString() : undefined,
-            priority,
-          }),
-        });
-        const data = (await response.json()) as {
-          ok: boolean;
-          reason?: string;
-        };
-
-        if (!response.ok || !data.ok) {
-          setStatus({
-            ok: false,
-            message:
-              data.reason ??
-              "Saved locally, but Google Tasks did not accept the task.",
-          });
-          return;
-        }
-      }
-
       await refreshWorkspace?.();
       setStatus({
         ok: true,
-        message: syncGoogle
-          ? "Saved locally and synced to Google Tasks."
-          : "Saved to local tasks.",
+        message: "Saved to Google Tasks.",
       });
-      onComplete?.(
-        `Task "${trimmed}" created${syncGoogle ? " and synced to Google Tasks" : ""}.`,
-      );
+      onComplete?.(`Google Task "${trimmed}" created.`);
       setTitle("");
       setNotes("");
       setDue("");
@@ -5705,14 +5754,9 @@ function TaskComposer({
           />
         </label>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <MiniControl label="Storage" value="Local task file" />
-        <MiniControl label="Completion" value="Task board checkbox" />
-        <ToggleRow
-          checked={syncGoogle}
-          label="Sync Google Tasks"
-          onChange={setSyncGoogle}
-        />
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <MiniControl label="Storage" value="Google Tasks" />
+        <MiniControl label="Completion" value="Google Tasks status" />
       </div>
       <Button
         className={`${primaryButtonClass} mt-4`}
@@ -6080,6 +6124,757 @@ function CalendarView({
   );
 }
 
+function TaskMasterDetailView({
+  briefing,
+  refreshWorkspace,
+}: {
+  briefing: Briefing | null;
+  refreshWorkspace: () => Promise<void>;
+}) {
+  const googleTasks = briefing?.googleTasks;
+  const tasks = useMemo(() => googleTasks?.tasks ?? [], [googleTasks?.tasks]);
+  const taskLists = googleTasks?.taskLists ?? [];
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
+    googleTaskKey(tasks[0] ?? null),
+  );
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const orderedTasks = useMemo(() => {
+    const open = sortGoogleTasksByUrgency(
+      tasks.filter((task) => task.status !== "completed"),
+    );
+    const completed = tasks
+      .filter((task) => task.status === "completed")
+      .sort(
+        (left, right) =>
+          new Date(right.completed ?? right.updated ?? 0).getTime() -
+          new Date(left.completed ?? left.updated ?? 0).getTime(),
+      );
+
+    return [...open, ...completed];
+  }, [tasks]);
+  const selectedTask =
+    orderedTasks.find((task) => googleTaskKey(task) === selectedTaskId) ??
+    orderedTasks[0] ??
+    null;
+
+  async function runGoogleTaskAction(body: Record<string, unknown>) {
+    const response = await fetch("/api/google/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await response.json()) as {
+      ok?: boolean;
+      reason?: string;
+    };
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.reason ?? "Google Tasks could not be updated.");
+    }
+
+    await refreshWorkspace();
+  }
+
+  async function createTask(input: GoogleTaskInput) {
+    await runGoogleTaskAction({
+      action: "create",
+      ...input,
+      notes: input.notes ?? "",
+    });
+  }
+
+  async function updateTask(task: GoogleTask, input: GoogleTaskInput) {
+    if (!task.id) throw new Error("This Google task has no editable ID.");
+    await runGoogleTaskAction({
+      action: "update",
+      id: task.id,
+      taskListId: task.taskListId,
+      title: input.title,
+      notes: input.notes ?? "",
+      due: input.due,
+      priority: input.priority,
+    });
+  }
+
+  async function completeTask(task: GoogleTask) {
+    if (!task.id) throw new Error("This Google task has no completion ID.");
+    await runGoogleTaskAction({
+      action: "complete",
+      id: task.id,
+      taskListId: task.taskListId,
+    });
+  }
+
+  return (
+    <div className="grid min-h-[calc(100vh-144px)] gap-5 lg:h-[calc(100vh-144px)] lg:grid-cols-[minmax(320px,2fr)_minmax(0,3fr)]">
+      <section
+        className={`${panelClass} flex min-h-[420px] flex-col overflow-hidden lg:h-full`}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-separator p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+              Google Tasks
+            </p>
+            <h2 className="mt-1 text-xl font-semibold">Your Google tasks</h2>
+            <p className="mt-1 text-sm text-muted">
+              {tasks.filter((task) => task.status !== "completed").length} open
+              {" · "}
+              {tasks.filter((task) => task.status === "completed").length}{" "}
+              complete
+            </p>
+          </div>
+          <Button
+            className={primaryButtonClass}
+            disabled={!googleTasks?.ok}
+            onClick={() => setTaskModalOpen(true)}
+            type="button"
+          >
+            <Plus className="h-4 w-4" />
+            Add task
+          </Button>
+        </div>
+
+        <ScrollShadow
+          className="min-h-0 flex-1 p-4"
+          hideScrollBar={false}
+          offset={8}
+          size={56}
+        >
+          <div className="space-y-3">
+            {orderedTasks.map((task) => (
+              <TaskListCard
+                completeTask={completeTask}
+                key={googleTaskKey(task)}
+                onSelect={() => setSelectedTaskId(googleTaskKey(task))}
+                selected={googleTaskKey(selectedTask) === googleTaskKey(task)}
+                task={task}
+              />
+            ))}
+            {orderedTasks.length === 0 ? (
+              <EmptyState
+                detail={
+                  googleTasks?.reason ??
+                  "Add a Google task to start building your working list."
+                }
+                icon={ListTodo}
+                title={
+                  googleTasks?.ok
+                    ? "No Google tasks yet"
+                    : "Connect Google Tasks"
+                }
+              />
+            ) : null}
+          </div>
+        </ScrollShadow>
+      </section>
+
+      <TaskDetailPanel
+        completeTask={completeTask}
+        key={googleTaskKey(selectedTask) ?? "empty-task-detail"}
+        onSave={updateTask}
+        task={selectedTask}
+      />
+
+      {taskModalOpen ? (
+        <GoogleTaskCreationModal
+          onCreate={createTask}
+          onClose={() => setTaskModalOpen(false)}
+          taskLists={taskLists}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function TaskListCard({
+  completeTask,
+  onSelect,
+  selected,
+  task,
+}: {
+  completeTask: (task: GoogleTask) => Promise<void>;
+  onSelect: () => void;
+  selected: boolean;
+  task: GoogleTask;
+}) {
+  const completed = task.status === "completed";
+
+  return (
+    <article
+      className={`task-rail-card flex items-start gap-3 rounded-2xl border bg-surface p-3 shadow-sm ${
+        selected
+          ? "border-[var(--accent)] ring-2 ring-[var(--accent-soft)]"
+          : "border-separator"
+      }`}
+    >
+      <Button
+        className="relay-content-card min-w-0 flex-1 justify-start bg-transparent p-0 text-left hover:bg-transparent"
+        onClick={onSelect}
+        type="button"
+      >
+        <span className="block min-w-0">
+          <span className="flex flex-wrap items-center gap-2">
+            <PriorityTag priority={googleTaskPriority(task)} />
+            {completed ? (
+              <Chip color="success" size="sm" variant="soft">
+                Complete
+              </Chip>
+            ) : null}
+          </span>
+          <span
+            className={`mt-2 block text-sm font-semibold leading-5 ${
+              completed ? "text-muted line-through" : "text-foreground"
+            }`}
+          >
+            {task.title}
+          </span>
+          <span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted">
+            {googleTaskNotes(task.notes) || "No notes added"}
+          </span>
+          <span className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {task.due ? formatDueDate(task.due) : "No due date"}
+            </span>
+            <span>{task.taskListTitle ?? "Google Tasks"}</span>
+          </span>
+        </span>
+      </Button>
+      <TaskCompletionButton completeTask={completeTask} task={task} />
+    </article>
+  );
+}
+
+function TaskCompletionButton({
+  completeTask,
+  task,
+}: {
+  completeTask: (task: GoogleTask) => Promise<void>;
+  task: GoogleTask;
+}) {
+  const [busy, setBusy] = useState(false);
+  const completed = task.status === "completed";
+
+  async function markComplete() {
+    if (completed || busy) return;
+    setBusy(true);
+    try {
+      await completeTask(task);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button
+      aria-pressed={completed}
+      className={`h-9 w-9 shrink-0 rounded-full border-2 p-0 transition ${
+        completed
+          ? "border-[var(--success)] bg-[var(--success)] text-white"
+          : "border-[var(--success)] bg-transparent text-[var(--success)] hover:bg-[var(--success-soft)]"
+      }`}
+      onClick={() => void markComplete()}
+      title={completed ? "Task complete" : "Mark task complete"}
+      type="button"
+    >
+      {busy ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Check className="h-4 w-4 stroke-[2.5]" />
+      )}
+    </Button>
+  );
+}
+
+function TaskDetailPanel({
+  completeTask,
+  onSave,
+  task,
+}: {
+  completeTask: (task: GoogleTask) => Promise<void>;
+  onSave: (task: GoogleTask, input: GoogleTaskInput) => Promise<void>;
+  task: GoogleTask | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(task?.title ?? "");
+  const [notes, setNotes] = useState(googleTaskNotes(task?.notes));
+  const [priority, setPriority] = useState<GoogleTaskPriority>(
+    googleTaskEditablePriority(task),
+  );
+  const [due, setDue] = useState<DateValue | null>(taskDateValue(task?.due));
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  function resetDraft(nextTask: GoogleTask | null) {
+    setTitle(nextTask?.title ?? "");
+    setNotes(googleTaskNotes(nextTask?.notes));
+    setPriority(googleTaskEditablePriority(nextTask));
+    setDue(taskDateValue(nextTask?.due));
+    setStatus(null);
+  }
+
+  if (!task) {
+    return (
+      <section className={`${panelClass} min-h-[420px] p-5`}>
+        <EmptyState
+          detail="Choose a task from the left to inspect its full details."
+          icon={ListTodo}
+          title="Select a task"
+        />
+      </section>
+    );
+  }
+
+  const activeTask = task;
+
+  async function save() {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    setStatus(null);
+    try {
+      await onSave(activeTask, {
+        title: title.trim(),
+        notes: notes.trim() || null,
+        due: due ? new Date(`${due.toString()}T23:59:00`).toISOString() : null,
+        priority,
+        taskListId: activeTask.taskListId ?? null,
+      });
+      setEditing(false);
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : "Task could not be updated.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section
+      className={`${panelClass} flex min-h-[520px] min-w-0 flex-col overflow-hidden`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-separator p-5">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+            Task detail
+          </p>
+          <h2 className="mt-1 truncate text-xl font-semibold">
+            {editing ? "Edit task" : task.title}
+          </h2>
+        </div>
+        <div className="flex items-center gap-2">
+          {!editing ? (
+            <Button
+              className={secondaryButtonClass}
+              onClick={() => {
+                resetDraft(task);
+                setEditing(true);
+              }}
+              type="button"
+            >
+              <FileText className="h-4 w-4" />
+              Edit
+            </Button>
+          ) : null}
+          <TaskCompletionButton completeTask={completeTask} task={task} />
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+        {editing ? (
+          <div className="space-y-5">
+            <label className="grid gap-1.5">
+              <span className="text-xs font-semibold uppercase text-muted">
+                Title
+              </span>
+              <Input
+                className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                onChange={(event) => setTitle(event.target.value)}
+                value={title}
+              />
+            </label>
+
+            <label className="grid gap-1.5">
+              <span className="text-xs font-semibold uppercase text-muted">
+                Notes
+              </span>
+              <TextArea
+                className="min-h-32 w-full resize-y rounded-xl border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                onChange={(event) => setNotes(event.target.value)}
+                value={notes}
+              />
+            </label>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <TaskDueDatePicker onChange={setDue} value={due} />
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-muted">
+                  Priority
+                </span>
+                <Select
+                  className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) =>
+                    setPriority(event.target.value as GoogleTaskPriority)
+                  }
+                  value={priority}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </Select>
+              </label>
+            </div>
+
+            {status ? (
+              <p className="rounded-xl bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
+                {status}
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button
+                className={primaryButtonClass}
+                disabled={!title.trim() || saving}
+                onClick={() => void save()}
+                type="button"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Save changes
+              </Button>
+              <Button
+                className={secondaryButtonClass}
+                onClick={() => {
+                  resetDraft(task);
+                  setEditing(false);
+                }}
+                type="button"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <PriorityTag priority={googleTaskPriority(task)} />
+              <Chip
+                color={task.status === "completed" ? "success" : "accent"}
+                size="sm"
+                variant="soft"
+              >
+                {task.status === "completed" ? "Complete" : "Open"}
+              </Chip>
+              <Chip size="sm" variant="secondary">
+                {task.taskListTitle ?? "Google Tasks"}
+              </Chip>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase text-muted">
+                Notes
+              </p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-foreground">
+                {googleTaskNotes(task.notes) ||
+                  "No notes have been added to this task."}
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TaskDetailDatum
+                icon={CalendarDays}
+                label="Due date"
+                value={task.due ? formatDueDate(task.due) : "No due date"}
+              />
+              <TaskDetailDatum
+                icon={Clock}
+                label="Last updated"
+                value={formatTaskTimestamp(task.updated)}
+              />
+              <TaskDetailDatum
+                icon={CheckCircle2}
+                label="Completed"
+                value={
+                  task.completed
+                    ? formatTaskTimestamp(task.completed)
+                    : "Not completed"
+                }
+              />
+              <TaskDetailDatum
+                icon={ListTodo}
+                label="Google task list"
+                value={task.taskListTitle ?? "Google Tasks"}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TaskDueDatePicker({
+  onChange,
+  value,
+}: {
+  onChange: (value: DateValue | null) => void;
+  value: DateValue | null;
+}) {
+  return (
+    <DatePicker className="grid gap-1.5" onChange={onChange} value={value}>
+      <Label className="text-xs font-semibold uppercase text-muted">
+        Due date
+      </Label>
+      <DateField.Group
+        className="h-11 rounded-xl border border-separator bg-surface-secondary px-3"
+        fullWidth
+        variant="secondary"
+      >
+        <DateField.Input className="min-w-0 flex-1 text-sm">
+          {(segment) => <DateField.Segment segment={segment} />}
+        </DateField.Input>
+        <DateField.Suffix>
+          <DatePicker.Trigger className="text-muted">
+            <DatePicker.TriggerIndicator />
+          </DatePicker.Trigger>
+        </DateField.Suffix>
+      </DateField.Group>
+      <DatePicker.Popover className="rounded-2xl border border-separator bg-overlay p-3 shadow-overlay">
+        <Calendar aria-label="Choose task due date">
+          <Calendar.Header>
+            <Calendar.YearPickerTrigger>
+              <Calendar.YearPickerTriggerHeading />
+              <Calendar.YearPickerTriggerIndicator />
+            </Calendar.YearPickerTrigger>
+            <Calendar.NavButton slot="previous" />
+            <Calendar.NavButton slot="next" />
+          </Calendar.Header>
+          <Calendar.Grid>
+            <Calendar.GridHeader>
+              {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+            </Calendar.GridHeader>
+            <Calendar.GridBody>
+              {(date) => <Calendar.Cell date={date} />}
+            </Calendar.GridBody>
+          </Calendar.Grid>
+        </Calendar>
+      </DatePicker.Popover>
+    </DatePicker>
+  );
+}
+
+function TaskDetailDatum({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-separator bg-surface-secondary p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </div>
+      <p className="mt-2 text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function taskDateValue(value?: string | null): DateValue | null {
+  if (!value) return null;
+  try {
+    return parseDate(value.slice(0, 10));
+  } catch {
+    return null;
+  }
+}
+
+function formatTaskTimestamp(value?: string | null) {
+  if (!value) return "Unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function GoogleTaskCreationModal({
+  onClose,
+  onCreate,
+  taskLists,
+}: {
+  onClose: () => void;
+  onCreate: (input: GoogleTaskInput) => Promise<void>;
+  taskLists: Array<{ id?: string | null; title: string }>;
+}) {
+  const [title, setTitle] = useState("");
+  const [notes, setNotes] = useState("");
+  const [due, setDue] = useState<DateValue | null>(null);
+  const [priority, setPriority] = useState<GoogleTaskPriority>("medium");
+  const [taskListId, setTaskListId] = useState(taskLists[0]?.id ?? "@default");
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function save() {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    setStatus(null);
+    try {
+      await onCreate({
+        title: title.trim(),
+        notes: notes.trim() || null,
+        due: due ? new Date(`${due.toString()}T23:59:00`).toISOString() : null,
+        priority,
+        taskListId: taskListId || "@default",
+      });
+      onClose();
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Google task could not be created.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal isOpen onOpenChange={(open) => !open && onClose()}>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container placement="center">
+          <Modal.Dialog
+            className={`${panelClass} w-full max-w-lg animate-slide-up p-5`}
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">Add Google task</h3>
+                <p className="mt-1 text-sm text-muted">
+                  Save directly to one of your Google task lists.
+                </p>
+              </div>
+              <Button
+                className={iconButtonClass}
+                onClick={onClose}
+                title="Close"
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-muted">
+                  Title
+                </span>
+                <Input
+                  className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) => setTitle(event.target.value)}
+                  value={title}
+                />
+              </label>
+
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-muted">
+                  Notes
+                </span>
+                <TextArea
+                  className="min-h-28 w-full resize-y rounded-xl border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) => setNotes(event.target.value)}
+                  value={notes}
+                />
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TaskDueDatePicker onChange={setDue} value={due} />
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-semibold uppercase text-muted">
+                    Priority
+                  </span>
+                  <Select
+                    className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) =>
+                      setPriority(event.target.value as GoogleTaskPriority)
+                    }
+                    value={priority}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </Select>
+                </label>
+              </div>
+
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-muted">
+                  Google task list
+                </span>
+                <Select
+                  className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) => setTaskListId(event.target.value)}
+                  value={taskListId}
+                >
+                  {taskLists.length > 0 ? (
+                    taskLists.map((taskList) => (
+                      <option
+                        key={taskList.id ?? taskList.title}
+                        value={taskList.id ?? "@default"}
+                      >
+                        {taskList.title}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="@default">Default</option>
+                  )}
+                </Select>
+              </label>
+            </div>
+
+            {status ? (
+              <p className="mt-4 rounded-xl bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
+                {status}
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button
+                className={primaryButtonClass}
+                disabled={!title.trim() || saving}
+                onClick={() => void save()}
+                type="button"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Add task
+              </Button>
+              <Button
+                className={secondaryButtonClass}
+                onClick={onClose}
+                type="button"
+              >
+                Cancel
+              </Button>
+            </div>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
 function TasksView({
   addTask,
   briefing,
@@ -6116,7 +6911,7 @@ function TasksView({
   const sortedLocalTasks = sortTasksByUrgency(openTasks);
 
   async function taskAction(body: Record<string, unknown>) {
-    await fetch("/api/local-tools/tasks", {
+    await fetch("/api/google/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -6161,6 +6956,16 @@ function TasksView({
       }),
     });
     await refreshWorkspace();
+  }
+
+  const useMasterDetailLayout = true;
+  if (useMasterDetailLayout) {
+    return (
+      <TaskMasterDetailView
+        briefing={briefing}
+        refreshWorkspace={refreshWorkspace}
+      />
+    );
   }
 
   return (
@@ -6502,7 +7307,7 @@ function TaskCreationModal({
               <div>
                 <h3 className="text-lg font-semibold">Add task</h3>
                 <p className="mt-1 text-sm text-muted">
-                  Create a local task with real metadata.
+                  Create a Google Task with real metadata.
                 </p>
               </div>
               <Button
@@ -7788,7 +8593,7 @@ function ProfileView({
             }`}
           >
             {usingPostgres
-              ? "Password users, local tasks, memories, task columns, and scheduled-email metadata are now persisted through Postgres when DATABASE_URL is available."
+              ? "Password users, memories, and scheduled-email metadata are persisted through Postgres when DATABASE_URL is available. Tasks remain in Google Tasks."
               : "On Vercel, local filesystem data can disappear between deployments or instances. Connect a Postgres database and set DATABASE_URL before inviting real users."}
           </p>
         </div>
@@ -8736,17 +9541,20 @@ function priorityWeight(priority?: RelayTaskPriority) {
   return 1;
 }
 
-function priorityTone(priority?: RelayTaskPriority) {
-  if (priority === "urgent") return "bg-danger-soft text-danger";
-  if (priority === "high") return "bg-warning-soft text-warning";
-  if (priority === "low") return "bg-success-soft text-success";
-  return "bg-accent-soft text-accent";
+function priorityColor(
+  priority?: RelayTaskPriority,
+): "accent" | "danger" | "success" | "warning" {
+  if (priority === "urgent") return "danger";
+  if (priority === "high") return "warning";
+  if (priority === "low") return "success";
+  return "accent";
 }
 
 function PriorityTag({ priority }: { priority?: RelayTaskPriority }) {
   return (
     <Chip
-      className={`inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-[11px] font-semibold ${priorityTone(priority)}`}
+      className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-[11px] font-semibold"
+      color={priorityColor(priority)}
       size="sm"
       variant="soft"
     >
@@ -8822,6 +9630,42 @@ function googleTaskPriority(task: GoogleTask): RelayTaskPriority {
   if (text.includes("priority: low") || text.includes("low priority"))
     return "low";
   return "medium";
+}
+
+function googleTaskEditablePriority(
+  task: GoogleTask | null,
+): GoogleTaskPriority {
+  const priority = task ? googleTaskPriority(task) : "medium";
+  return priority === "urgent" ? "high" : priority;
+}
+
+function googleTaskNotes(notes?: string | null) {
+  return (
+    notes
+      ?.replace(/^Priority:\s*(?:high|medium|low)\s*(?:\r?\n){0,2}/i, "")
+      .trim() ?? ""
+  );
+}
+
+function googleTaskKey(task: GoogleTask | null) {
+  if (!task) return null;
+  return `${task.taskListId ?? "@default"}:${task.id ?? task.title}`;
+}
+
+function sortGoogleTasksByUrgency(items: GoogleTask[]) {
+  return [...items].sort((left, right) => {
+    const leftDue =
+      parseEventDate(left.due)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const rightDue =
+      parseEventDate(right.due)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const leftScore =
+      priorityWeight(googleTaskPriority(left)) + (isOverdue(left.due) ? 10 : 0);
+    const rightScore =
+      priorityWeight(googleTaskPriority(right)) +
+      (isOverdue(right.due) ? 10 : 0);
+    if (leftScore !== rightScore) return rightScore - leftScore;
+    return leftDue - rightDue;
+  });
 }
 
 function githubUrgency(issue: GithubIssue) {
@@ -8934,7 +9778,7 @@ function buildPlannerActions(
     actions.push({
       icon: CheckCircle2,
       title: "Advance priority task",
-      detail: `${sortedTasks[0].title} is the highest-ranked open local task.`,
+      detail: `${sortedTasks[0].title} is the highest-ranked open Google Task.`,
       onClick: () => {
         setActiveView("tasks");
         runPrompt(`Plan the next step for ${sortedTasks[0].title}`);
@@ -9397,6 +10241,28 @@ function sameCalendarDay(left: Date | null, right: Date | null) {
 function addDays(date: Date, amount: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function shiftCalendarDate(
+  date: Date,
+  view: "day" | "week" | "month",
+  direction: -1 | 1,
+) {
+  if (view !== "month") {
+    return addDays(date, direction * (view === "week" ? 7 : 1));
+  }
+
+  const next = new Date(date);
+  const selectedDay = next.getDate();
+  next.setDate(1);
+  next.setMonth(next.getMonth() + direction);
+  const finalDayOfMonth = new Date(
+    next.getFullYear(),
+    next.getMonth() + 1,
+    0,
+  ).getDate();
+  next.setDate(Math.min(selectedDay, finalDayOfMonth));
   return next;
 }
 

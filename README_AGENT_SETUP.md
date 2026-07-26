@@ -84,13 +84,13 @@ The homepage includes a `No-Key Local Agent` that can:
 
 - chat with fixed backend rules
 - report OAuth setup/sign-in status
-- create, list, complete, and clear local tasks
+- create, list, complete, edit, and delete tasks through Google Tasks
 - create, list, search, and delete local notes
 - calculate simple arithmetic
 - generate a deterministic briefing/focus summary
 - export the local workspace as JSON
 
-Local tasks and notes are stored in `.relay-data/`, which is ignored by git.
+Local notes are stored in `.relay-data/`, which is ignored by git. Tasks are stored only in Google Tasks.
 
 CopilotKit's full AI sidebar is hidden unless this is set:
 

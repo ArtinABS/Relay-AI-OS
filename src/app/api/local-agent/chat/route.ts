@@ -3,7 +3,13 @@ import { z } from "zod";
 
 import { getDirectGoogleTokens } from "@/lib/google/direct-session";
 import { getGoogleSetupStatus } from "@/lib/google/client";
-import { getUpcomingCalendarEventsForUser } from "@/lib/google/workspace";
+import {
+  completeGoogleTaskForUser,
+  createGoogleTaskForUser,
+  deleteGoogleTaskForUser,
+  getUpcomingCalendarEventsForUser,
+  listGoogleTasksForUser,
+} from "@/lib/google/workspace";
 import { calculateExpression } from "@/lib/local-tools/calculator";
 import {
   addNote,
@@ -11,12 +17,6 @@ import {
   listNotes,
   searchNotes,
 } from "@/lib/local-store/notes";
-import {
-  addTask,
-  clearCompletedTasks,
-  completeTask,
-  listTasks,
-} from "@/lib/local-store/tasks";
 
 type BriefingResponse = {
   localTime: string;
@@ -63,6 +63,16 @@ export async function POST(request: Request) {
   const text = body.data.message.toLowerCase();
   const originalMessage = body.data.message.trim();
   const setup = getGoogleSetupStatus();
+  const googleConnected = Boolean(
+    directTokens?.accessToken || directTokens?.refreshToken,
+  );
+
+  async function loadGoogleTasks() {
+    if (!directTokens || !googleConnected) {
+      return { ok: false, taskLists: [], tasks: [] };
+    }
+    return listGoogleTasksForUser(directTokens, 100);
+  }
 
   if (
     text === "help" ||
@@ -72,13 +82,13 @@ export async function POST(request: Request) {
     return NextResponse.json<ChatResponse>({
       role: "assistant",
       content: [
-        "## Relay local tools",
+        "## Relay tools",
         "",
         "- OAuth status",
-        "- Add task: `add task review thesis outline`",
-        "- List tasks",
-        "- Complete task: `complete task 1`",
-        "- Clear completed tasks",
+        "- Add Google Task: `add task review thesis outline`",
+        "- List Google Tasks",
+        "- Complete Google Task: `complete task 1`",
+        "- Clear completed Google Tasks",
         "- Remember note: `remember that thesis meeting is Monday`",
         "- List notes",
         "- Search notes: `search notes thesis`",
@@ -92,20 +102,23 @@ export async function POST(request: Request) {
   }
 
   if (text.includes("export")) {
-    const [tasks, notes] = await Promise.all([listTasks(), listNotes()]);
+    const [googleTasks, notes] = await Promise.all([
+      loadGoogleTasks(),
+      listNotes(),
+    ]);
     return NextResponse.json<ChatResponse>({
       role: "assistant",
       content: [
         "## Workspace export ready",
         "",
-        `- **Tasks:** ${tasks.length}`,
+        `- **Google Tasks:** ${googleTasks.tasks.length}`,
         `- **Notes:** ${notes.length}`,
         "",
         "Open `/api/local-tools/export` in the browser to download the JSON snapshot.",
       ].join("\n"),
       data: {
         exportUrl: "/api/local-tools/export",
-        taskCount: tasks.length,
+        taskCount: googleTasks.tasks.length,
         noteCount: notes.length,
       },
     });
@@ -117,8 +130,13 @@ export async function POST(request: Request) {
     text.includes("plan my day") ||
     text.includes("focus")
   ) {
-    const [tasks, notes] = await Promise.all([listTasks(), listNotes()]);
-    const openTasks = tasks.filter((task) => !task.completed);
+    const [googleTasks, notes] = await Promise.all([
+      loadGoogleTasks(),
+      listNotes(),
+    ]);
+    const openTasks = googleTasks.tasks.filter(
+      (task) => task.status !== "completed",
+    );
     const briefing: BriefingResponse = {
       localTime: new Date().toLocaleString(),
       focus: openTasks[0] ? { title: openTasks[0].title } : null,
@@ -126,7 +144,7 @@ export async function POST(request: Request) {
       recentNotes: notes.slice(0, 5).map((note) => ({ body: note.body })),
       counts: {
         openTasks: openTasks.length,
-        completedTasks: tasks.length - openTasks.length,
+        completedTasks: googleTasks.tasks.length - openTasks.length,
         notes: notes.length,
       },
       google: {
@@ -211,23 +229,35 @@ export async function POST(request: Request) {
     originalMessage.match(/^remind me to\s+(.+)$/i);
 
   if (taskMatch?.[1]) {
-    const task = await addTask(taskMatch[1]);
+    if (!directTokens || !googleConnected) {
+      return NextResponse.json<ChatResponse>({
+        role: "assistant",
+        content: "Connect Google before creating a task.",
+      });
+    }
+    const task = await createGoogleTaskForUser(directTokens, {
+      title: taskMatch[1],
+    });
     return NextResponse.json<ChatResponse>({
       role: "assistant",
-      content: `✓ Task added: **${task.title}**`,
+      content: task.ok
+        ? `Google Task added: **${task.task?.title ?? taskMatch[1]}**`
+        : (task.reason ?? "Google Tasks could not create that task."),
       data: task,
     });
   }
 
   if (text.includes("list tasks") || text.includes("show tasks")) {
-    const tasks = await listTasks();
-    const openTasks = tasks.filter((task) => !task.completed);
+    const googleTasks = await loadGoogleTasks();
+    const openTasks = googleTasks.tasks.filter(
+      (task) => task.status !== "completed",
+    );
 
     if (openTasks.length === 0) {
       return NextResponse.json<ChatResponse>({
         role: "assistant",
         content: "You have no open tasks.",
-        data: tasks,
+        data: googleTasks.tasks,
       });
     }
 
@@ -242,22 +272,59 @@ export async function POST(request: Request) {
 
   const completeMatch = originalMessage.match(/^complete task\s+(.+)$/i);
   if (completeMatch?.[1]) {
-    const task = await completeTask(completeMatch[1].trim());
+    const googleTasks = await loadGoogleTasks();
+    const identifier = completeMatch[1].trim();
+    const listIndex = Number(identifier);
+    const openTasks = googleTasks.tasks.filter(
+      (task) => task.status !== "completed",
+    );
+    const task =
+      (Number.isInteger(listIndex) && listIndex > 0
+        ? openTasks[listIndex - 1]
+        : null) ??
+      openTasks.find((candidate) => candidate.id === identifier) ??
+      openTasks.find((candidate) =>
+        candidate.title.toLowerCase().includes(identifier.toLowerCase()),
+      );
+    const result =
+      task?.id && directTokens && googleConnected
+        ? await completeGoogleTaskForUser(directTokens, {
+            id: task.id,
+            taskListId: task.taskListId,
+          })
+        : null;
     return NextResponse.json<ChatResponse>({
       role: "assistant",
-      content: task
-        ? `Completed task: ${task.title}`
-        : "I could not find that task.",
-      data: task,
+      content:
+        result?.ok && task
+          ? `Completed Google Task: ${task.title}`
+          : (result?.reason ?? "I could not find that Google Task."),
+      data: result,
     });
   }
 
   if (text.includes("clear completed")) {
-    const result = await clearCompletedTasks();
+    const googleTasks = await loadGoogleTasks();
+    const completedTasks = googleTasks.tasks.filter(
+      (task) => task.status === "completed" && task.id,
+    );
+    const results =
+      directTokens && googleConnected
+        ? await Promise.all(
+            completedTasks.map((task) =>
+              deleteGoogleTaskForUser(directTokens, {
+                id: task.id as string,
+                taskListId: task.taskListId,
+              }),
+            ),
+          )
+        : [];
+    const removed = results.filter((result) => result.ok).length;
+    const remaining = googleTasks.tasks.length - completedTasks.length;
     return NextResponse.json<ChatResponse>({
       role: "assistant",
-      content: `Cleared ${result.removed} completed task(s). ${result.remaining} open task(s) remain.`,
-      data: result,
+      content: `Cleared ${removed} completed Google Task(s). ${remaining} open task(s) remain.`,
+      data: { removed, remaining },
     });
   }
 
@@ -442,7 +509,7 @@ export async function POST(request: Request) {
   return NextResponse.json<ChatResponse>({
     role: "assistant",
     content:
-      "I am Relay's no-key local agent. Try: help, add task review notes, list tasks, remember that meeting is Monday, list notes, calculate 24*7, or OAuth status.",
+      "I am Relay's fallback agent. Try: help, add task review notes, list tasks, remember that meeting is Monday, list notes, calculate 24*7, or OAuth status. Task actions use Google Tasks.",
   });
   } catch (error) {
     return NextResponse.json<ChatResponse>(

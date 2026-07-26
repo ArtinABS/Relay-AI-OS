@@ -39,14 +39,19 @@ export type GoogleContactInput = {
 };
 
 function compactStrings(values: Array<string | null | undefined>) {
-  return values.map((value) => value?.trim()).filter((value): value is string => Boolean(value));
+  return values
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
 }
 
 function formatGoogleDate(date?: people_v1.Schema$Date | null) {
   if (!date) return null;
-  const year = date.year && date.year > 0 ? String(date.year).padStart(4, "0") : null;
-  const month = date.month && date.month > 0 ? String(date.month).padStart(2, "0") : null;
-  const day = date.day && date.day > 0 ? String(date.day).padStart(2, "0") : null;
+  const year =
+    date.year && date.year > 0 ? String(date.year).padStart(4, "0") : null;
+  const month =
+    date.month && date.month > 0 ? String(date.month).padStart(2, "0") : null;
+  const day =
+    date.day && date.day > 0 ? String(date.day).padStart(2, "0") : null;
 
   if (year && month && day) return `${year}-${month}-${day}`;
   if (month && day) return `${month}-${day}`;
@@ -78,54 +83,71 @@ function mapGoogleContact(person: people_v1.Schema$Person): GoogleContact {
   const birthday = person.birthdays?.find((item) => item.date)?.date;
   const biography = person.biographies?.[0];
   const address = person.addresses?.[0];
-  const nameFromParts = compactStrings([name?.givenName, name?.familyName]).join(" ");
+  const nameFromParts = compactStrings([
+    name?.givenName,
+    name?.familyName,
+  ]).join(" ");
 
   return {
     resourceName: person.resourceName ?? null,
     etag: contactSource(person)?.etag ?? person.etag ?? null,
-    displayName: name?.displayName ?? (
-      nameFromParts ||
-      person.emailAddresses?.[0]?.value ||
-      person.phoneNumbers?.[0]?.value ||
-      "Unnamed contact"
-    ),
+    displayName:
+      name?.displayName ??
+      (nameFromParts ||
+        person.emailAddresses?.[0]?.value ||
+        person.phoneNumbers?.[0]?.value ||
+        "Unnamed contact"),
     givenName: name?.givenName ?? null,
     familyName: name?.familyName ?? null,
-    emails: compactStrings(person.emailAddresses?.map((email) => email.value) ?? []),
-    phoneNumbers: compactStrings(person.phoneNumbers?.map((phone) => phone.value) ?? []),
+    emails: compactStrings(
+      person.emailAddresses?.map((email) => email.value) ?? [],
+    ),
+    phoneNumbers: compactStrings(
+      person.phoneNumbers?.map((phone) => phone.value) ?? [],
+    ),
     organization: organization?.name ?? null,
     jobTitle: organization?.title ?? null,
     birthday: formatGoogleDate(birthday),
     notes: biography?.value ?? null,
     address: address?.formattedValue ?? null,
-    photoUrl: person.photos?.find((photo) => photo.default)?.url ?? person.photos?.[0]?.url ?? null,
+    photoUrl:
+      person.photos?.find((photo) => photo.default)?.url ??
+      person.photos?.[0]?.url ??
+      null,
   };
 }
 
-function buildContactPerson(input: GoogleContactInput): people_v1.Schema$Person {
+function buildContactPerson(
+  input: GoogleContactInput,
+): people_v1.Schema$Person {
   const displayParts = compactStrings([input.displayName]);
   const nameParts = compactStrings([input.givenName, input.familyName]);
   const fallbackName = displayParts[0] ?? nameParts.join(" ");
   const birthday = parseBirthday(input.birthday);
 
   return {
-    names: fallbackName || input.givenName || input.familyName
-      ? [
-          {
-            displayName: input.displayName,
-            givenName: input.givenName ?? input.displayName,
-            familyName: input.familyName,
-          },
-        ]
-      : undefined,
+    names:
+      fallbackName || input.givenName || input.familyName
+        ? [
+            {
+              displayName: input.displayName,
+              givenName: input.givenName ?? input.displayName,
+              familyName: input.familyName,
+            },
+          ]
+        : undefined,
     emailAddresses: input.email ? [{ value: input.email }] : undefined,
-    phoneNumbers: input.phoneNumber ? [{ value: input.phoneNumber }] : undefined,
+    phoneNumbers: input.phoneNumber
+      ? [{ value: input.phoneNumber }]
+      : undefined,
     organizations:
       input.organization || input.jobTitle
         ? [{ name: input.organization, title: input.jobTitle }]
         : undefined,
     birthdays: birthday ? [{ date: birthday }] : undefined,
-    biographies: input.notes ? [{ value: input.notes, contentType: "TEXT_PLAIN" }] : undefined,
+    biographies: input.notes
+      ? [{ value: input.notes, contentType: "TEXT_PLAIN" }]
+      : undefined,
     addresses: input.address ? [{ formattedValue: input.address }] : undefined,
   };
 }
@@ -152,7 +174,8 @@ function buildContactUpdatePerson(
       {
         ...existingName,
         displayName: input.displayName ?? existingName.displayName,
-        givenName: input.givenName ?? input.displayName ?? existingName.givenName,
+        givenName:
+          input.givenName ?? input.displayName ?? existingName.givenName,
         familyName: input.familyName ?? existingName.familyName,
       },
     ];
@@ -272,7 +295,11 @@ export async function getGoogleContactForUser(
     personFields: contactPersonFields,
   });
 
-  return { ok: true, contact: mapGoogleContact(response.data), raw: response.data };
+  return {
+    ok: true,
+    contact: mapGoogleContact(response.data),
+    raw: response.data,
+  };
 }
 
 export async function createGoogleContactForUser(
@@ -323,7 +350,10 @@ export async function updateGoogleContactForUser(
     resourceName: input.resourceName,
     personFields: contactPersonFields,
   });
-  const { person, updatePersonFields } = buildContactUpdatePerson(existing.data, input);
+  const { person, updatePersonFields } = buildContactUpdatePerson(
+    existing.data,
+    input,
+  );
 
   if (!updatePersonFields) {
     return { ok: false, reason: "No contact fields were provided to update." };
@@ -594,7 +624,10 @@ function mapDriveFile(file: {
   mimeType?: string | null;
   webViewLink?: string | null;
   modifiedTime?: string | null;
-  owners?: Array<{ displayName?: string | null; emailAddress?: string | null }> | null;
+  owners?: Array<{
+    displayName?: string | null;
+    emailAddress?: string | null;
+  }> | null;
   parents?: string[] | null;
 }) {
   return {
@@ -636,7 +669,8 @@ export async function listRecentDriveFilesForUser(
       .filter(Boolean)
       .join(" and "),
     orderBy: "modifiedTime desc",
-    fields: "files(id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents)",
+    fields:
+      "files(id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents)",
   });
 
   return {
@@ -658,7 +692,8 @@ export async function getDriveFileForUser(tokens: GoogleTokenSet, id: string) {
   const response = await googleServices.drive().files.get({
     auth,
     fileId: id,
-    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    fields:
+      "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
   });
 
   return { ok: true, file: mapDriveFile(response.data) };
@@ -680,7 +715,8 @@ export async function renameDriveFileForUser(
   const response = await googleServices.drive().files.update({
     auth,
     fileId: input.id,
-    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    fields:
+      "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
     requestBody: { name: input.name },
   });
 
@@ -711,7 +747,8 @@ export async function moveDriveFileForUser(
     fileId: input.id,
     addParents: input.folderId,
     removeParents: previousParents || undefined,
-    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    fields:
+      "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
   });
 
   return { ok: true, file: mapDriveFile(response.data) };
@@ -733,7 +770,8 @@ export async function copyDriveFileForUser(
   const response = await googleServices.drive().files.copy({
     auth,
     fileId: input.id,
-    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    fields:
+      "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
     requestBody: {
       name: input.name,
       parents: input.folderId ? [input.folderId] : undefined,
@@ -759,14 +797,18 @@ export async function setDriveFileTrashedForUser(
   const response = await googleServices.drive().files.update({
     auth,
     fileId: input.id,
-    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    fields:
+      "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
     requestBody: { trashed: input.trashed },
   });
 
   return { ok: true, file: mapDriveFile(response.data) };
 }
 
-export async function deleteDriveFileForUser(tokens: GoogleTokenSet, id: string) {
+export async function deleteDriveFileForUser(
+  tokens: GoogleTokenSet,
+  id: string,
+) {
   if (!tokens.accessToken && !tokens.refreshToken) {
     return {
       ok: false,
@@ -835,10 +877,14 @@ export async function readDriveFileTextForUser(
   const metadata = await drive.files.get({
     auth,
     fileId: input.id,
-    fields: "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
+    fields:
+      "id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents",
   });
   const mimeType = metadata.data.mimeType ?? "";
-  const maxCharacters = Math.min(Math.max(input.maxCharacters ?? 6000, 500), 20000);
+  const maxCharacters = Math.min(
+    Math.max(input.maxCharacters ?? 6000, 500),
+    20000,
+  );
   let text = "";
 
   if (mimeType.startsWith("application/vnd.google-apps.")) {
@@ -853,15 +899,23 @@ export async function readDriveFileTextForUser(
       },
       { responseType: "text" },
     );
-    text = typeof exportResponse.data === "string"
-      ? exportResponse.data
-      : JSON.stringify(exportResponse.data);
-  } else if (mimeType.startsWith("text/") || mimeType.includes("json") || mimeType.includes("csv")) {
+    text =
+      typeof exportResponse.data === "string"
+        ? exportResponse.data
+        : JSON.stringify(exportResponse.data);
+  } else if (
+    mimeType.startsWith("text/") ||
+    mimeType.includes("json") ||
+    mimeType.includes("csv")
+  ) {
     const response = await drive.files.get(
       { auth, fileId: input.id, alt: "media" },
       { responseType: "text" },
     );
-    text = typeof response.data === "string" ? response.data : JSON.stringify(response.data);
+    text =
+      typeof response.data === "string"
+        ? response.data
+        : JSON.stringify(response.data);
   } else {
     return {
       ok: false,
@@ -934,7 +988,10 @@ export async function listGoogleTasksForUser(
   const auth = createGoogleOAuthClient(tokens);
   const taskListsResult = await listGoogleTaskListsForUser(tokens);
   const taskLists = taskListsResult.ok ? taskListsResult.taskLists : [];
-  const listsToRead = taskLists.length > 0 ? taskLists.slice(0, 5) : [{ id: "@default", title: "Default" }];
+  const listsToRead =
+    taskLists.length > 0
+      ? taskLists.slice(0, 5)
+      : [{ id: "@default", title: "Default" }];
 
   const taskGroups = await Promise.all(
     listsToRead.map(async (taskList) => {
@@ -990,9 +1047,7 @@ export async function createGoogleTaskForUser(
 
   const auth = createGoogleOAuthClient(tokens);
   const tasklist = await resolveGoogleTaskListId(tokens, task.taskListId);
-  const notes = [task.priority ? `Priority: ${task.priority}` : null, task.notes]
-    .filter(Boolean)
-    .join("\n\n");
+  const notes = formatGoogleTaskNotes(task.notes, task.priority);
   const response = await googleServices.tasks().tasks.insert({
     auth,
     tasklist,
@@ -1040,9 +1095,7 @@ export async function updateGoogleTaskForUser(
 
   const auth = createGoogleOAuthClient(tokens);
   const tasklist = await resolveGoogleTaskListId(tokens, task.taskListId);
-  const notes = [task.priority ? `Priority: ${task.priority}` : null, task.notes]
-    .filter(Boolean)
-    .join("\n\n");
+  const notes = formatGoogleTaskNotes(task.notes, task.priority);
   const response = await googleServices.tasks().tasks.patch({
     auth,
     task: task.id,
@@ -1052,7 +1105,8 @@ export async function updateGoogleTaskForUser(
       notes: notes || undefined,
       due: task.due ?? undefined,
       status: task.status,
-      completed: task.status === "completed" ? new Date().toISOString() : undefined,
+      completed:
+        task.status === "completed" ? new Date().toISOString() : undefined,
     },
   });
 
@@ -1080,6 +1134,20 @@ export async function completeGoogleTaskForUser(
     taskListId: task.taskListId,
     status: "completed",
   });
+}
+
+function formatGoogleTaskNotes(
+  notes?: string,
+  priority?: "high" | "medium" | "low",
+) {
+  const cleanNotes =
+    notes
+      ?.replace(/^Priority:\s*(?:high|medium|low)\s*(?:\r?\n){0,2}/i, "")
+      .trim() ?? "";
+
+  return [priority ? `Priority: ${priority}` : null, cleanNotes]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export async function deleteGoogleTaskForUser(
@@ -1149,7 +1217,9 @@ function extractTextFromGmailPayload(payload?: {
 
   const parts = payload.parts ?? [];
   for (const part of parts) {
-    const text = extractTextFromGmailPayload(part as Parameters<typeof extractTextFromGmailPayload>[0]);
+    const text = extractTextFromGmailPayload(
+      part as Parameters<typeof extractTextFromGmailPayload>[0],
+    );
     if (text) return text;
   }
 
@@ -1173,8 +1243,12 @@ function createRawEmail(input: {
     input.cc ? `Cc: ${sanitizeMimeHeader(input.cc)}` : null,
     input.bcc ? `Bcc: ${sanitizeMimeHeader(input.bcc)}` : null,
     `Subject: ${sanitizeMimeHeader(input.subject)}`,
-    input.inReplyTo ? `In-Reply-To: ${sanitizeMimeHeader(input.inReplyTo)}` : null,
-    input.references ? `References: ${sanitizeMimeHeader(input.references)}` : null,
+    input.inReplyTo
+      ? `In-Reply-To: ${sanitizeMimeHeader(input.inReplyTo)}`
+      : null,
+    input.references
+      ? `References: ${sanitizeMimeHeader(input.references)}`
+      : null,
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=UTF-8",
   ].filter(Boolean);
@@ -1418,11 +1492,16 @@ export async function replyToGmailMessageForUser(
   if (!original.ok || !("message" in original)) return original;
 
   const message = original.message;
-  if (!message) return { ok: false, reason: "Original Gmail message could not be read." };
+  if (!message)
+    return { ok: false, reason: "Original Gmail message could not be read." };
 
   return sendGmailMessageForUser(tokens, {
     to: reply.to ?? message.from ?? "",
-    subject: reply.subject ?? (message.subject.startsWith("Re:") ? message.subject : `Re: ${message.subject}`),
+    subject:
+      reply.subject ??
+      (message.subject.startsWith("Re:")
+        ? message.subject
+        : `Re: ${message.subject}`),
     body: reply.body,
     threadId: message.threadId ?? undefined,
   });
@@ -1556,7 +1635,10 @@ export async function deleteGmailMessageForUser(
   return { ok: true, id };
 }
 
-async function ensureGmailLabelIdForUser(tokens: GoogleTokenSet, labelName: string) {
+async function ensureGmailLabelIdForUser(
+  tokens: GoogleTokenSet,
+  labelName: string,
+) {
   const auth = createGoogleOAuthClient(tokens);
   const gmail = googleServices.gmail();
   const labels = await gmail.users.labels.list({ auth, userId: "me" });
@@ -1614,7 +1696,10 @@ export async function searchDriveFiles(query: string, maxResults = 10) {
   };
 }
 
-export async function readSpreadsheetRange(spreadsheetId: string, range: string) {
+export async function readSpreadsheetRange(
+  spreadsheetId: string,
+  range: string,
+) {
   const readiness = assertGoogleToolReady();
   if (!readiness.ok) return readiness;
 

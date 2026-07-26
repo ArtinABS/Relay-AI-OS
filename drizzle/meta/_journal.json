@@ -15,6 +15,13 @@
       "when": 1781966725776,
       "tag": "0001_wide_namorita",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785061138144,
+      "tag": "0002_gifted_pretty_boy",
+      "breakpoints": true
     }
   ]
 }

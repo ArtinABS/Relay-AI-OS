@@ -11,11 +11,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { Card, Link, Surface } from "@heroui/react";
 import { Button, Input } from "@/components/ui/relay-ui";
 
-type RelayTask = {
-  id: string;
+type GoogleTask = {
+  id?: string | null;
   title: string;
-  completed: boolean;
-  createdAt: string;
+  status?: string | null;
+  taskListId?: string | null;
 };
 
 type RelayNote = {
@@ -32,7 +32,7 @@ type OAuthStatus = {
 
 type Briefing = {
   localTime: string;
-  focus: RelayTask | null;
+  focus: GoogleTask | null;
   counts: {
     openTasks: number;
     completedTasks: number;
@@ -41,7 +41,7 @@ type Briefing = {
 };
 
 export function RelayToolsPanel() {
-  const [tasks, setTasks] = useState<RelayTask[]>([]);
+  const [tasks, setTasks] = useState<GoogleTask[]>([]);
   const [notes, setNotes] = useState<RelayNote[]>([]);
   const [oauthStatus, setOauthStatus] = useState<OAuthStatus | null>(null);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
@@ -51,13 +51,13 @@ export function RelayToolsPanel() {
   async function refresh() {
     const [tasksResponse, notesResponse, oauthResponse, briefingResponse] =
       await Promise.all([
-        fetch("/api/local-tools/tasks"),
+        fetch("/api/google/tasks"),
         fetch("/api/local-tools/notes"),
         fetch("/api/oauth/status"),
         fetch("/api/local-tools/briefing"),
       ]);
 
-    const tasksData = (await tasksResponse.json()) as { tasks: RelayTask[] };
+    const tasksData = (await tasksResponse.json()) as { tasks: GoogleTask[] };
     const notesData = (await notesResponse.json()) as { notes: RelayNote[] };
     const oauthData = (await oauthResponse.json()) as OAuthStatus;
     const briefingData = (await briefingResponse.json()) as Briefing;
@@ -74,7 +74,7 @@ export function RelayToolsPanel() {
     async function loadInitialData() {
       const [tasksResponse, notesResponse, oauthResponse, briefingResponse] =
         await Promise.all([
-          fetch("/api/local-tools/tasks"),
+          fetch("/api/google/tasks"),
           fetch("/api/local-tools/notes"),
           fetch("/api/oauth/status"),
           fetch("/api/local-tools/briefing"),
@@ -82,7 +82,7 @@ export function RelayToolsPanel() {
 
       if (!active) return;
 
-      const tasksData = (await tasksResponse.json()) as { tasks: RelayTask[] };
+      const tasksData = (await tasksResponse.json()) as { tasks: GoogleTask[] };
       const notesData = (await notesResponse.json()) as { notes: RelayNote[] };
       const oauthData = (await oauthResponse.json()) as OAuthStatus;
       const briefingData = (await briefingResponse.json()) as Briefing;
@@ -105,10 +105,10 @@ export function RelayToolsPanel() {
     const title = taskTitle.trim();
     if (!title) return;
 
-    await fetch("/api/local-tools/tasks", {
+    await fetch("/api/google/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add", title }),
+      body: JSON.stringify({ action: "create", title }),
     });
     setTaskTitle("");
     await refresh();
@@ -128,16 +128,21 @@ export function RelayToolsPanel() {
     await refresh();
   }
 
-  async function markDone(task: RelayTask) {
-    await fetch("/api/local-tools/tasks", {
+  async function markDone(task: GoogleTask) {
+    if (!task.id) return;
+    await fetch("/api/google/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "complete", identifier: task.id }),
+      body: JSON.stringify({
+        action: "complete",
+        id: task.id,
+        taskListId: task.taskListId,
+      }),
     });
     await refresh();
   }
 
-  const openTasks = tasks.filter((task) => !task.completed);
+  const openTasks = tasks.filter((task) => task.status !== "completed");
 
   return (
     <section className="grid gap-5 lg:grid-cols-3">
@@ -147,7 +152,7 @@ export function RelayToolsPanel() {
             <div>
               <h2 className="text-lg font-semibold">Relay Status</h2>
               <p className="mt-1 text-sm leading-6 text-muted">
-                Local tools are active. OAuth is optional for no-key tools.
+                Notes work locally; tasks are synced with Google Tasks.
               </p>
             </div>
             <Button
@@ -189,7 +194,7 @@ export function RelayToolsPanel() {
         <Card.Content className="p-5">
           <div className="flex items-center gap-2">
             <ListTodo className="h-5 w-5 text-success" />
-            <h2 className="text-lg font-semibold">Tasks</h2>
+            <h2 className="text-lg font-semibold">Google Tasks</h2>
           </div>
           <form className="mt-4 flex gap-2" onSubmit={addTaskFromForm}>
             <Input
@@ -206,7 +211,7 @@ export function RelayToolsPanel() {
             {openTasks.slice(0, 5).map((task) => (
               <Surface
                 className="flex items-center justify-between gap-3 rounded-xl border border-separator px-3 py-2 text-sm"
-                key={task.id}
+                key={`${task.taskListId}-${task.id ?? task.title}`}
                 variant="secondary"
               >
                 <span className="line-clamp-2">{task.title}</span>

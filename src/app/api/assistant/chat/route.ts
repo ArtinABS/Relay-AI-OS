@@ -56,14 +56,6 @@ import {
 } from "@/lib/google/workspace";
 import { calculateExpression } from "@/lib/local-tools/calculator";
 import { addNote, listNotes, searchNotes } from "@/lib/local-store/notes";
-import {
-  addTask,
-  clearCompletedTasks,
-  completeTask,
-  deleteTask,
-  listTasks,
-  updateTask,
-} from "@/lib/local-store/tasks";
 
 const requestSchema = z.object({
   message: z.string().min(1),
@@ -146,7 +138,14 @@ export async function POST(request: Request) {
 
   const directTokens = await getDirectGoogleTokens();
   const githubTokens = await getDirectGithubTokens();
-  const tasks = await listTasks();
+  const googleTaskSnapshot =
+    directTokens?.accessToken || directTokens?.refreshToken
+      ? await listGoogleTasksForUser(directTokens, 25).catch(() => ({
+          ok: false,
+          taskLists: [],
+          tasks: [],
+        }))
+      : { ok: false, taskLists: [], tasks: [] };
   const notes = await listNotes();
 
   try {
@@ -174,8 +173,10 @@ export async function POST(request: Request) {
         "For long-term memory, ask for permission before storing unless the user explicitly says to remember/save it.",
         "",
         `Current date/time: ${new Date().toLocaleString()}`,
-        `Known open tasks: ${JSON.stringify(
-          tasks.filter((task) => !task.completed).slice(0, 12),
+        `Known open Google Tasks: ${JSON.stringify(
+          googleTaskSnapshot.tasks
+            .filter((task) => task.status !== "completed")
+            .slice(0, 12),
         )}`,
         `Known recent notes: ${JSON.stringify(notes.slice(0, 8))}`,
         `Google signed in: ${Boolean(directTokens?.accessToken || directTokens?.refreshToken)}`,
@@ -211,100 +212,6 @@ export async function POST(request: Request) {
               login: githubTokens?.login ?? null,
             },
           }),
-        }),
-        list_tasks: tool({
-          description: "List local Relay tasks.",
-          inputSchema: z.object({
-            includeCompleted: z.boolean().default(false),
-          }),
-          execute: async ({ includeCompleted }) => {
-            const allTasks = await listTasks();
-            return includeCompleted
-              ? allTasks
-              : allTasks.filter((task) => !task.completed);
-          },
-        }),
-        create_task: tool({
-          description: "Create a local Relay task.",
-          inputSchema: z.object({
-            title: z.string().min(1),
-            notes: z.string().optional(),
-            due: z.string().datetime().nullable().optional(),
-            priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
-          }),
-          execute: async (task) => addTask(task),
-        }),
-        complete_task: tool({
-          description:
-            "Complete a local Relay task by id, list number, or title fragment only after explicit confirmation.",
-          inputSchema: z.object({
-            identifier: z.string().min(1),
-            confirmed: z.boolean().default(false),
-          }),
-          execute: async ({ identifier, confirmed }) => {
-            if (!confirmed) {
-              return { ok: false, reason: "Completing a task requires confirmation." };
-            }
-
-            const task = await completeTask(identifier);
-            return task
-              ? { ok: true, task }
-              : { ok: false, reason: "No matching local task was found." };
-          },
-        }),
-        update_task: tool({
-          description:
-            "Edit a local Relay task title, notes, due date, priority, or column after explicit confirmation.",
-          inputSchema: z.object({
-            id: z.string().min(1),
-            title: z.string().min(1).optional(),
-            notes: z.string().nullable().optional(),
-            due: z.string().datetime().nullable().optional(),
-            priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
-            columnId: z.string().nullable().optional(),
-            confirmed: z.boolean().default(false),
-          }),
-          execute: async ({ confirmed, id, ...patch }) => {
-            if (!confirmed) {
-              return { ok: false, reason: "Editing a task requires confirmation." };
-            }
-
-            const task = await updateTask(id, patch);
-            return task
-              ? { ok: true, task }
-              : { ok: false, reason: "No matching local task was found." };
-          },
-        }),
-        delete_task: tool({
-          description:
-            "Delete a local Relay task by id, list number, or title fragment after explicit confirmation.",
-          inputSchema: z.object({
-            identifier: z.string().min(1),
-            confirmed: z.boolean().default(false),
-          }),
-          execute: async ({ identifier, confirmed }) => {
-            if (!confirmed) {
-              return { ok: false, reason: "Deleting a task requires confirmation." };
-            }
-
-            const task = await deleteTask(identifier);
-            return task
-              ? { ok: true, task }
-              : { ok: false, reason: "No matching local task was found." };
-          },
-        }),
-        clear_completed_tasks: tool({
-          description: "Clear completed local Relay tasks after explicit confirmation.",
-          inputSchema: z.object({
-            confirmed: z.boolean().default(false),
-          }),
-          execute: async ({ confirmed }) => {
-            if (!confirmed) {
-              return { ok: false, reason: "Clearing completed tasks requires confirmation." };
-            }
-
-            return { ok: true, ...(await clearCompletedTasks()) };
-          },
         }),
         list_notes: tool({
           description: "List recent local Relay notes and memories.",

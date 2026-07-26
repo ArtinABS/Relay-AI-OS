@@ -23,7 +23,7 @@ export const toolCatalog = [
     name: "Tasks",
     status: "ready",
     icon: ListTodo,
-    detail: "Create, list, complete, and clear local tasks without an API key.",
+    detail: "Create, list, complete, edit, and delete tasks through Google Tasks.",
   },
   {
     name: "Notes",
@@ -77,7 +77,7 @@ export const toolCatalog = [
     name: "Memory",
     status: "database",
     icon: Database,
-    detail: "Store durable preferences, tasks, approvals, run logs, and audit trails.",
+    detail: "Store durable preferences, approvals, run logs, and audit trails.",
   },
   {
     name: "Approvals",

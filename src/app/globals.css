@@ -755,6 +755,32 @@ select:focus-visible {
   transform: translateY(-1px);
 }
 
+.relay-product-shell .task-rail-card {
+  position: relative;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 220ms ease,
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.relay-product-shell .task-rail-card:hover {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  border-color: color-mix(in oklab, var(--accent) 62%, var(--border));
+  box-shadow:
+    0 22px 44px color-mix(in oklab, var(--foreground) 16%, transparent),
+    0 8px 18px color-mix(in oklab, var(--accent) 12%, transparent);
+  transform: translateY(-6px);
+  z-index: 1;
+}
+
+.relay-product-shell .task-rail-card .relay-content-card,
+.relay-product-shell .task-rail-card .relay-content-card:hover {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
 .relay-product-shell .relay-soft-panel {
   border-color: var(--separator);
 }

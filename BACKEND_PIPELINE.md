@@ -33,7 +33,7 @@ The no-key local agent can:
 
 - report OAuth/setup status
 - detect whether you are signed in
-- manage local tasks
+- manage tasks through the connected Google Tasks account
 - manage local notes
 - calculate simple arithmetic
 - generate a local briefing/focus summary
