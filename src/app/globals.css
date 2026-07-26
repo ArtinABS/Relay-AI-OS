@@ -3,8 +3,8 @@
 @import "@copilotkit/react-ui/styles.css";
 
 :root {
-  --background: #f6f8f7;
-  --foreground: #15171c;
+  --background: #faf7fc;
+  --foreground: #27172e;
 }
 
 @theme inline {
@@ -22,7 +22,7 @@ body {
 }
 
 ::selection {
-  background: rgba(59, 111, 245, 0.2);
+  background: rgba(216, 96, 255, 0.24);
 }
 
 button,
@@ -50,55 +50,64 @@ select:focus-visible {
 }
 
 .assistant-shell {
-  --app-bg: #f7f8f6;
-  --sidebar: rgba(238, 243, 241, 0.86);
-  --surface: rgba(255, 255, 255, 0.92);
-  --surface-soft: rgba(246, 248, 247, 0.9);
-  --surface-glass: rgba(255, 255, 255, 0.78);
-  --text: #15171c;
-  --muted: #68707d;
-  --line: rgba(33, 38, 45, 0.1);
-  --line-strong: rgba(33, 38, 45, 0.2);
-  --track: rgba(33, 38, 45, 0.1);
-  --accent: #3b6ff5;
-  --accent-strong: #2458de;
-  --accent-soft: rgba(59, 111, 245, 0.12);
-  --signal: #0f766e;
-  --signal-soft: rgba(15, 118, 110, 0.12);
-  --violet: #6d5dfc;
-  --violet-soft: rgba(109, 93, 252, 0.12);
+  --app-bg: #faf7fc;
+  --sidebar: rgba(247, 240, 250, 0.9);
+  --surface: rgba(255, 252, 255, 0.94);
+  --surface-soft: rgba(247, 240, 250, 0.92);
+  --surface-glass: rgba(255, 250, 255, 0.82);
+  --text: #27172e;
+  --muted: #74667c;
+  --line: rgba(72, 24, 96, 0.11);
+  --line-strong: rgba(72, 24, 96, 0.22);
+  --track: rgba(72, 24, 96, 0.11);
+  --accent: #7830a8;
+  --accent-strong: #601890;
+  --accent-soft: rgba(168, 72, 216, 0.14);
+  --signal: #a848d8;
+  --signal-soft: rgba(168, 72, 216, 0.13);
+  --violet: #d860ff;
+  --violet-soft: rgba(216, 96, 255, 0.13);
+  --brand-ink: #180048;
+  --brand-orbit: #7830a8;
+  --brand-violet: #a848d8;
+  --brand-electric: #d860ff;
   --success: #12815d;
   --success-soft: rgba(18, 129, 93, 0.12);
   --warning: #a15c00;
   --warning-soft: rgba(228, 152, 43, 0.16);
   --danger: #c2415a;
   --danger-soft: rgba(194, 65, 90, 0.12);
-  --shadow: 0 18px 45px rgba(17, 24, 39, 0.08);
-  --shadow-strong: 0 30px 70px rgba(17, 24, 39, 0.16);
+  --shadow: 0 18px 45px rgba(48, 0, 72, 0.09);
+  --shadow-strong: 0 30px 70px rgba(48, 0, 72, 0.18);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), transparent 34rem),
+    radial-gradient(circle at 82% -8%, rgba(216, 96, 255, 0.13), transparent 30rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 34rem),
     var(--app-bg);
   isolation: isolate;
 }
 
 .assistant-shell[data-theme="dark"] {
-  --app-bg: #0b0f14;
-  --sidebar: #0f151b;
-  --surface: rgba(20, 27, 34, 0.92);
-  --surface-soft: rgba(16, 22, 29, 0.88);
-  --surface-glass: rgba(14, 20, 27, 0.78);
-  --text: #f4f7fb;
-  --muted: #9aa7b7;
-  --line: rgba(218, 230, 244, 0.1);
-  --line-strong: rgba(218, 230, 244, 0.2);
-  --track: rgba(218, 230, 244, 0.12);
-  --accent: #7c9cff;
-  --accent-strong: #9bb5ff;
-  --accent-soft: rgba(124, 156, 255, 0.16);
-  --signal: #63d2c8;
-  --signal-soft: rgba(99, 210, 200, 0.14);
-  --violet: #a79bff;
-  --violet-soft: rgba(167, 155, 255, 0.14);
+  --app-bg: #0b0612;
+  --sidebar: #12091f;
+  --surface: rgba(24, 12, 37, 0.94);
+  --surface-soft: rgba(31, 16, 47, 0.9);
+  --surface-glass: rgba(18, 9, 31, 0.82);
+  --text: #fbf7fd;
+  --muted: #b8a7c0;
+  --line: rgba(225, 180, 255, 0.11);
+  --line-strong: rgba(225, 180, 255, 0.22);
+  --track: rgba(225, 180, 255, 0.13);
+  --accent: #d860ff;
+  --accent-strong: #e78aff;
+  --accent-soft: rgba(216, 96, 255, 0.17);
+  --signal: #b650e0;
+  --signal-soft: rgba(182, 80, 224, 0.16);
+  --violet: #ed9cff;
+  --violet-soft: rgba(237, 156, 255, 0.15);
+  --brand-ink: #180048;
+  --brand-orbit: #7830a8;
+  --brand-violet: #a848d8;
+  --brand-electric: #d860ff;
   --success: #5dd6a6;
   --success-soft: rgba(93, 214, 166, 0.14);
   --warning: #f3b35a;
@@ -111,35 +120,34 @@ select:focus-visible {
 
 /*
  * Relay workspace theme
- * A quiet, high-information flight deck built on HeroUI's semantic tokens.
- * The auth screen intentionally keeps its existing treatment; these tokens
- * only apply after the user enters onboarding or the workspace.
+ * A quiet, high-information flight deck using the Relay mark's purple spectrum.
+ * These semantic tokens preserve accessible contrast across product surfaces.
  */
 .relay-product-shell[data-theme="light"] {
-  --background: oklch(0.975 0.009 250);
-  --foreground: oklch(0.245 0.028 258);
-  --surface: oklch(0.995 0.003 250);
+  --background: #faf7fc;
+  --foreground: #27172e;
+  --surface: #fffaff;
   --surface-foreground: var(--foreground);
-  --surface-secondary: oklch(0.958 0.009 250);
+  --surface-secondary: #f6eff8;
   --surface-secondary-foreground: var(--foreground);
-  --surface-tertiary: oklch(0.925 0.017 250);
+  --surface-tertiary: #ebdef0;
   --surface-tertiary-foreground: var(--foreground);
-  --overlay: oklch(0.995 0.003 250);
+  --overlay: #fffaff;
   --overlay-foreground: var(--foreground);
-  --muted: oklch(0.54 0.025 258);
-  --default: oklch(0.935 0.012 250);
+  --muted: #74667c;
+  --default: #f0e6f3;
   --default-foreground: var(--foreground);
-  --accent: oklch(0.585 0.19 255);
-  --accent-foreground: oklch(0.99 0.003 250);
+  --accent: #7830a8;
+  --accent-foreground: #ffffff;
   --success: oklch(0.64 0.145 165);
   --success-foreground: oklch(0.18 0.02 165);
   --warning: oklch(0.75 0.145 75);
   --warning-foreground: oklch(0.25 0.045 75);
   --danger: oklch(0.62 0.2 25);
   --danger-foreground: oklch(0.99 0.003 250);
-  --border: oklch(0.845 0.023 250);
-  --separator: oklch(0.91 0.014 250);
-  --field-background: oklch(0.995 0.003 250);
+  --border: #d8c5df;
+  --separator: #eaddec;
+  --field-background: #fffaff;
   --field-foreground: var(--foreground);
   --field-border: var(--separator);
   --focus: var(--accent);
@@ -153,9 +161,9 @@ select:focus-visible {
   --line-strong: var(--border);
   --track: var(--default);
   --accent-strong: var(--accent-hover);
-  --signal: oklch(0.62 0.13 185);
+  --signal: #a848d8;
   --signal-soft: color-mix(in oklab, var(--signal) 14%, transparent);
-  --violet: oklch(0.62 0.17 292);
+  --violet: #d860ff;
   --violet-soft: color-mix(in oklab, var(--violet) 14%, transparent);
   --shadow: var(--surface-shadow);
   --shadow-strong: var(--overlay-shadow);
@@ -166,30 +174,30 @@ select:focus-visible {
 }
 
 .relay-product-shell[data-theme="dark"] {
-  --background: oklch(0.135 0.022 258);
-  --foreground: oklch(0.94 0.012 250);
-  --surface: oklch(0.18 0.024 258);
+  --background: #0b0612;
+  --foreground: #fbf7fd;
+  --surface: #180c25;
   --surface-foreground: var(--foreground);
-  --surface-secondary: oklch(0.215 0.025 258);
+  --surface-secondary: #1f102f;
   --surface-secondary-foreground: var(--foreground);
-  --surface-tertiary: oklch(0.255 0.027 258);
+  --surface-tertiary: #2a1739;
   --surface-tertiary-foreground: var(--foreground);
-  --overlay: oklch(0.195 0.025 258);
+  --overlay: #1b0e29;
   --overlay-foreground: var(--foreground);
-  --muted: oklch(0.71 0.024 252);
-  --default: oklch(0.255 0.025 258);
+  --muted: #b8a7c0;
+  --default: #291837;
   --default-foreground: var(--foreground);
-  --accent: oklch(0.72 0.15 252);
-  --accent-foreground: oklch(0.15 0.025 258);
+  --accent: #d860ff;
+  --accent-foreground: #180048;
   --success: oklch(0.72 0.13 165);
   --success-foreground: oklch(0.15 0.025 165);
   --warning: oklch(0.8 0.13 78);
   --warning-foreground: oklch(0.2 0.04 78);
   --danger: oklch(0.7 0.18 25);
   --danger-foreground: oklch(0.98 0.006 250);
-  --border: oklch(0.32 0.032 255);
-  --separator: oklch(0.265 0.026 255);
-  --field-background: oklch(0.205 0.025 258);
+  --border: #4b2b59;
+  --separator: #34203e;
+  --field-background: #1c1029;
   --field-foreground: var(--foreground);
   --field-border: var(--separator);
   --focus: var(--accent);
@@ -203,9 +211,9 @@ select:focus-visible {
   --line-strong: var(--border);
   --track: var(--default);
   --accent-strong: var(--accent-hover);
-  --signal: oklch(0.73 0.12 185);
+  --signal: #b650e0;
   --signal-soft: color-mix(in oklab, var(--signal) 16%, transparent);
-  --violet: oklch(0.74 0.14 292);
+  --violet: #ed9cff;
   --violet-soft: color-mix(in oklab, var(--violet) 16%, transparent);
   --shadow: var(--surface-shadow);
   --shadow-strong: var(--overlay-shadow);
@@ -272,8 +280,8 @@ select:focus-visible {
 }
 
 .metric-sky {
-  --metric-bg: rgba(14, 165, 233, 0.14);
-  --metric-fg: #0284c7;
+  --metric-bg: var(--violet-soft);
+  --metric-fg: var(--violet);
 }
 
 .metric-amber {
@@ -286,11 +294,11 @@ select:focus-visible {
 }
 
 .timeline-sky {
-  box-shadow: inset 3px 0 0 #0284c7;
+  box-shadow: inset 3px 0 0 var(--signal);
 }
 
 .timeline-violet {
-  box-shadow: inset 3px 0 0 #7c3aed;
+  box-shadow: inset 3px 0 0 var(--violet);
 }
 
 .timeline-amber {
@@ -300,7 +308,7 @@ select:focus-visible {
 .command-hero {
   animation: fade-in 420ms ease-out both;
   background:
-    linear-gradient(135deg, rgba(20, 38, 74, 0.95) 0%, rgba(20, 70, 78, 0.95) 52%, rgba(37, 49, 42, 0.96) 100%),
+    linear-gradient(135deg, #180048 0%, #481878 52%, #7830a8 100%),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 34px),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 34px);
   isolation: isolate;
@@ -309,9 +317,9 @@ select:focus-visible {
 
 .command-hero::before {
   background:
-    linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.16), transparent),
-    radial-gradient(circle at 22% 26%, rgba(243, 179, 90, 0.16), transparent 22%),
-    radial-gradient(circle at 80% 0%, rgba(124, 156, 255, 0.24), transparent 34%);
+    linear-gradient(90deg, transparent, rgba(216, 96, 255, 0.2), transparent),
+    radial-gradient(circle at 22% 26%, rgba(216, 120, 240, 0.2), transparent 22%),
+    radial-gradient(circle at 80% 0%, rgba(216, 96, 255, 0.3), transparent 34%);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -343,7 +351,7 @@ select:focus-visible {
 
 .signal-map::after {
   animation: signal-scan 5s ease-in-out infinite;
-  background: linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.22), transparent);
+  background: linear-gradient(90deg, transparent, rgba(216, 96, 255, 0.28), transparent);
   content: "";
   height: 1px;
   inset: 20% 0 auto;
@@ -363,7 +371,7 @@ select:focus-visible {
 }
 
 .signal-node[data-tone="blue"] {
-  --node-color: #9bb5ff;
+  --node-color: #d860ff;
 }
 
 .signal-node[data-tone="green"] {
@@ -375,11 +383,11 @@ select:focus-visible {
 }
 
 .signal-node[data-tone="violet"] {
-  --node-color: #c4b5fd;
+  --node-color: #ed9cff;
 }
 
 .signal-node[data-tone="cyan"] {
-  --node-color: #67e8f9;
+  --node-color: #b650e0;
 }
 
 .signal-node-icon {
@@ -579,7 +587,7 @@ select:focus-visible {
 }
 
 .interactive-control:hover {
-  box-shadow: 0 10px 24px rgba(59, 111, 245, 0.16);
+  box-shadow: 0 10px 24px color-mix(in oklab, var(--accent) 20%, transparent);
   transform: translateY(-1px);
 }
 
@@ -591,7 +599,7 @@ select:focus-visible {
 
 .profile-identity-band {
   background:
-    linear-gradient(135deg, rgba(21, 30, 54, 0.94), rgba(38, 82, 139, 0.92) 52%, rgba(15, 118, 110, 0.9)),
+    linear-gradient(135deg, rgba(24, 0, 72, 0.97), rgba(72, 24, 120, 0.94) 52%, rgba(120, 48, 168, 0.92)),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 30px);
   position: relative;
 }
@@ -627,6 +635,33 @@ select:focus-visible {
 
 .sidebar-shell {
   box-shadow: inset -1px 0 0 var(--line);
+}
+
+.brand-symbol {
+  isolation: isolate;
+  position: relative;
+}
+
+.brand-symbol::before {
+  background: radial-gradient(circle, color-mix(in oklab, var(--brand-electric) 28%, transparent), transparent 68%);
+  content: "";
+  inset: -22%;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.brand-symbol-image {
+  filter:
+    drop-shadow(0 7px 10px color-mix(in oklab, var(--brand-ink) 28%, transparent))
+    drop-shadow(0 0 8px color-mix(in oklab, var(--brand-electric) 22%, transparent));
+}
+
+.brand-wordmark {
+  background: linear-gradient(102deg, var(--text) 18%, var(--brand-violet) 72%, var(--brand-electric));
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.025em;
 }
 
 .mobile-sidebar-backdrop {
@@ -885,7 +920,7 @@ select:focus-visible {
 
 .relay-product-shell .command-hero {
   background:
-    linear-gradient(115deg, oklch(0.23 0.055 255), oklch(0.205 0.05 235) 54%, oklch(0.19 0.045 205)),
+    linear-gradient(115deg, #180048, #481878 54%, #7830a8),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 40px),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 40px);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -909,7 +944,7 @@ select:focus-visible {
 
 .relay-product-shell .profile-identity-band {
   background:
-    linear-gradient(120deg, oklch(0.245 0.065 255), oklch(0.225 0.06 235) 58%, oklch(0.22 0.05 195)),
+    linear-gradient(120deg, #180048, #481878 58%, #7830a8),
     var(--surface);
 }
 
@@ -940,9 +975,9 @@ select:focus-visible {
 }
 
 .relay-product-shell .markdown-content pre {
-  background: oklch(0.18 0.025 258);
+  background: #180c25;
   border-color: color-mix(in oklab, white 10%, transparent);
-  color: oklch(0.93 0.012 250);
+  color: #f8effb;
 }
 
 @media (max-width: 1023px) {

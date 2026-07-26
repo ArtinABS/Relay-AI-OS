@@ -28,6 +28,7 @@ import {
 } from "@heroui/react";
 import { parseDate, type DateValue } from "@internationalized/date";
 import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
+import Image from "next/image";
 import {
   Activity,
   AlertCircle,
@@ -2025,9 +2026,7 @@ function Sidebar({
     >
       <div className="mb-8 flex items-center justify-between">
         {collapsed ? (
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent text-sm font-bold text-white">
-            R
-          </span>
+          <BrandSymbol />
         ) : (
           <BrandMark />
         )}
@@ -9345,14 +9344,30 @@ function TaskContextMenu({
 function BrandMark() {
   return (
     <div className="flex items-center gap-3">
-      <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent text-white shadow-lg shadow-black/10">
-        <Sparkles className="h-5 w-5" />
-      </span>
+      <BrandSymbol />
       <div>
-        <p className="text-base font-semibold leading-5">Relay</p>
+        <p className="brand-wordmark text-base font-semibold leading-5">
+          Relay
+        </p>
         <p className="text-xs text-muted">Personal AI OS</p>
       </div>
     </div>
+  );
+}
+
+function BrandSymbol() {
+  return (
+    <span className="brand-symbol grid h-11 w-11 shrink-0 place-items-center">
+      <Image
+        alt=""
+        aria-hidden="true"
+        className="brand-symbol-image h-11 w-11 object-contain"
+        height={44}
+        src="/brand/relay-mark.svg"
+        unoptimized
+        width={44}
+      />
+    </span>
   );
 }
 
