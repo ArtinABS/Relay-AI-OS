@@ -24,10 +24,15 @@ import {
   Skeleton,
   Surface,
   Switch,
+  Tabs,
+  Toast,
   Tooltip,
+  toast,
 } from "@heroui/react";
 import { parseDate, type DateValue } from "@internationalized/date";
 import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import SoftAurora from "@/components/ui/soft-aurora";
 import Image from "next/image";
 import {
   Activity,
@@ -45,6 +50,7 @@ import {
   Command,
   Database,
   ExternalLink,
+  Filter,
   FileSpreadsheet,
   FileText,
   FolderOpen,
@@ -62,7 +68,6 @@ import {
   Menu,
   MessageSquare,
   Mic,
-  Moon,
   MoreHorizontal,
   Paperclip,
   Plus,
@@ -72,7 +77,6 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
-  Sun,
   UploadCloud,
   User,
   Users,
@@ -96,7 +100,6 @@ type ViewId =
   | "files"
   | "github"
   | "memory"
-  | "integrations"
   | "profile"
   | "settings";
 
@@ -441,20 +444,13 @@ type AssistantEndpointResponse = {
   aiUsed?: boolean;
 };
 
-type Toast = {
-  id: string;
-  title: string;
-  detail?: string;
-  tone: "success" | "info" | "warning";
-};
-
 type NavItem = {
   id: ViewId;
   label: string;
   icon: LucideIcon;
 };
 
-const navItems: NavItem[] = [
+const primaryNavItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
@@ -462,7 +458,9 @@ const navItems: NavItem[] = [
   { id: "files", label: "Files", icon: FolderOpen },
   { id: "github", label: "GitHub", icon: GitBranch },
   { id: "memory", label: "Memory", icon: Brain },
-  { id: "integrations", label: "Integrations", icon: Cloud },
+];
+
+const utilityNavItems: NavItem[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -576,6 +574,16 @@ function driveFileType(mimeType: string) {
   return "File";
 }
 
+type DriveFileCategory = "all" | "folder" | "document" | "image";
+
+function driveFileCategory(
+  mimeType: string,
+): Exclude<DriveFileCategory, "all"> {
+  if (mimeType.includes("folder")) return "folder";
+  if (mimeType.includes("image")) return "image";
+  return "document";
+}
+
 async function readJsonResponse<T>(response: Response): Promise<T | null> {
   const text = await response.text();
   if (!text) return null;
@@ -605,7 +613,7 @@ function DriveFileGlyph({
 export function AssistantOS() {
   const [stage, setStage] = useState<AppStage>("auth");
   const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [theme, setTheme] = useState<ThemeMode>("dark");
   const [activeView, setActiveView] = useState<ViewId>("chat");
   const [messages, setMessages] = useState<Message[]>(starterMessages);
   const [input, setInput] = useState("");
@@ -619,7 +627,6 @@ export function AssistantOS() {
     null,
   );
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const [commandOpen, setCommandOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -627,6 +634,15 @@ export function AssistantOS() {
     y: number;
     task: RelayTask;
   } | null>(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    root.dataset.theme = theme;
+    root.classList.toggle("dark", theme === "dark");
+    root.classList.toggle("light", theme === "light");
+    root.style.colorScheme = theme;
+  }, [theme]);
 
   const signedInToGoogle = Boolean(oauthStatus?.hasDirectGoogleToken);
   const signedInToGithub = Boolean(oauthStatus?.github?.connected);
@@ -699,13 +715,24 @@ export function AssistantOS() {
   function addToast(
     title: string,
     detail: string | undefined,
-    tone: Toast["tone"],
+    tone: "success" | "info" | "warning",
   ) {
-    const id = createId("toast");
-    setToasts((current) => [...current, { id, title, detail, tone }]);
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 4200);
+    const options = {
+      description: detail,
+      timeout: 4200,
+    };
+
+    if (tone === "success") {
+      toast.success(title, options);
+      return;
+    }
+
+    if (tone === "warning") {
+      toast.warning(title, options);
+      return;
+    }
+
+    toast.info(title, options);
   }
 
   async function refreshWorkspace() {
@@ -749,9 +776,8 @@ export function AssistantOS() {
     const mappedColumns: TaskColumn[] = (
       briefingData.googleTasks?.taskLists ?? []
     )
-      .filter(
-        (taskList): taskList is { id: string; title: string } =>
-          Boolean(taskList.id),
+      .filter((taskList): taskList is { id: string; title: string } =>
+        Boolean(taskList.id),
       )
       .map((taskList, index) => ({
         id: taskList.id,
@@ -789,7 +815,9 @@ export function AssistantOS() {
     });
     if (!response.ok) {
       const data = (await response.json()) as { reason?: string };
-      throw new Error(data.reason ?? "Google Tasks could not create this task.");
+      throw new Error(
+        data.reason ?? "Google Tasks could not create this task.",
+      );
     }
     await refreshWorkspace();
     addToast("Google Task created", trimmed, "success");
@@ -807,7 +835,9 @@ export function AssistantOS() {
     });
     if (!response.ok) {
       const data = (await response.json()) as { reason?: string };
-      throw new Error(data.reason ?? "Google Tasks could not complete this task.");
+      throw new Error(
+        data.reason ?? "Google Tasks could not complete this task.",
+      );
     }
     await refreshWorkspace();
     addToast("Google Task completed", task.title, "success");
@@ -1111,7 +1141,7 @@ export function AssistantOS() {
     {
       label: "Open integrations",
       icon: Cloud,
-      run: () => setActiveView("integrations"),
+      run: () => setActiveView("settings"),
     },
     {
       label: "Open profile",
@@ -1145,6 +1175,8 @@ export function AssistantOS() {
       data-theme={theme}
       onClick={() => setContextMenu(null)}
     >
+      <Toast.Provider maxVisibleToasts={4} placement="bottom end" width={380} />
+
       {stage === "auth" ? (
         <AuthExperience
           {...shared}
@@ -1208,8 +1240,6 @@ export function AssistantOS() {
         setOpen={setCommandOpen}
       />
 
-      <ToastStack toasts={toasts} />
-
       {contextMenu ? (
         <TaskContextMenu
           contextMenu={contextMenu}
@@ -1250,11 +1280,29 @@ function AuthExperience({
   const [remember, setRemember] = useState(true);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [email, setEmail] = useState("");
+  const [rememberedEmail, setRememberedEmail] = useState("");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    const storedEmail = window.localStorage
+      .getItem("relay:remembered-email")
+      ?.trim();
+    if (!storedEmail) return;
+
+    const hydrationTimer = window.setTimeout(() => {
+      setEmail(storedEmail);
+      setRememberedEmail(storedEmail);
+    }, 0);
+
+    return () => window.clearTimeout(hydrationTimer);
+  }, []);
+
+  async function submit(
+    event: FormEvent<HTMLFormElement>,
+    submittedMode: AuthMode = authMode,
+  ) {
     event.preventDefault();
     if (submitting) return;
 
@@ -1270,21 +1318,21 @@ function AuthExperience({
 
     try {
       const endpoint =
-        authMode === "login"
+        submittedMode === "login"
           ? "/api/auth/password/login"
-          : authMode === "signup"
+          : submittedMode === "signup"
             ? "/api/auth/password/signup"
-            : authMode === "forgot"
+            : submittedMode === "forgot"
               ? formCode && formPassword
                 ? "/api/auth/password/reset"
                 : "/api/auth/password/forgot"
               : "/api/auth/password/verify";
       const body =
-        authMode === "login"
+        submittedMode === "login"
           ? { email: formEmail, password: formPassword, remember }
-          : authMode === "signup"
+          : submittedMode === "signup"
             ? { email: formEmail, password: formPassword, name: formName }
-            : authMode === "forgot"
+            : submittedMode === "forgot"
               ? formCode && formPassword
                 ? {
                     email: formEmail,
@@ -1308,14 +1356,23 @@ function AuthExperience({
         devResetCode?: string | null;
       };
 
-      if (response.ok && data.ok && authMode === "login") {
+      if (response.ok && data.ok && submittedMode === "login") {
+        if (remember) {
+          window.localStorage.setItem("relay:remembered-email", formEmail);
+          setRememberedEmail(formEmail);
+        } else {
+          window.localStorage.removeItem("relay:remembered-email");
+          setRememberedEmail("");
+        }
         await onPasswordAuthenticated(
           `Signed in as ${data.user?.email ?? formEmail}.`,
         );
         return;
       }
 
-      if (response.ok && data.ok && authMode === "signup") {
+      if (response.ok && data.ok && submittedMode === "signup") {
+        window.localStorage.setItem("relay:remembered-email", formEmail);
+        setRememberedEmail(formEmail);
         setAuthMode("verify");
         setDevCode(data.devVerificationCode ?? null);
         setAuthNotice(
@@ -1324,7 +1381,7 @@ function AuthExperience({
         return;
       }
 
-      if (response.ok && data.ok && authMode === "forgot") {
+      if (response.ok && data.ok && submittedMode === "forgot") {
         if (data.user) {
           await onPasswordAuthenticated(
             `Password reset for ${data.user.email ?? formEmail}.`,
@@ -1340,7 +1397,7 @@ function AuthExperience({
         return;
       }
 
-      if (response.ok && data.ok && authMode === "verify") {
+      if (response.ok && data.ok && submittedMode === "verify") {
         await onPasswordAuthenticated(
           `Verified and signed in as ${data.user?.email ?? formEmail}.`,
         );
@@ -1379,201 +1436,264 @@ function AuthExperience({
           ? "Enter the code created for your account."
           : "Sign in to continue to your personal workspace.";
 
-  return (
-    <main className="relative flex min-h-screen items-center justify-center px-4 py-12">
-      <Button
-        aria-label="Toggle color theme"
-        className="absolute right-5 top-5"
-        isIconOnly
-        onPress={() => setTheme(theme === "dark" ? "light" : "dark")}
-        title="Toggle theme"
-        variant="ghost"
-      >
-        {theme === "dark" ? (
-          <Sun className="h-4 w-4" />
-        ) : (
-          <Moon className="h-4 w-4" />
-        )}
-      </Button>
+  const renderAuthContent = (mode: AuthMode) => (
+    <>
+      <form className="space-y-4" onSubmit={(event) => submit(event, mode)}>
+        {mode === "signup" ? (
+          <Field
+            label="Full name"
+            name="name"
+            onChange={setName}
+            placeholder="Alex Morgan"
+            value={name}
+          />
+        ) : null}
 
-      <Card className="w-full max-w-[420px] overflow-hidden border border-[var(--line)] bg-[var(--surface)] p-0 shadow-[var(--shadow-strong)]">
-        <Card.Header className="flex flex-col items-start gap-5 border-b border-[var(--line)] px-6 py-6">
-          <BrandMark />
-          <div>
-            <Card.Title className="text-2xl font-semibold tracking-tight">
-              {heading}
-            </Card.Title>
-            <Card.Description className="mt-1.5 text-sm leading-6 text-[var(--muted)]">
-              {description}
-            </Card.Description>
-          </div>
-        </Card.Header>
-
-        <Card.Content className="px-6 py-6">
-          {isPrimaryMode ? (
-            <div className="mb-5 grid grid-cols-2 rounded-xl bg-[var(--surface-soft)] p-1">
-              {(["login", "signup"] as AuthMode[]).map((mode) => (
-                <Button
-                  className="w-full"
-                  key={mode}
-                  onPress={() => {
-                    setAuthMode(mode);
-                    setAuthNotice(null);
-                    setDevCode(null);
-                  }}
-                  size="sm"
-                  variant={authMode === mode ? "secondary" : "ghost"}
-                >
-                  {mode === "login" ? "Sign in" : "Create account"}
-                </Button>
-              ))}
-            </div>
-          ) : (
+        {mode === "login" && rememberedEmail ? (
+          <div className="auth-saved-account">
+            <input name="email" type="hidden" value={rememberedEmail} />
+            <span className="auth-saved-account__avatar" aria-hidden="true">
+              {rememberedEmail.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] font-medium text-muted">
+                Continue as
+              </span>
+              <span className="block truncate text-sm font-semibold">
+                {rememberedEmail}
+              </span>
+            </span>
             <Button
-              className="mb-5 -ml-2"
+              className="h-8 px-2 text-xs"
               onPress={() => {
-                setAuthMode("login");
-                setAuthNotice(null);
-                setDevCode(null);
+                window.localStorage.removeItem("relay:remembered-email");
+                setRememberedEmail("");
+                setEmail("");
               }}
               size="sm"
               variant="ghost"
             >
-              <ArrowRight className="h-4 w-4 rotate-180" />
-              Back to sign in
+              Change
             </Button>
+          </div>
+        ) : (
+          <Field
+            autoComplete="email"
+            label="Email"
+            name="email"
+            onChange={setEmail}
+            placeholder="you@company.com"
+            type="email"
+            value={email}
+          />
+        )}
+
+        {mode === "verify" || mode === "forgot" ? (
+          <Field
+            label={mode === "forgot" ? "Reset code" : "Verification code"}
+            name="code"
+            onChange={setCode}
+            placeholder="284991"
+            value={code}
+          />
+        ) : null}
+
+        {mode === "login" || mode === "signup" || mode === "forgot" ? (
+          <Field
+            autoComplete={
+              mode === "login" ? "current-password" : "new-password"
+            }
+            label={mode === "forgot" ? "New password" : "Password"}
+            name="password"
+            placeholder="Enter your password"
+            type="password"
+          />
+        ) : null}
+
+        {mode === "login" ? (
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <Checkbox isSelected={remember} onChange={setRemember}>
+              <Checkbox.Content className="text-[var(--muted)]">
+                <Checkbox.Control>
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                Remember me
+              </Checkbox.Content>
+            </Checkbox>
+            <Button
+              className="px-0 text-[var(--accent)]"
+              onPress={() => {
+                setAuthMode("forgot");
+                setAuthNotice(null);
+              }}
+              size="sm"
+              variant="ghost"
+            >
+              Forgot password?
+            </Button>
+          </div>
+        ) : null}
+
+        <Button
+          className="auth-primary-action"
+          fullWidth
+          isDisabled={submitting}
+          type="submit"
+          variant="primary"
+        >
+          {submitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <LogIn className="h-4 w-4" />
           )}
+          {authActionLabel(mode)}
+        </Button>
 
-          <form className="space-y-4" onSubmit={submit}>
-            {authMode === "signup" ? (
-              <Field
-                label="Full name"
-                name="name"
-                onChange={setName}
-                placeholder="Alex Morgan"
-                value={name}
-              />
-            ) : null}
+        {authNotice ? (
+          <p className="rounded-xl border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm font-medium text-[var(--warning)]">
+            {authNotice}
+          </p>
+        ) : null}
+        {devCode ? (
+          <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)]">
+            Development code:{" "}
+            <span className="font-mono font-semibold text-[var(--text)]">
+              {devCode}
+            </span>
+          </p>
+        ) : null}
+        {signedInWithPassword ? (
+          <p className="rounded-xl border border-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-sm font-medium text-[var(--success)]">
+            Signed in as {passwordAuth?.user?.email ?? "email user"}.
+          </p>
+        ) : null}
+      </form>
 
-            <Field
-              autoComplete="email"
-              label="Email"
-              name="email"
-              onChange={setEmail}
-              placeholder="you@company.com"
-              type="email"
-              value={email}
-            />
+      <div className="my-5 flex items-center gap-3 text-xs text-[var(--muted)] before:h-px before:flex-1 before:bg-[var(--line)] after:h-px after:flex-1 after:bg-[var(--line)]">
+        or
+      </div>
 
-            {authMode === "verify" || authMode === "forgot" ? (
-              <Field
-                label={
-                  authMode === "forgot" ? "Reset code" : "Verification code"
-                }
-                name="code"
-                onChange={setCode}
-                placeholder="284991"
-                value={code}
-              />
-            ) : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button
+          className="auth-provider-button"
+          fullWidth
+          isDisabled={!googleConfigured && !signedInToGoogle}
+          onPress={connectGoogle}
+          variant="secondary"
+        >
+          <Globe className="h-4 w-4" />
+          Google
+        </Button>
+        <Button
+          className="auth-provider-button"
+          fullWidth
+          onPress={enterAfterAuth}
+          variant="secondary"
+        >
+          <Sparkles className="h-4 w-4" />
+          Local mode
+        </Button>
+      </div>
+    </>
+  );
 
-            {authMode === "login" ||
-            authMode === "signup" ||
-            authMode === "forgot" ? (
-              <Field
-                autoComplete={
-                  authMode === "login" ? "current-password" : "new-password"
-                }
-                label={authMode === "forgot" ? "New password" : "Password"}
-                name="password"
-                placeholder="Enter your password"
-                type="password"
-              />
-            ) : null}
+  return (
+    <main className="auth-stage relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-16">
+      <div className="soft-aurora">
+        <SoftAurora
+          bandHeight={0.46}
+          bandSpread={0.92}
+          brightness={theme === "dark" ? 0.72 : 0.5}
+          color1="#20c8e8"
+          color2="#008fa5"
+          colorSpeed={0.72}
+          enableMouseInteraction
+          layerOffset={0.38}
+          mouseInfluence={0.14}
+          noiseAmplitude={0.86}
+          noiseFrequency={2.15}
+          octaveDecay={0.14}
+          scale={1.35}
+          speed={0.42}
+        />
+      </div>
+      <div className="auth-brand absolute left-5 top-5 z-20 sm:left-8 sm:top-7">
+        <BrandMark />
+      </div>
+      <AnimatedThemeToggler
+        className="absolute right-5 top-5 z-20 border border-[var(--line)] bg-[var(--surface-glass)] text-[var(--muted)] shadow-[var(--shadow)] backdrop-blur-xl hover:text-[var(--text)]"
+        onThemeChange={setTheme}
+        theme={theme}
+      />
 
-            {authMode === "login" ? (
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <Checkbox isSelected={remember} onChange={setRemember}>
-                  <Checkbox.Content className="text-[var(--muted)]">
-                    <Checkbox.Control>
-                      <Checkbox.Indicator />
-                    </Checkbox.Control>
-                    Remember me
-                  </Checkbox.Content>
-                </Checkbox>
+      <div className="auth-stack relative z-10 w-full max-w-[400px]">
+        <div className="auth-intro mb-5 text-center">
+          <h1 className="text-[2rem] font-semibold tracking-[-0.035em] text-[var(--text)]">
+            {heading}
+          </h1>
+          <p className="mt-1.5 text-sm leading-6 text-[var(--muted)]">
+            {description}
+          </p>
+        </div>
+
+        <Card className="auth-card w-full overflow-hidden border border-[var(--line)] bg-[var(--surface-glass)] p-0 backdrop-blur-2xl">
+          <Card.Content className="px-5 py-5 sm:px-6 sm:py-6">
+            {isPrimaryMode ? (
+              <Tabs
+                className="auth-mode-tabs"
+                onSelectionChange={(key) => {
+                  const nextMode = String(key);
+                  if (nextMode !== "login" && nextMode !== "signup") return;
+                  setAuthMode(nextMode);
+                  setAuthNotice(null);
+                  setDevCode(null);
+                }}
+                selectedKey={authMode}
+                variant="secondary"
+              >
+                <Tabs.ListContainer className="w-full">
+                  <Tabs.List
+                    aria-label="Authentication mode"
+                    className="w-full *:flex-1"
+                  >
+                    <Tabs.Tab id="login">
+                      Sign in
+                      <Tabs.Indicator />
+                    </Tabs.Tab>
+                    <Tabs.Tab id="signup">
+                      Create account
+                      <Tabs.Indicator />
+                    </Tabs.Tab>
+                  </Tabs.List>
+                </Tabs.ListContainer>
+                <Tabs.Panel className="auth-mode-tabs__panel" id="login">
+                  {renderAuthContent("login")}
+                </Tabs.Panel>
+                <Tabs.Panel className="auth-mode-tabs__panel" id="signup">
+                  {renderAuthContent("signup")}
+                </Tabs.Panel>
+              </Tabs>
+            ) : (
+              <>
                 <Button
-                  className="px-0 text-[var(--accent)]"
+                  className="mb-5 -ml-2"
                   onPress={() => {
-                    setAuthMode("forgot");
+                    setAuthMode("login");
                     setAuthNotice(null);
+                    setDevCode(null);
                   }}
                   size="sm"
                   variant="ghost"
                 >
-                  Forgot password?
+                  <ArrowRight className="h-4 w-4 rotate-180" />
+                  Back to sign in
                 </Button>
-              </div>
-            ) : null}
-
-            <Button
-              fullWidth
-              isDisabled={submitting}
-              type="submit"
-              variant="primary"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <LogIn className="h-4 w-4" />
-              )}
-              {authActionLabel(authMode)}
-            </Button>
-
-            {authNotice ? (
-              <p className="rounded-xl border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm font-medium text-[var(--warning)]">
-                {authNotice}
-              </p>
-            ) : null}
-            {devCode ? (
-              <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)]">
-                Development code:{" "}
-                <span className="font-mono font-semibold text-[var(--text)]">
-                  {devCode}
-                </span>
-              </p>
-            ) : null}
-            {signedInWithPassword ? (
-              <p className="rounded-xl border border-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-sm font-medium text-[var(--success)]">
-                Signed in as {passwordAuth?.user?.email ?? "email user"}.
-              </p>
-            ) : null}
-          </form>
-
-          <div className="my-5 flex items-center gap-3 text-xs text-[var(--muted)] before:h-px before:flex-1 before:bg-[var(--line)] after:h-px after:flex-1 after:bg-[var(--line)]">
-            or
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Button
-              fullWidth
-              isDisabled={!googleConfigured && !signedInToGoogle}
-              onPress={connectGoogle}
-              variant="secondary"
-            >
-              <Globe className="h-4 w-4" />
-              Google
-            </Button>
-            <Button fullWidth onPress={enterAfterAuth} variant="secondary">
-              <Sparkles className="h-4 w-4" />
-              Local mode
-            </Button>
-          </div>
-        </Card.Content>
-
-        <Card.Footer className="border-t border-[var(--line)] px-6 py-4 text-center text-xs leading-5 text-[var(--muted)]">
-          Credentials are hashed locally and sessions use an HTTP-only cookie.
-        </Card.Footer>
-      </Card>
+                {renderAuthContent(authMode)}
+              </>
+            )}
+          </Card.Content>
+        </Card>
+      </div>
     </main>
   );
 }
@@ -1663,18 +1783,11 @@ function OnboardingExperience({
             >
               <RefreshCcw className="h-4 w-4" />
             </Button>
-            <Button
+            <AnimatedThemeToggler
               className={iconButtonClass}
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              type="button"
-              title="Toggle theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </Button>
+              onThemeChange={setTheme}
+              theme={theme}
+            />
           </div>
         </header>
 
@@ -1843,7 +1956,7 @@ function WorkspaceExperience({
 
   return (
     <div
-      className="workspace-frame min-h-screen transition-[grid-template-columns] duration-300 ease-out lg:grid"
+      className="workspace-frame min-h-screen transition-[grid-template-columns] duration-300 ease-out lg:grid lg:h-screen lg:min-h-0 lg:overflow-hidden"
       style={{
         gridTemplateColumns: showGlobalRightSidebar
           ? `${navCollapsed ? 76 : sidebarWidth}px minmax(0,1fr) 340px`
@@ -1855,25 +1968,16 @@ function WorkspaceExperience({
         collapsed={navCollapsed}
         mobileOpen={sidebarOpen}
         onToggleCollapsed={() => setNavCollapsed((current) => !current)}
-        setDesktopWidth={setSidebarWidth}
         setActiveView={setActiveView}
+        setCommandOpen={setCommandOpen}
+        setDesktopWidth={setSidebarWidth}
         setMobileOpen={setSidebarOpen}
+        setTheme={setTheme}
+        theme={theme}
         width={sidebarWidth}
       />
 
-      <main className="workspace-main min-w-0 border-l border-separator">
-        <TopBar
-          activeView={activeView}
-          aiStatus={aiStatus}
-          connectGoogle={connectGoogle}
-          googleConfigured={googleConfigured}
-          setCommandOpen={setCommandOpen}
-          setSidebarOpen={setSidebarOpen}
-          setTheme={setTheme}
-          signedInToGoogle={signedInToGoogle}
-          theme={theme}
-        />
-
+      <main className="workspace-main min-w-0 border-l border-separator lg:h-screen lg:overflow-y-auto lg:overscroll-contain">
         <div
           className={
             activeView === "chat"
@@ -1951,20 +2055,6 @@ function WorkspaceExperience({
             <MemoryView addMemory={addMemory} notes={notes} />
           ) : null}
 
-          {activeView === "integrations" ? (
-            <IntegrationsView
-              connectGithub={connectGithub}
-              connectGoogle={connectGoogle}
-              disconnectGithub={disconnectGithub}
-              disconnectGoogle={disconnectGoogle}
-              githubConfigured={githubConfigured}
-              googleConfigured={googleConfigured}
-              oauthStatus={oauthStatus}
-              signedInToGithub={signedInToGithub}
-              signedInToGoogle={signedInToGoogle}
-            />
-          ) : null}
-
           {activeView === "profile" ? (
             <ProfileView
               connectGithub={connectGithub}
@@ -1983,7 +2073,18 @@ function WorkspaceExperience({
           ) : null}
 
           {activeView === "settings" ? (
-            <SettingsView aiStatus={aiStatus} oauthStatus={oauthStatus} />
+            <SettingsView
+              aiStatus={aiStatus}
+              connectGithub={connectGithub}
+              connectGoogle={connectGoogle}
+              disconnectGithub={disconnectGithub}
+              disconnectGoogle={disconnectGoogle}
+              githubConfigured={githubConfigured}
+              googleConfigured={googleConfigured}
+              oauthStatus={oauthStatus}
+              signedInToGithub={signedInToGithub}
+              signedInToGoogle={signedInToGoogle}
+            />
           ) : null}
         </div>
       </main>
@@ -2007,8 +2108,11 @@ function Sidebar({
   mobileOpen,
   onToggleCollapsed,
   setActiveView,
+  setCommandOpen,
   setDesktopWidth,
   setMobileOpen,
+  setTheme,
+  theme,
   width,
 }: {
   activeView: ViewId;
@@ -2016,28 +2120,20 @@ function Sidebar({
   mobileOpen: boolean;
   onToggleCollapsed: () => void;
   setActiveView: (view: ViewId) => void;
+  setCommandOpen: (open: boolean) => void;
   setDesktopWidth: (width: number) => void;
   setMobileOpen: (open: boolean) => void;
+  setTheme: (theme: ThemeMode) => void;
+  theme: ThemeMode;
   width: number;
 }) {
+  const effectiveCollapsed = collapsed && !mobileOpen;
   const content = (
     <aside
-      className={`sidebar-shell relative flex h-full flex-col bg-[var(--sidebar)] py-5 text-left transition-all duration-300 ease-out ${collapsed ? "px-3" : "px-4"}`}
+      className={`sidebar-shell relative flex h-full flex-col bg-[var(--sidebar)] py-5 text-left transition-all duration-300 ease-out ${effectiveCollapsed ? "px-3" : "px-4"}`}
     >
-      <div className="mb-8 flex items-center justify-between">
-        {collapsed ? (
-          <BrandSymbol />
-        ) : (
-          <BrandMark />
-        )}
-        <Button
-          className="hidden h-9 w-9 items-center justify-center rounded-md text-muted transition hover:bg-surface-secondary hover:text-foreground lg:inline-flex"
-          onClick={onToggleCollapsed}
-          type="button"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <Columns3 className="h-4 w-4" />
-        </Button>
+      <div className="mb-7 flex min-h-10 items-center justify-between">
+        {effectiveCollapsed ? <BrandSymbol compact /> : <BrandMark />}
         <Button
           className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted lg:hidden"
           onClick={() => setMobileOpen(false)}
@@ -2048,19 +2144,21 @@ function Sidebar({
         </Button>
       </div>
 
-      <nav className="space-y-1.5">
-        {navItems.map((item) => {
+      <nav className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1">
+        {primaryNavItems.map((item) => {
           const Icon = item.icon;
           const active = activeView === item.id;
 
           return (
             <Button
-              className={`nav-item flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
+              className={`nav-item flex h-11 w-full items-center gap-3 rounded-xl px-4 text-sm font-semibold transition ${
                 active
                   ? "is-active bg-surface text-foreground shadow-surface"
                   : "text-muted hover:bg-surface-secondary hover:text-foreground"
               } ${
-                collapsed ? "justify-center px-0" : "justify-start text-left"
+                effectiveCollapsed
+                  ? "justify-center px-0"
+                  : "justify-start text-left"
               }`}
               key={item.id}
               onClick={() => {
@@ -2071,13 +2169,65 @@ function Sidebar({
               title={item.label}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {collapsed ? null : item.label}
+              {effectiveCollapsed ? null : item.label}
             </Button>
           );
         })}
       </nav>
 
-      {!collapsed ? (
+      <div className="mt-4 shrink-0 border-t border-separator pt-4">
+        <nav className="space-y-1.5">
+          {utilityNavItems.map((item) => {
+            const Icon = item.icon;
+            const active = activeView === item.id;
+
+            return (
+              <Button
+                className={`nav-item flex h-11 w-full items-center gap-3 rounded-xl px-4 text-sm font-semibold transition ${
+                  active
+                    ? "is-active bg-surface text-foreground shadow-surface"
+                    : "text-muted hover:bg-surface-secondary hover:text-foreground"
+                } ${
+                  effectiveCollapsed
+                    ? "justify-center px-0"
+                    : "justify-start text-left"
+                }`}
+                key={item.id}
+                onClick={() => {
+                  setActiveView(item.id);
+                  setMobileOpen(false);
+                }}
+                type="button"
+                title={item.label}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {effectiveCollapsed ? null : item.label}
+              </Button>
+            );
+          })}
+        </nav>
+        <div
+          className={`mt-3 flex gap-2 ${
+            effectiveCollapsed ? "flex-col items-center" : ""
+          }`}
+        >
+          <Button
+            className={iconButtonClass}
+            onClick={() => setCommandOpen(true)}
+            type="button"
+            title="Open command palette"
+          >
+            <Command className="h-4 w-4" />
+          </Button>
+          <AnimatedThemeToggler
+            className={iconButtonClass}
+            onThemeChange={setTheme}
+            theme={theme}
+          />
+        </div>
+      </div>
+
+      {!effectiveCollapsed ? (
         <Input
           aria-label="Resize sidebar"
           className="absolute right-1 top-1/2 hidden h-28 w-1 -translate-y-1/2 cursor-ew-resize appearance-none rounded-full bg-[var(--line-strong)] opacity-0 transition hover:opacity-100 lg:block"
@@ -2094,111 +2244,35 @@ function Sidebar({
 
   return (
     <>
-      <div className="hidden lg:block">{content}</div>
+      <div className="relative hidden h-screen lg:block">
+        {content}
+        <Button
+          className="absolute -right-4 top-7 z-30 h-8 w-8 min-w-8 rounded-full border border-separator bg-overlay text-muted shadow-overlay transition hover:border-accent hover:text-accent"
+          isIconOnly
+          onClick={onToggleCollapsed}
+          type="button"
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <Columns3 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {!mobileOpen ? (
+        <Button
+          className="fixed left-4 top-4 z-30 border border-separator bg-overlay text-foreground shadow-overlay lg:hidden"
+          isIconOnly
+          onClick={() => setMobileOpen(true)}
+          type="button"
+          title="Open navigation"
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
+      ) : null}
       {mobileOpen ? (
-        <div className="mobile-sidebar-backdrop fixed inset-0 z-40 bg-black/40 lg:hidden">
+        <div className="mobile-sidebar-backdrop fixed inset-0 z-40 bg-[var(--backdrop)] backdrop-blur-sm lg:hidden">
           <div className="mobile-sidebar-panel h-full w-[280px]">{content}</div>
         </div>
       ) : null}
     </>
-  );
-}
-
-function TopBar({
-  activeView,
-  aiStatus,
-  connectGoogle,
-  googleConfigured,
-  setCommandOpen,
-  setSidebarOpen,
-  setTheme,
-  signedInToGoogle,
-  theme,
-}: {
-  activeView: ViewId;
-  aiStatus: AiStatus | null;
-  connectGoogle: () => void;
-  googleConfigured: boolean;
-  setCommandOpen: (open: boolean) => void;
-  setSidebarOpen: (open: boolean) => void;
-  setTheme: (theme: ThemeMode) => void;
-  signedInToGoogle: boolean;
-  theme: ThemeMode;
-}) {
-  const navItem = navItems.find((item) => item.id === activeView);
-  const ActiveIcon = navItem?.icon;
-
-  return (
-    <header className="relay-topbar sticky top-0 z-20 flex h-[72px] items-center justify-between gap-3 border-b border-separator bg-[var(--surface-glass)] px-4 backdrop-blur-xl sm:px-6">
-      <div className="flex min-w-0 items-center gap-3">
-        <Button
-          className={iconButtonClass + " lg:hidden"}
-          onClick={() => setSidebarOpen(true)}
-          type="button"
-          title="Menu"
-        >
-          <Menu className="h-4 w-4" />
-        </Button>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            {ActiveIcon ? <ActiveIcon className="h-4 w-4 text-accent" /> : null}
-            <h1 className="truncate text-base font-semibold sm:text-lg">
-              {navItem?.label ?? "Workspace"}
-            </h1>
-          </div>
-          <p className="hidden text-xs text-muted sm:block">
-            {aiStatus?.configured
-              ? `${aiStatus.label} key set`
-              : "Local agent active"}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex min-w-0 items-center gap-2">
-        <Button
-          className="hidden h-10 min-w-0 items-center gap-2 rounded-md border border-separator bg-surface px-3 text-left text-sm text-muted transition hover:border-border sm:inline-flex lg:w-72"
-          onClick={() => setCommandOpen(true)}
-          type="button"
-        >
-          <Search className="h-4 w-4" />
-          <span className="truncate">Search actions, tools, and views</span>
-          <Command className="ml-auto h-3.5 w-3.5" />
-        </Button>
-        <Button
-          className={iconButtonClass}
-          onClick={() => setCommandOpen(true)}
-          type="button"
-          title="Command"
-        >
-          <Command className="h-4 w-4" />
-        </Button>
-        <Button
-          className={iconButtonClass}
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          type="button"
-          title="Toggle theme"
-        >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          className={
-            signedInToGoogle ? secondaryButtonClass : primaryButtonClass
-          }
-          disabled={!googleConfigured && !signedInToGoogle}
-          onClick={connectGoogle}
-          type="button"
-        >
-          <Globe className="h-4 w-4" />
-          <span className="hidden sm:inline">
-            {signedInToGoogle ? "Google connected" : "Connect"}
-          </span>
-        </Button>
-      </div>
-    </header>
   );
 }
 
@@ -2220,7 +2294,7 @@ function DashboardView({
   tasks: RelayTask[];
 }) {
   return (
-    <div className="space-y-7 animate-fade-in">
+    <div className="relay-dashboard space-y-7 animate-fade-in">
       <WeeklyCommandCalendar
         briefing={briefing}
         completeTask={completeTask}
@@ -2417,10 +2491,10 @@ function WeeklyCommandCalendar({
             <div className="min-w-0" key={dayKey}>
               <Button
                 aria-pressed={inspectorActive}
-                className={`relay-content-card week-day-card min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 hover:-translate-y-1 hover:shadow-surface ${
+                className={`relay-content-card week-day-card min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 ${
                   isToday
                     ? "border-[var(--accent)] bg-accent-soft"
-                    : "border-separator bg-surface-secondary hover:border-border"
+                    : "border-separator bg-surface-secondary"
                 }`}
                 onClick={() => setActiveInspectorDay(dayKey)}
                 type="button"
@@ -2657,7 +2731,7 @@ function InspectorGroup({
         {items.length > 0 ? (
           items.slice(0, 4).map((item) => (
             <Button
-              className="pointer-events-auto grid w-full grid-cols-[1fr_auto] gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-surface"
+              className="dashboard-row pointer-events-auto grid w-full grid-cols-[1fr_auto] gap-2 rounded-lg px-2 py-1.5 text-left transition"
               key={item.id}
               onClick={item.onClick}
               type="button"
@@ -2696,12 +2770,31 @@ function TaskSnapshot({
   runPrompt: (prompt: string) => void;
   tasks: RelayTask[];
 }) {
+  const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const googleTasks =
     briefing?.googleTasks?.tasks.filter(
       (task) => task.status !== "completed",
     ) ?? [];
   const sortedTasks = sortTasksByUrgency(openTasks).slice(0, 6);
   const overdueCount = openTasks.filter((task) => isOverdue(task.due)).length;
+
+  async function markTaskDone(task: RelayTask) {
+    if (completingTaskIds.has(task.id)) return;
+
+    setCompletingTaskIds((current) => new Set(current).add(task.id));
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 420));
+      await completeTask(task);
+    } catch {
+      setCompletingTaskIds((current) => {
+        const next = new Set(current);
+        next.delete(task.id);
+        return next;
+      });
+    }
+  }
 
   return (
     <section className={`${panelClass} overflow-hidden`}>
@@ -2724,17 +2817,15 @@ function TaskSnapshot({
         </Button>
       </div>
       <div className="divide-y divide-separator">
-        {sortedTasks.map((task) => (
-          <HoverPreview
-            detail={task.notes || "No notes saved for this task."}
-            key={task.id}
-            meta={task.due ? `Due ${formatDueDate(task.due)}` : "No due date"}
-            title={task.title}
-          >
-            <Button
-              className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-accent-soft"
-              onClick={() => void completeTask(task)}
-              type="button"
+        {sortedTasks.map((task) => {
+          const isCompleting = completingTaskIds.has(task.id);
+
+          return (
+            <div
+              className={`dashboard-task-row grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3.5 ${
+                isCompleting ? "is-completing" : ""
+              }`}
+              key={task.id}
             >
               <PriorityTag priority={task.priority} />
               <span className="min-w-0">
@@ -2746,15 +2837,29 @@ function TaskSnapshot({
                   {task.notes || "No note"}
                 </span>
               </span>
-              <Check className="h-4 w-4 text-success" />
-            </Button>
-          </HoverPreview>
-        ))}
+              <Button
+                aria-busy={isCompleting}
+                aria-label={`Mark ${task.title} as done`}
+                className={`dashboard-task-done ${
+                  isCompleting ? "is-completing" : ""
+                }`}
+                isIconOnly
+                onPress={() => void markTaskDone(task)}
+                size="sm"
+                variant="ghost"
+              >
+                <Check className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        })}
         {sortedTasks.length === 0 ? (
           <EmptyState
             icon={ListTodo}
             title={
-              tasks.length > 0 ? "All Google Tasks completed" : "No Google Tasks"
+              tasks.length > 0
+                ? "All Google Tasks completed"
+                : "No Google Tasks"
             }
             detail="Create tasks from chat or the Tasks tab."
           />
@@ -2794,12 +2899,7 @@ function GithubActivityPanel({
       </div>
       <div className="divide-y divide-separator">
         {issues.slice(0, 5).map((issue) => (
-          <HoverPreview
-            detail={`${issue.labels.join(", ") || "No labels"} · updated ${formatFileTime(issue.updatedAt)}`}
-            key={issue.id}
-            meta={issue.repositoryFullName ?? "GitHub"}
-            title={issue.title}
-          >
+          <div key={issue.id}>
             <div className="grid grid-cols-[1fr_auto] gap-3 p-4">
               <Button
                 className="relay-content-row min-w-0 text-left"
@@ -2834,7 +2934,7 @@ function GithubActivityPanel({
                 </Link>
               </div>
             </div>
-          </HoverPreview>
+          </div>
         ))}
         {issues.length === 0 ? (
           <EmptyState
@@ -2898,13 +2998,13 @@ function AiActionPlanner({
           const Icon = action.icon;
           return (
             <Button
-              className="relay-content-card group rounded-2xl border border-separator bg-surface p-4 text-left transition hover:-translate-y-1 hover:border-[var(--accent)] hover:bg-accent-soft"
+              className="relay-content-card rounded-2xl border border-separator bg-surface p-4 text-left transition"
               key={action.title}
               onClick={action.onClick}
               type="button"
             >
               <div className="mb-4 flex items-center justify-between">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent transition group-hover:bg-accent group-hover:text-white">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent">
                   <Icon className="h-4 w-4" />
                 </span>
                 <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-0.5 group-hover:text-accent" />
@@ -2991,15 +3091,10 @@ function InboxHighlights({
           <div className="grid min-h-80 xl:grid-cols-[minmax(0,1fr)_280px]">
             <div className="divide-y divide-separator">
               {items.map((item) => (
-                <HoverPreview
-                  detail={item.snippet}
-                  key={item.id}
-                  meta={item.time ? formatFileTime(item.time) : item.kind}
-                  title={item.person}
-                >
+                <div key={item.id}>
                   <Button
-                    className={`grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-accent-soft ${
-                      selected?.id === item.id ? "bg-accent-soft" : ""
+                    className={`dashboard-mail-row dashboard-row grid w-full grid-cols-[40px_1fr_auto] items-center gap-3 rounded-none p-4 text-left transition ${
+                      selected?.id === item.id ? "is-selected" : ""
                     }`}
                     onClick={() => setSelectedId(item.id)}
                     type="button"
@@ -3019,7 +3114,7 @@ function InboxHighlights({
                       {item.kind}
                     </span>
                   </Button>
-                </HoverPreview>
+                </div>
               ))}
             </div>
             <div className="border-t border-separator bg-surface-secondary p-4 xl:border-l xl:border-t-0">
@@ -3074,13 +3169,13 @@ function ControlMetric({
   value: string;
 }) {
   return (
-    <Card className="group border border-separator bg-surface p-0 shadow-surface transition hover:border-border-secondary">
+    <Card className="border border-separator bg-surface p-0 shadow-surface">
       <Card.Content className="p-4">
         <div className="mb-5 flex items-center justify-between">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">
             <Icon className="h-4 w-4" />
           </span>
-          <MoreHorizontal className="h-4 w-4 text-muted opacity-0 transition group-hover:opacity-100" />
+          <MoreHorizontal className="h-4 w-4 text-muted" />
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
           {label}
@@ -3135,7 +3230,7 @@ function HoverPreview({
         {children}
       </Tooltip.Trigger>
       <Tooltip.Content
-        className="w-72 border border-border bg-overlay p-3 text-sm shadow-overlay"
+        className="relay-themed-overlay w-72 border border-border bg-overlay p-3 text-sm shadow-overlay"
         placement="bottom start"
         showArrow
       >
@@ -3199,7 +3294,7 @@ function ChatView({
 
   return (
     <div
-      className={`h-[calc(100vh-96px)] min-h-0 overflow-hidden ${
+      className={`h-[calc(100vh-24px)] min-h-0 overflow-hidden sm:h-[calc(100vh-32px)] ${
         showContextWorkspace
           ? "flex flex-col gap-4 transition-[grid-template-columns] duration-300 ease-out xl:grid"
           : ""
@@ -5100,7 +5195,9 @@ function TaskWorkspace({
           </div>
           <StatusBadge
             ready={Boolean(briefing?.googleTasks?.ok)}
-            label={briefing?.googleTasks?.ok ? "Google ready" : "Connect Google"}
+            label={
+              briefing?.googleTasks?.ok ? "Google ready" : "Connect Google"
+            }
           />
         </div>
         <div className="space-y-2">
@@ -6137,6 +6234,16 @@ function TaskMasterDetailView({
     googleTaskKey(tasks[0] ?? null),
   );
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">(
+    "all",
+  );
+  const [priorityFilter, setPriorityFilter] = useState<
+    "all" | GoogleTaskPriority
+  >("all");
+  const [dueFilter, setDueFilter] = useState<
+    "all" | "overdue" | "today" | "week" | "none"
+  >("all");
   const orderedTasks = useMemo(() => {
     const open = sortGoogleTasksByUrgency(
       tasks.filter((task) => task.status !== "completed"),
@@ -6151,10 +6258,47 @@ function TaskMasterDetailView({
 
     return [...open, ...completed];
   }, [tasks]);
+  const filteredTasks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endOfWeek = addDays(today, 7);
+
+    return orderedTasks.filter((task) => {
+      const completed = task.status === "completed";
+      if (statusFilter === "pending" && completed) return false;
+      if (statusFilter === "done" && !completed) return false;
+      if (
+        priorityFilter !== "all" &&
+        googleTaskPriority(task) !== priorityFilter
+      ) {
+        return false;
+      }
+
+      const dueDate = parseEventDate(task.due);
+      if (dueFilter === "overdue" && !isOverdue(task.due)) return false;
+      if (
+        dueFilter === "today" &&
+        (!dueDate || !sameCalendarDay(dueDate, today))
+      ) {
+        return false;
+      }
+      if (
+        dueFilter === "week" &&
+        (!dueDate || dueDate < today || dueDate > endOfWeek)
+      ) {
+        return false;
+      }
+      if (dueFilter === "none" && dueDate) return false;
+
+      return true;
+    });
+  }, [dueFilter, orderedTasks, priorityFilter, statusFilter]);
   const selectedTask =
-    orderedTasks.find((task) => googleTaskKey(task) === selectedTaskId) ??
-    orderedTasks[0] ??
+    filteredTasks.find((task) => googleTaskKey(task) === selectedTaskId) ??
+    filteredTasks[0] ??
     null;
+  const filtersActive =
+    statusFilter !== "all" || priorityFilter !== "all" || dueFilter !== "all";
 
   async function runGoogleTaskAction(body: Record<string, unknown>) {
     const response = await fetch("/api/google/tasks", {
@@ -6233,6 +6377,100 @@ function TaskMasterDetailView({
           </Button>
         </div>
 
+        <Disclosure
+          className="task-filter-disclosure border-b border-separator"
+          isExpanded={filtersExpanded}
+          onExpandedChange={setFiltersExpanded}
+        >
+          <Disclosure.Heading className="flex items-center justify-between gap-3 p-4">
+            <Button
+              className="task-filter-trigger"
+              slot="trigger"
+              type="button"
+              variant="secondary"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {filtersActive ? (
+                <span className="task-filter-active-dot" aria-hidden="true" />
+              ) : null}
+              <Chip size="sm" variant="secondary">
+                {filteredTasks.length}
+              </Chip>
+              <Disclosure.Indicator />
+            </Button>
+            {filtersActive ? (
+              <Button
+                className="h-8 px-2 text-xs text-muted"
+                onClick={() => {
+                  setStatusFilter("all");
+                  setPriorityFilter("all");
+                  setDueFilter("all");
+                }}
+                type="button"
+                variant="ghost"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            ) : null}
+          </Disclosure.Heading>
+          <Disclosure.Content>
+            <Disclosure.Body className="grid gap-2 px-4 pb-4 pt-0 sm:grid-cols-3">
+              <Select
+                aria-label="Filter tasks by status"
+                className="h-10 w-full rounded-xl border border-separator bg-surface px-3 text-sm"
+                onChange={(event) =>
+                  setStatusFilter(
+                    event.target.value as "all" | "pending" | "done",
+                  )
+                }
+                value={statusFilter}
+              >
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="done">Done</option>
+              </Select>
+              <Select
+                aria-label="Filter tasks by priority"
+                className="h-10 w-full rounded-xl border border-separator bg-surface px-3 text-sm"
+                onChange={(event) =>
+                  setPriorityFilter(
+                    event.target.value as "all" | GoogleTaskPriority,
+                  )
+                }
+                value={priorityFilter}
+              >
+                <option value="all">All priorities</option>
+                <option value="high">High priority</option>
+                <option value="medium">Medium priority</option>
+                <option value="low">Low priority</option>
+              </Select>
+              <Select
+                aria-label="Filter tasks by due date"
+                className="h-10 w-full rounded-xl border border-separator bg-surface px-3 text-sm"
+                onChange={(event) =>
+                  setDueFilter(
+                    event.target.value as
+                      | "all"
+                      | "overdue"
+                      | "today"
+                      | "week"
+                      | "none",
+                  )
+                }
+                value={dueFilter}
+              >
+                <option value="all">Any due date</option>
+                <option value="overdue">Overdue</option>
+                <option value="today">Due today</option>
+                <option value="week">Next 7 days</option>
+                <option value="none">No due date</option>
+              </Select>
+            </Disclosure.Body>
+          </Disclosure.Content>
+        </Disclosure>
+
         <ScrollShadow
           className="min-h-0 flex-1 p-4"
           hideScrollBar={false}
@@ -6240,7 +6478,7 @@ function TaskMasterDetailView({
           size={56}
         >
           <div className="space-y-3">
-            {orderedTasks.map((task) => (
+            {filteredTasks.map((task) => (
               <TaskListCard
                 completeTask={completeTask}
                 key={googleTaskKey(task)}
@@ -6249,17 +6487,21 @@ function TaskMasterDetailView({
                 task={task}
               />
             ))}
-            {orderedTasks.length === 0 ? (
+            {filteredTasks.length === 0 ? (
               <EmptyState
                 detail={
-                  googleTasks?.reason ??
-                  "Add a Google task to start building your working list."
+                  filtersActive
+                    ? "Clear or adjust the filters to see more Google tasks."
+                    : (googleTasks?.reason ??
+                      "Add a Google task to start building your working list.")
                 }
                 icon={ListTodo}
                 title={
-                  googleTasks?.ok
-                    ? "No Google tasks yet"
-                    : "Connect Google Tasks"
+                  filtersActive
+                    ? "No tasks match"
+                    : googleTasks?.ok
+                      ? "No Google tasks yet"
+                      : "Connect Google Tasks"
                 }
               />
             ) : null}
@@ -6641,7 +6883,7 @@ function TaskDueDatePicker({
           </DatePicker.Trigger>
         </DateField.Suffix>
       </DateField.Group>
-      <DatePicker.Popover className="rounded-2xl border border-separator bg-overlay p-3 shadow-overlay">
+      <DatePicker.Popover className="relay-themed-overlay rounded-2xl border border-separator bg-overlay p-3 shadow-overlay">
         <Calendar aria-label="Choose task due date">
           <Calendar.Header>
             <Calendar.YearPickerTrigger>
@@ -7431,11 +7673,41 @@ function FilesView({
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<DriveFileCategory>("all");
+  const [sortBy, setSortBy] = useState<"recent" | "name" | "type">("recent");
   const files = searchResults ?? initialFiles;
+  const organizedFiles = useMemo(() => {
+    const filtered =
+      typeFilter === "all"
+        ? files
+        : files.filter(
+            (file) => driveFileCategory(file.mimeType) === typeFilter,
+          );
+
+    return [...filtered].sort((left, right) => {
+      if (sortBy === "name") return left.name.localeCompare(right.name);
+      if (sortBy === "type") {
+        return driveFileType(left.mimeType).localeCompare(
+          driveFileType(right.mimeType),
+        );
+      }
+
+      return (
+        new Date(right.modifiedTime ?? 0).getTime() -
+        new Date(left.modifiedTime ?? 0).getTime()
+      );
+    });
+  }, [files, sortBy, typeFilter]);
   const selectedFile =
-    files.find((file) => (file.id ?? file.name) === selectedFileId) ??
-    files[0] ??
+    organizedFiles.find((file) => (file.id ?? file.name) === selectedFileId) ??
+    organizedFiles[0] ??
     null;
+  const folderCount = files.filter(
+    (file) => driveFileCategory(file.mimeType) === "folder",
+  ).length;
+  const imageCount = files.filter(
+    (file) => driveFileCategory(file.mimeType) === "image",
+  ).length;
 
   async function searchFiles(nextQuery = query) {
     setLoading(true);
@@ -7488,65 +7760,76 @@ function FilesView({
               Ask AI
             </Button>
           </div>
-          <form
-            className="flex gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void searchFiles();
-            }}
-          >
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-separator bg-surface-secondary px-3">
-              <Search className="h-4 w-4 text-muted" />
-              <Input
-                className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search Drive files and folders..."
-                value={query}
-              />
-            </div>
-            <Button
-              className={secondaryButtonClass}
-              disabled={loading}
-              type="submit"
+          <div className="grid gap-3">
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void searchFiles();
+              }}
             >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              Search
-            </Button>
-          </form>
-        </div>
-
-        <div className="recent-file-strip border-b border-separator px-5 py-3">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {initialFiles.slice(0, 8).map((file) => (
-              <Button
-                className="interactive-control flex min-w-52 items-center gap-2 rounded-xl border border-separator bg-surface-secondary px-3 py-2 text-left"
-                key={file.id ?? file.name}
-                onClick={() => setSelectedFileId(file.id ?? file.name)}
-                type="button"
-              >
-                <DriveFileGlyph
-                  className="h-4 w-4 shrink-0 text-accent"
-                  mimeType={file.mimeType}
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-separator bg-surface-secondary px-3">
+                <Search className="h-4 w-4 text-muted" />
+                <Input
+                  className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search Drive files and folders..."
+                  value={query}
                 />
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-semibold">
-                    {file.name}
-                  </span>
-                  <span className="block truncate text-[11px] text-muted">
-                    {formatFileTime(file.modifiedTime)}
-                  </span>
-                </span>
+              </div>
+              <Button
+                className={secondaryButtonClass}
+                disabled={loading}
+                type="submit"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                Search
               </Button>
-            ))}
-            {initialFiles.length === 0 ? (
-              <span className="text-sm text-muted">
-                {briefing?.drive.reason ?? "No recent files loaded."}
-              </span>
-            ) : null}
+            </form>
+            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <Select
+                aria-label="Filter Drive files by type"
+                className="h-10 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
+                onChange={(event) =>
+                  setTypeFilter(event.target.value as DriveFileCategory)
+                }
+                value={typeFilter}
+              >
+                <option value="all">All file types</option>
+                <option value="folder">Folders</option>
+                <option value="document">Documents</option>
+                <option value="image">Images</option>
+              </Select>
+              <Select
+                aria-label="Sort Drive files"
+                className="h-10 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
+                onChange={(event) =>
+                  setSortBy(event.target.value as "recent" | "name" | "type")
+                }
+                value={sortBy}
+              >
+                <option value="recent">Recently modified</option>
+                <option value="name">Name A–Z</option>
+                <option value="type">File type</option>
+              </Select>
+              <div className="flex items-center gap-2">
+                <Chip size="sm" variant="secondary">
+                  {files.length} items
+                </Chip>
+                <Chip size="sm" variant="secondary">
+                  {folderCount} folders
+                </Chip>
+                {imageCount > 0 ? (
+                  <Chip size="sm" variant="secondary">
+                    {imageCount} images
+                  </Chip>
+                ) : null}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -7556,60 +7839,67 @@ function FilesView({
               {status}
             </p>
           ) : null}
-          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-            {files.map((file) => (
-              <HoverPreview
-                detail={`${driveFileType(file.mimeType)} · ${file.owner ?? "Unknown owner"} · ${formatFileTime(file.modifiedTime)}`}
-                key={file.id ?? file.name}
-                meta={
-                  file.mimeType.includes("folder")
-                    ? "Folder"
-                    : driveFileType(file.mimeType)
-                }
-                title={file.name}
-              >
-                <Button
-                  className={`relay-content-card interactive-row rounded-2xl border p-4 text-left ${
-                    selectedFileId === (file.id ?? file.name)
-                      ? "border-[var(--accent)] bg-accent-soft"
-                      : "border-separator bg-surface-secondary"
-                  }`}
-                  onClick={() => setSelectedFileId(file.id ?? file.name)}
-                  type="button"
-                >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-soft text-accent">
+          {organizedFiles.length > 0 ? (
+            <div className="overflow-hidden rounded-2xl border border-separator">
+              <div className="hidden grid-cols-[44px_minmax(0,1fr)_120px_120px] items-center gap-3 border-b border-separator bg-surface-secondary px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted md:grid">
+                <span />
+                <span>Name</span>
+                <span>Type</span>
+                <span>Modified</span>
+              </div>
+              <div className="divide-y divide-separator">
+                {organizedFiles.map((file) => (
+                  <Button
+                    className={`file-browser-row grid w-full grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 rounded-none px-4 py-3 text-left md:grid-cols-[44px_minmax(0,1fr)_120px_120px] ${
+                      selectedFile === file
+                        ? "is-selected bg-accent-soft"
+                        : "bg-surface"
+                    }`}
+                    key={file.id ?? file.name}
+                    onClick={() => setSelectedFileId(file.id ?? file.name)}
+                    type="button"
+                  >
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent">
                       <DriveFileGlyph
                         className="h-5 w-5"
                         mimeType={file.mimeType}
                       />
                     </span>
-                    <span className="rounded-full bg-surface px-2 py-1 text-[11px] font-semibold text-muted">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold">
+                        {file.name}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-muted">
+                        {file.owner ?? "Unknown owner"}
+                      </span>
+                    </span>
+                    <span className="rounded-full bg-surface-secondary px-2 py-1 text-[11px] font-semibold text-muted md:rounded-none md:bg-transparent md:p-0">
                       {driveFileType(file.mimeType)}
                     </span>
-                  </div>
-                  <p className="line-clamp-3 text-sm font-semibold leading-5">
-                    {file.name}
-                  </p>
-                  <p className="mt-2 truncate text-xs text-muted">
-                    {file.owner ?? "Unknown owner"}
-                  </p>
-                </Button>
-              </HoverPreview>
-            ))}
-          </div>
-          {files.length === 0 ? (
+                    <span className="hidden text-xs text-muted md:block">
+                      {formatFileTime(file.modifiedTime)}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {organizedFiles.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
               title={
-                briefing?.google.connected
-                  ? "No Drive files found"
-                  : "Drive not connected"
+                files.length > 0
+                  ? "No files match this filter"
+                  : briefing?.google.connected
+                    ? "No Drive files found"
+                    : "Drive not connected"
               }
               detail={
-                status ??
-                briefing?.drive.reason ??
-                "Search Drive or connect Google."
+                files.length > 0
+                  ? "Choose another file type to see more Drive items."
+                  : (status ??
+                    briefing?.drive.reason ??
+                    "Search Drive or connect Google.")
               }
             />
           ) : null}
@@ -8816,10 +9106,26 @@ function ProfileConnectionRow({
 
 function SettingsView({
   aiStatus,
+  connectGithub,
+  connectGoogle,
+  disconnectGithub,
+  disconnectGoogle,
+  githubConfigured,
+  googleConfigured,
   oauthStatus,
+  signedInToGithub,
+  signedInToGoogle,
 }: {
   aiStatus: AiStatus | null;
+  connectGithub: () => void;
+  connectGoogle: () => void;
+  disconnectGithub: () => void;
+  disconnectGoogle: () => void;
+  githubConfigured: boolean;
+  googleConfigured: boolean;
   oauthStatus: OAuthStatus | null;
+  signedInToGithub: boolean;
+  signedInToGoogle: boolean;
 }) {
   const [providerHealth, setProviderHealth] = useState<{
     ok: boolean;
@@ -8856,111 +9162,154 @@ function SettingsView({
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-      <section className={`${panelClass} p-5`}>
-        <div className="mb-5 flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-accent">
-            <Bot className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="text-xl font-semibold">AI provider</h2>
-            <p className="mt-1 text-sm text-muted">
-              {aiStatus?.configured
-                ? `${aiStatus.label} key is present`
-                : "Local mode"}
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-3">
-          <SettingRow
-            label="Provider"
-            value={aiStatus?.label ?? "OpenRouter"}
-          />
-          <SettingRow
-            label="Model"
-            value={aiStatus?.modelId ?? "openrouter/free"}
-          />
-          <SettingRow
-            label="Server key"
-            value={aiStatus?.configured ? "Present" : "Missing"}
-          />
-          <SettingRow
-            label="Recommended free start"
-            value="OpenRouter free router"
-          />
-          <SettingRow label="Regional fallback" value="Gemini when available" />
-        </div>
-        <div className="mt-5 rounded-lg border border-separator bg-surface-secondary p-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-7 animate-fade-in">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+          Workspace configuration
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Settings</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+          Manage your AI provider, security posture, and connected services in
+          one place.
+        </p>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className={`${panelClass} p-5`}>
+          <div className="mb-5 flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-accent">
+              <Bot className="h-5 w-5" />
+            </span>
             <div>
-              <p className="text-sm font-semibold">Live provider check</p>
-              <p className="mt-1 text-xs text-muted">
-                Confirms the server key can make a real model call.
+              <h2 className="text-xl font-semibold">AI provider</h2>
+              <p className="mt-1 text-sm text-muted">
+                {aiStatus?.configured
+                  ? `${aiStatus.label} key is present`
+                  : "Local mode"}
               </p>
             </div>
-            <Button
-              className={secondaryButtonClass}
-              disabled={checkingProvider}
-              onClick={testProvider}
-              type="button"
-            >
-              {checkingProvider ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Zap className="h-4 w-4" />
-              )}
-              Test
-            </Button>
           </div>
-          {providerHealth ? (
-            <p
-              className={
-                providerHealth.ok
-                  ? "mt-3 text-sm font-medium text-success"
-                  : "mt-3 text-sm font-medium text-warning"
-              }
-            >
-              {providerHealth.ok ? "Connected: " : "Provider issue: "}
-              {providerHealth.message}
-            </p>
-          ) : null}
-        </div>
-      </section>
+          <div className="grid gap-3">
+            <SettingRow
+              label="Provider"
+              value={aiStatus?.label ?? "OpenRouter"}
+            />
+            <SettingRow
+              label="Model"
+              value={aiStatus?.modelId ?? "openrouter/free"}
+            />
+            <SettingRow
+              label="Server key"
+              value={aiStatus?.configured ? "Present" : "Missing"}
+            />
+            <SettingRow
+              label="Recommended free start"
+              value="OpenRouter free router"
+            />
+            <SettingRow
+              label="Regional fallback"
+              value="Gemini when available"
+            />
+          </div>
+          <div className="mt-5 rounded-lg border border-separator bg-surface-secondary p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Live provider check</p>
+                <p className="mt-1 text-xs text-muted">
+                  Confirms the server key can make a real model call.
+                </p>
+              </div>
+              <Button
+                className={secondaryButtonClass}
+                disabled={checkingProvider}
+                onClick={testProvider}
+                type="button"
+              >
+                {checkingProvider ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4" />
+                )}
+                Test
+              </Button>
+            </div>
+            {providerHealth ? (
+              <p
+                className={
+                  providerHealth.ok
+                    ? "mt-3 text-sm font-medium text-success"
+                    : "mt-3 text-sm font-medium text-warning"
+                }
+              >
+                {providerHealth.ok ? "Connected: " : "Provider issue: "}
+                {providerHealth.message}
+              </p>
+            ) : null}
+          </div>
+        </section>
 
-      <section className={`${panelClass} p-5`}>
-        <div className="mb-5 flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-success-soft text-success">
-            <ShieldCheck className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="text-xl font-semibold">Security posture</h2>
-            <p className="mt-1 text-sm text-muted">
-              Human approval and scoped OAuth.
-            </p>
+        <section className={`${panelClass} p-5`}>
+          <div className="mb-5 flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-lg bg-success-soft text-success">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-xl font-semibold">Security posture</h2>
+              <p className="mt-1 text-sm text-muted">
+                Human approval and scoped OAuth.
+              </p>
+            </div>
           </div>
+          <div className="grid gap-3">
+            <SettingRow
+              label="Google OAuth"
+              value={
+                oauthStatus?.hasDirectGoogleToken
+                  ? "Connected"
+                  : "Not connected"
+              }
+            />
+            <SettingRow
+              label="GitHub OAuth"
+              value={
+                oauthStatus?.github?.connected
+                  ? (oauthStatus.github.login ?? "Connected")
+                  : "Not connected"
+              }
+            />
+            <SettingRow
+              label="Token storage"
+              value="HTTP-only cookie in development"
+            />
+            <SettingRow label="High-impact actions" value="Approval required" />
+            <SettingRow label="Long-term memory" value="Permission required" />
+          </div>
+        </section>
+      </div>
+
+      <section className="space-y-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+            Connections
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+            Integrations
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            Connect the services Relay can read from and act on.
+          </p>
         </div>
-        <div className="grid gap-3">
-          <SettingRow
-            label="Google OAuth"
-            value={
-              oauthStatus?.hasDirectGoogleToken ? "Connected" : "Not connected"
-            }
-          />
-          <SettingRow
-            label="GitHub OAuth"
-            value={
-              oauthStatus?.github?.connected
-                ? (oauthStatus.github.login ?? "Connected")
-                : "Not connected"
-            }
-          />
-          <SettingRow
-            label="Token storage"
-            value="HTTP-only cookie in development"
-          />
-          <SettingRow label="High-impact actions" value="Approval required" />
-          <SettingRow label="Long-term memory" value="Permission required" />
-        </div>
+        <IntegrationsView
+          connectGithub={connectGithub}
+          connectGoogle={connectGoogle}
+          disconnectGithub={disconnectGithub}
+          disconnectGoogle={disconnectGoogle}
+          githubConfigured={githubConfigured}
+          googleConfigured={googleConfigured}
+          oauthStatus={oauthStatus}
+          signedInToGithub={signedInToGithub}
+          signedInToGoogle={signedInToGoogle}
+        />
       </section>
     </div>
   );
@@ -9117,10 +9466,10 @@ function RailDisclosure({
 }
 
 function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
-  const files = briefing?.drive.files ?? [];
+  const files = (briefing?.drive.files ?? []).slice(0, 4);
 
   return (
-    <section className={`${panelClass} hover-lift p-5`}>
+    <section className={`${panelClass} p-5`}>
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Recent files</h2>
@@ -9279,30 +9628,6 @@ function CommandPalette({
   );
 }
 
-function ToastStack({ toasts }: { toasts: Toast[] }) {
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex w-[min(360px,calc(100vw-32px))] flex-col gap-3">
-      {toasts.map((toast) => (
-        <div
-          className={`${panelClass} animate-slide-up border-l-4 p-4 ${
-            toast.tone === "success"
-              ? "border-l-[var(--success)]"
-              : toast.tone === "warning"
-                ? "border-l-[var(--warning)]"
-                : "border-l-[var(--accent)]"
-          }`}
-          key={toast.id}
-        >
-          <p className="text-sm font-semibold">{toast.title}</p>
-          {toast.detail ? (
-            <p className="mt-1 text-xs text-muted">{toast.detail}</p>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function TaskContextMenu({
   contextMenu,
   onClose,
@@ -9349,19 +9674,25 @@ function BrandMark() {
         <p className="brand-wordmark text-base font-semibold leading-5">
           Relay
         </p>
-        <p className="text-xs text-muted">Personal AI OS</p>
+        <p className="text-xs text-muted">Personal AI Assistant</p>
       </div>
     </div>
   );
 }
 
-function BrandSymbol() {
+function BrandSymbol({ compact = false }: { compact?: boolean }) {
   return (
-    <span className="brand-symbol grid h-11 w-11 shrink-0 place-items-center">
+    <span
+      className={`brand-symbol grid shrink-0 place-items-center transition-[width,height] duration-300 ${
+        compact ? "h-9 w-9" : "h-11 w-11"
+      }`}
+    >
       <Image
         alt=""
         aria-hidden="true"
-        className="brand-symbol-image h-11 w-11 object-contain"
+        className={`brand-symbol-image object-contain transition-transform duration-300 ${
+          compact ? "h-8 w-8 scale-90" : "h-11 w-11 scale-100"
+        }`}
         height={44}
         src="/brand/relay-mark-cyan.svg"
         unoptimized
@@ -9395,7 +9726,7 @@ function Field({
       </span>
       <Input
         autoComplete={autoComplete}
-        className="h-11 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none transition placeholder:text-muted focus:border-[var(--accent)]"
+        className="auth-input h-11 w-full rounded-xl px-3 text-sm outline-none transition placeholder:text-muted"
         name={name}
         onChange={
           onChange ? (event) => onChange(event.target.value) : undefined

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   applicationName: "Relay",
-  title: "Relay — Personal AI OS",
+  title: "Relay — Personal AI Assistant",
   description:
     "An enterprise-grade personal AI assistant for chat, scheduling, files, memory, and workspace automation.",
 };
@@ -28,7 +28,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      data-theme="dark"
     >
       <body className="min-h-full flex flex-col">
         <AppCopilotProvider>{children}</AppCopilotProvider>

@@ -3,8 +3,8 @@
 @import "@copilotkit/react-ui/styles.css";
 
 :root {
-  --background: #f4f7fa;
-  --foreground: #142832;
+  --background: #050c12;
+  --foreground: #eef8fb;
 }
 
 @theme inline {
@@ -80,22 +80,26 @@ select:focus-visible {
   --shadow: 0 18px 45px rgba(8, 32, 46, 0.08);
   --shadow-strong: 0 30px 70px rgba(8, 32, 46, 0.16);
   background:
-    radial-gradient(circle at 82% -8%, rgba(0, 169, 206, 0.07), transparent 30rem),
+    radial-gradient(
+      circle at 82% -8%,
+      rgba(0, 169, 206, 0.07),
+      transparent 30rem
+    ),
     linear-gradient(180deg, rgba(255, 255, 255, 0.66), transparent 34rem),
     var(--app-bg);
   isolation: isolate;
 }
 
 .assistant-shell[data-theme="dark"] {
-  --app-bg: #071118;
-  --sidebar: #0a161e;
-  --surface: rgba(14, 28, 37, 0.96);
-  --surface-soft: rgba(19, 38, 48, 0.94);
-  --surface-glass: rgba(10, 22, 30, 0.86);
-  --text: #f0f9fc;
-  --muted: #9fb3bd;
+  --app-bg: #050c12;
+  --sidebar: #07131a;
+  --surface: rgba(10, 21, 29, 0.96);
+  --surface-soft: rgba(15, 32, 41, 0.94);
+  --surface-glass: rgba(8, 18, 25, 0.84);
+  --text: #eef8fb;
+  --muted: #9bb0ba;
   --line: rgba(175, 219, 234, 0.12);
-  --line-strong: rgba(175, 219, 234, 0.22);
+  --line-strong: rgba(175, 219, 234, 0.2);
   --track: rgba(175, 219, 234, 0.13);
   --accent: #35d0ef;
   --accent-strong: #5adef5;
@@ -117,7 +121,11 @@ select:focus-visible {
   --shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
   --shadow-strong: 0 30px 70px rgba(0, 0, 0, 0.34);
   background:
-    radial-gradient(circle at 82% -8%, rgba(0, 169, 206, 0.07), transparent 30rem),
+    radial-gradient(
+      circle at 82% -8%,
+      rgba(0, 169, 206, 0.07),
+      transparent 30rem
+    ),
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 34rem),
     var(--app-bg);
 }
@@ -128,6 +136,7 @@ select:focus-visible {
  * restrained cyan. The Relay mark carries the luminous end of the spectrum.
  * These semantic tokens preserve accessible contrast across product surfaces.
  */
+:root[data-theme="light"],
 .relay-product-shell[data-theme="light"] {
   --background: #f4f7fa;
   --foreground: #142832;
@@ -139,22 +148,41 @@ select:focus-visible {
   --surface-tertiary-foreground: var(--foreground);
   --overlay: #ffffff;
   --overlay-foreground: var(--foreground);
+  --backdrop: rgba(6, 47, 60, 0.46);
   --muted: #647985;
   --default: #e7edf1;
+  --default-hover: #d9e4e9;
   --default-foreground: var(--foreground);
   --accent: #007f9d;
+  --accent-hover: #006f89;
   --accent-foreground: #ffffff;
+  --accent-soft: rgba(0, 127, 157, 0.12);
+  --accent-soft-hover: rgba(0, 127, 157, 0.18);
+  --accent-soft-foreground: #075f73;
   --success: oklch(0.64 0.145 165);
   --success-foreground: oklch(0.18 0.02 165);
+  --success-soft: rgba(18, 129, 93, 0.13);
+  --success-soft-hover: rgba(18, 129, 93, 0.2);
+  --success-soft-foreground: #0e6e50;
   --warning: oklch(0.75 0.145 75);
   --warning-foreground: oklch(0.25 0.045 75);
+  --warning-soft: rgba(161, 92, 0, 0.13);
+  --warning-soft-hover: rgba(161, 92, 0, 0.2);
+  --warning-soft-foreground: #865000;
   --danger: oklch(0.62 0.2 25);
   --danger-foreground: oklch(0.99 0.003 250);
+  --danger-soft: rgba(194, 65, 90, 0.12);
+  --danger-soft-hover: rgba(194, 65, 90, 0.19);
+  --danger-soft-foreground: #ad304b;
+  --segment: rgba(255, 255, 255, 0.92);
+  --segment-foreground: #12313d;
   --border: #c7d3da;
   --separator: #dce5ea;
   --field-background: #ffffff;
   --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
   --field-border: var(--separator);
+  --field-border-hover: #afc0c9;
   --focus: var(--accent);
   --link: var(--accent);
   --app-bg: var(--background);
@@ -172,39 +200,79 @@ select:focus-visible {
   --violet-soft: color-mix(in oklab, var(--violet) 14%, transparent);
   --shadow: var(--surface-shadow);
   --shadow-strong: var(--overlay-shadow);
+  --surface-shadow: 0 2px 6px rgba(8, 32, 46, 0.07);
+  --overlay-shadow:
+    0 24px 60px rgba(8, 32, 46, 0.16), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  --copilot-kit-primary-color: #007f9d;
+  --copilot-kit-contrast-color: #ffffff;
+  --copilot-kit-background-color: #ffffff;
+  --copilot-kit-input-background-color: #edf2f6;
+  --copilot-kit-secondary-color: #ffffff;
+  --copilot-kit-secondary-contrast-color: #142832;
+  --copilot-kit-separator-color: #dce5ea;
+  --copilot-kit-muted-color: #9fb0ba;
+  --copilot-kit-dev-console-bg: #f4f7fa;
+  --copilot-kit-dev-console-text: #142832;
+  --copilot-kit-shadow-sm: 0 1px 2px rgba(8, 32, 46, 0.08);
+  --copilot-kit-shadow-md: 0 10px 28px rgba(8, 32, 46, 0.12);
+  --copilot-kit-shadow-lg: 0 24px 60px rgba(8, 32, 46, 0.18);
   --radius: 0.75rem;
   background:
-    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 5%, transparent), transparent 30rem),
+    radial-gradient(
+      circle at 78% -10%,
+      color-mix(in oklab, var(--accent) 5%, transparent),
+      transparent 30rem
+    ),
     var(--background);
 }
 
+:root[data-theme="dark"],
 .relay-product-shell[data-theme="dark"] {
-  --background: #071118;
-  --foreground: #f0f9fc;
-  --surface: #0e1c25;
+  --background: #050c12;
+  --foreground: #eef8fb;
+  --surface: #0a151d;
   --surface-foreground: var(--foreground);
-  --surface-secondary: #132630;
+  --surface-secondary: #0f2029;
   --surface-secondary-foreground: var(--foreground);
-  --surface-tertiary: #1b3340;
+  --surface-tertiary: #172c36;
   --surface-tertiary-foreground: var(--foreground);
-  --overlay: #11232d;
+  --overlay: #0c1a23;
   --overlay-foreground: var(--foreground);
-  --muted: #9fb3bd;
-  --default: #1b3340;
+  --backdrop: rgba(1, 7, 11, 0.78);
+  --muted: #9bb0ba;
+  --default: #172c36;
+  --default-hover: #203b47;
   --default-foreground: var(--foreground);
   --accent: #35d0ef;
+  --accent-hover: #58dcf4;
   --accent-foreground: #062f3c;
+  --accent-soft: rgba(53, 208, 239, 0.14);
+  --accent-soft-hover: rgba(53, 208, 239, 0.21);
+  --accent-soft-foreground: #d8f7fc;
   --success: oklch(0.72 0.13 165);
   --success-foreground: oklch(0.15 0.025 165);
+  --success-soft: rgba(93, 214, 166, 0.14);
+  --success-soft-hover: rgba(93, 214, 166, 0.21);
+  --success-soft-foreground: #a8efd2;
   --warning: oklch(0.8 0.13 78);
   --warning-foreground: oklch(0.2 0.04 78);
+  --warning-soft: rgba(243, 179, 90, 0.15);
+  --warning-soft-hover: rgba(243, 179, 90, 0.22);
+  --warning-soft-foreground: #ffd89f;
   --danger: oklch(0.7 0.18 25);
   --danger-foreground: oklch(0.98 0.006 250);
-  --border: #385362;
-  --separator: #243d4a;
-  --field-background: #11232d;
+  --danger-soft: rgba(255, 123, 147, 0.14);
+  --danger-soft-hover: rgba(255, 123, 147, 0.21);
+  --danger-soft-foreground: #ffb4c2;
+  --segment: rgba(25, 49, 61, 0.9);
+  --segment-foreground: #eef8fb;
+  --border: #324c5a;
+  --separator: #1c3440;
+  --field-background: #0c1a23;
   --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
   --field-border: var(--separator);
+  --field-border-hover: #385666;
   --focus: var(--accent);
   --link: var(--accent);
   --app-bg: var(--background);
@@ -222,9 +290,29 @@ select:focus-visible {
   --violet-soft: color-mix(in oklab, var(--violet) 16%, transparent);
   --shadow: var(--surface-shadow);
   --shadow-strong: var(--overlay-shadow);
+  --surface-shadow: 0 0 0 1px rgba(175, 219, 234, 0.04);
+  --overlay-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(53, 208, 239, 0.1);
+  --copilot-kit-primary-color: #35d0ef;
+  --copilot-kit-contrast-color: #062f3c;
+  --copilot-kit-background-color: #0a151d;
+  --copilot-kit-input-background-color: #0f2029;
+  --copilot-kit-secondary-color: #0c1a23;
+  --copilot-kit-secondary-contrast-color: #eef8fb;
+  --copilot-kit-separator-color: #1c3440;
+  --copilot-kit-muted-color: #647b86;
+  --copilot-kit-dev-console-bg: #0a151d;
+  --copilot-kit-dev-console-text: #eef8fb;
+  --copilot-kit-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --copilot-kit-shadow-md: 0 12px 30px rgba(0, 0, 0, 0.38);
+  --copilot-kit-shadow-lg: 0 28px 72px rgba(0, 0, 0, 0.5);
   --radius: 0.75rem;
   background:
-    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 7%, transparent), transparent 32rem),
+    radial-gradient(
+      circle at 78% -10%,
+      color-mix(in oklab, var(--accent) 7%, transparent),
+      transparent 32rem
+    ),
     var(--background);
 }
 
@@ -249,6 +337,278 @@ select:focus-visible {
   background: transparent;
 }
 
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+.auth-stage {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--app-bg) 78%, transparent),
+    var(--app-bg)
+  );
+}
+
+.auth-card {
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--surface-glass) 70%, white 2%),
+    color-mix(in oklab, var(--surface-glass) 58%, transparent)
+  ) !important;
+  border-color: color-mix(
+    in oklab,
+    var(--line-strong) 70%,
+    var(--brand-cyan) 14%
+  ) !important;
+  backdrop-filter: blur(22px) saturate(124%);
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.36),
+    0 14px 36px color-mix(in oklab, var(--brand-core) 10%, transparent),
+    inset 0 1px 0 color-mix(in oklab, white 8%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, var(--accent) 5%, transparent);
+  transform: translateY(-2px);
+}
+
+.auth-intro {
+  text-shadow: 0 12px 40px color-mix(in oklab, var(--app-bg) 72%, transparent);
+}
+
+.auth-brand {
+  filter: drop-shadow(
+    0 12px 28px color-mix(in oklab, var(--app-bg) 72%, transparent)
+  );
+}
+
+.auth-mode-tabs {
+  gap: 0;
+  width: 100%;
+}
+
+.auth-mode-tabs .auth-mode-tabs__panel {
+  margin-top: 0.25rem;
+  padding: 1.25rem 0 0;
+}
+
+.auth-card .input {
+  background: color-mix(in oklab, var(--accent) 4%, var(--surface) 58%);
+  border-color: color-mix(in oklab, var(--accent) 15%, var(--line));
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 3%, transparent),
+    0 8px 24px color-mix(in oklab, var(--app-bg) 18%, transparent);
+}
+
+.auth-card .input:hover,
+.auth-card .input[data-hovered="true"] {
+  background: color-mix(in oklab, var(--accent) 7%, var(--surface) 62%);
+  border-color: color-mix(in oklab, var(--accent) 32%, var(--line));
+}
+
+.auth-card .input:focus,
+.auth-card .input[data-focused="true"] {
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface) 66%);
+}
+
+.assistant-shell .auth-card .auth-provider-button {
+  --button-bg: color-mix(in oklab, var(--accent) 8%, var(--surface) 72%);
+  --button-bg-hover: color-mix(in oklab, var(--accent) 13%, var(--surface) 74%);
+  --button-bg-pressed: color-mix(
+    in oklab,
+    var(--accent) 17%,
+    var(--surface) 76%
+  );
+  --button-fg: var(--text);
+  border: 1px solid color-mix(in oklab, var(--accent) 20%, var(--line));
+}
+
+.auth-card .auth-primary-action {
+  box-shadow: 0 12px 30px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+
+.auth-saved-account {
+  align-items: center;
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface) 62%);
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--line));
+  border-radius: 0.85rem;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.55rem 0.6rem;
+}
+
+.auth-saved-account__avatar {
+  align-items: center;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  border-radius: 999px;
+  color: var(--accent);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 750;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.soft-aurora {
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+}
+
+.soft-aurora canvas {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.soft-aurora::after {
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 0 28%,
+      color-mix(in oklab, var(--app-bg) 36%, transparent) 76%,
+      color-mix(in oklab, var(--app-bg) 62%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--app-bg) 22%, transparent),
+      transparent 42%,
+      color-mix(in oklab, var(--app-bg) 34%, transparent)
+    );
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+/*
+ * Portal and hidden-surface contract
+ * HeroUI overlays mount at the document root, so these surfaces deliberately
+ * consume the same Relay tokens as the workspace instead of library defaults.
+ */
+.relay-themed-overlay,
+.modal__dialog,
+.popover,
+.select__popover,
+.date-picker__popover,
+.tooltip {
+  background: color-mix(in oklab, var(--overlay) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(118%);
+  border: 1px solid var(--separator);
+  color: var(--overlay-foreground);
+  box-shadow: var(--overlay-shadow);
+}
+
+.toast {
+  background: color-mix(in oklab, var(--overlay) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid color-mix(in oklab, var(--border) 78%, transparent);
+  box-shadow:
+    var(--overlay-shadow),
+    inset 0 1px 0 color-mix(in oklab, white 6%, transparent);
+}
+
+.toast--accent {
+  background: color-mix(in oklab, var(--accent) 9%, var(--overlay) 91%);
+}
+
+.toast--success {
+  background: color-mix(in oklab, var(--success) 8%, var(--overlay) 92%);
+}
+
+.toast--warning {
+  background: color-mix(in oklab, var(--warning) 8%, var(--overlay) 92%);
+}
+
+.toast--danger {
+  background: color-mix(in oklab, var(--danger) 8%, var(--overlay) 92%);
+}
+
+.assistant-shell .button--secondary,
+.assistant-shell .button--tertiary {
+  --button-bg: color-mix(in oklab, var(--surface-tertiary) 88%, transparent);
+  --button-bg-hover: color-mix(
+    in oklab,
+    var(--accent) 8%,
+    var(--surface-tertiary)
+  );
+  --button-bg-pressed: color-mix(
+    in oklab,
+    var(--accent) 12%,
+    var(--surface-tertiary)
+  );
+  --button-fg: var(--foreground);
+}
+
+.assistant-shell .button--ghost,
+.assistant-shell .button--outline {
+  --button-bg-hover: color-mix(in oklab, var(--accent) 8%, transparent);
+  --button-bg-pressed: color-mix(in oklab, var(--accent) 12%, transparent);
+  --button-fg: var(--foreground);
+}
+
+.assistant-shell .button--outline {
+  border-color: var(--border);
+}
+
+.modal__backdrop--blur,
+.modal__backdrop--opaque {
+  background: var(--backdrop);
+}
+
+.relay-themed-listbox .list-box-item {
+  color: var(--overlay-foreground);
+}
+
+.relay-themed-listbox .list-box-item:hover,
+.relay-themed-listbox .list-box-item[data-hovered="true"],
+.relay-themed-listbox .list-box-item[data-focus="true"] {
+  background: var(--accent-soft);
+}
+
+.relay-themed-listbox
+  .list-box-item:is([aria-selected="true"], [data-selected="true"]) {
+  background: color-mix(in oklab, var(--accent) 14%, var(--overlay));
+  color: var(--accent);
+}
+
+.relay-themed-listbox .list-box-item__indicator {
+  color: var(--accent);
+}
+
+.copilotKitWindow,
+.copilotKitSidebarContentWrapper,
+.copilotKitDebugMenu,
+.copilotKitHelpModal {
+  border-color: var(--copilot-kit-separator-color);
+  box-shadow: var(--copilot-kit-shadow-lg);
+}
+
+.copilotKitInput,
+.copilotKitAttachmentQueueItem,
+.copilotKitCodeBlock {
+  border-color: var(--copilot-kit-separator-color);
+}
+
+.copilotKitDebugMenuItem:hover,
+.copilotKitHelpItemButton:hover {
+  background: color-mix(
+    in oklab,
+    var(--copilot-kit-primary-color) 10%,
+    var(--copilot-kit-dev-console-bg)
+  );
+}
+
 .nav-item {
   overflow: hidden;
   position: relative;
@@ -264,7 +624,9 @@ select:focus-visible {
   position: absolute;
   top: 22%;
   transform: translateX(-4px);
-  transition: opacity 180ms ease, transform 220ms ease;
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease;
   width: 3px;
 }
 
@@ -314,8 +676,16 @@ select:focus-visible {
   animation: fade-in 420ms ease-out both;
   background:
     linear-gradient(135deg, #062f3c 0%, #075b72 54%, #0787a3 100%),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 34px),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 34px);
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.08) 0 1px,
+      transparent 1px 34px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.06) 0 1px,
+      transparent 1px 34px
+    );
   isolation: isolate;
   position: relative;
 }
@@ -323,7 +693,11 @@ select:focus-visible {
 .command-hero::before {
   background:
     linear-gradient(90deg, transparent, rgba(107, 231, 255, 0.12), transparent),
-    radial-gradient(circle at 22% 26%, rgba(114, 223, 242, 0.1), transparent 22%),
+    radial-gradient(
+      circle at 22% 26%,
+      rgba(114, 223, 242, 0.1),
+      transparent 22%
+    ),
     radial-gradient(circle at 80% 0%, rgba(0, 169, 206, 0.2), transparent 34%);
   content: "";
   inset: 0;
@@ -333,7 +707,12 @@ select:focus-visible {
 }
 
 .command-hero::after {
-  background: linear-gradient(115deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  background: linear-gradient(
+    115deg,
+    transparent,
+    rgba(255, 255, 255, 0.16),
+    transparent
+  );
   content: "";
   height: 160%;
   left: -40%;
@@ -348,15 +727,32 @@ select:focus-visible {
 
 .signal-map {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 32px),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 32px);
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16),
+      rgba(255, 255, 255, 0.08)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.08) 0 1px,
+      transparent 1px 32px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.06) 0 1px,
+      transparent 1px 32px
+    );
   position: relative;
 }
 
 .signal-map::after {
   animation: signal-scan 5s ease-in-out infinite;
-  background: linear-gradient(90deg, transparent, rgba(107, 231, 255, 0.2), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(107, 231, 255, 0.2),
+    transparent
+  );
   content: "";
   height: 1px;
   inset: 20% 0 auto;
@@ -366,7 +762,10 @@ select:focus-visible {
 
 .signal-node {
   border-color: rgba(255, 255, 255, 0.18);
-  transition: border-color 180ms ease, background 180ms ease, transform 200ms ease;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 200ms ease;
 }
 
 .signal-node:hover {
@@ -518,7 +917,8 @@ select:focus-visible {
   background: var(--track);
   border: 1px solid var(--line);
   border-radius: 0.45rem;
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.88em;
   padding: 0.12rem 0.35rem;
 }
@@ -582,7 +982,9 @@ select:focus-visible {
   height: 2px;
   opacity: 0;
   position: absolute;
-  transition: opacity 180ms ease, width 220ms ease;
+  transition:
+    opacity 180ms ease,
+    width 220ms ease;
   width: 0;
 }
 
@@ -598,19 +1000,37 @@ select:focus-visible {
 
 .ai-planner {
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--surface) 86%, var(--accent-soft)), var(--surface)),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface) 86%, var(--accent-soft)),
+      var(--surface)
+    ),
     repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 36px);
 }
 
 .profile-identity-band {
   background:
-    linear-gradient(135deg, rgba(6, 47, 60, 0.99), rgba(7, 91, 114, 0.97) 56%, rgba(7, 135, 163, 0.94)),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 30px);
+    linear-gradient(
+      135deg,
+      rgba(6, 47, 60, 0.99),
+      rgba(7, 91, 114, 0.97) 56%,
+      rgba(7, 135, 163, 0.94)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.1) 0 1px,
+      transparent 1px 30px
+    );
   position: relative;
 }
 
 .profile-identity-band::after {
-  background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  background: linear-gradient(
+    110deg,
+    transparent,
+    rgba(255, 255, 255, 0.18),
+    transparent
+  );
   content: "";
   height: 180%;
   pointer-events: none;
@@ -628,7 +1048,9 @@ select:focus-visible {
   inset: 20% auto 20% 2px;
   opacity: 0;
   position: absolute;
-  transition: opacity 160ms ease, transform 180ms ease;
+  transition:
+    opacity 160ms ease,
+    transform 180ms ease;
   width: 2px;
 }
 
@@ -648,7 +1070,11 @@ select:focus-visible {
 }
 
 .brand-symbol::before {
-  background: radial-gradient(circle, color-mix(in oklab, var(--brand-core) 12%, transparent), transparent 68%);
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--brand-core) 12%, transparent),
+    transparent 68%
+  );
   content: "";
   inset: -10%;
   pointer-events: none;
@@ -657,7 +1083,9 @@ select:focus-visible {
 }
 
 .brand-symbol-image {
-  filter: drop-shadow(0 6px 9px color-mix(in oklab, var(--brand-ink) 22%, transparent));
+  filter: drop-shadow(
+    0 6px 9px color-mix(in oklab, var(--brand-ink) 22%, transparent)
+  );
 }
 
 .brand-wordmark {
@@ -686,7 +1114,12 @@ select:focus-visible {
 }
 
 .shine-button::after {
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.32),
+    transparent
+  );
   content: "";
   inset: 0;
   position: absolute;
@@ -702,7 +1135,9 @@ select:focus-visible {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
-  transition: grid-template-rows 260ms ease, opacity 220ms ease;
+  transition:
+    grid-template-rows 260ms ease,
+    opacity 220ms ease;
 }
 
 .collapsible-content > div {
@@ -771,7 +1206,7 @@ select:focus-visible {
 .relay-product-shell .relay-page {
   margin-inline: auto;
   max-width: 1760px;
-  min-height: calc(100vh - 72px);
+  min-height: 100vh;
 }
 
 .relay-product-shell .relay-page--chat {
@@ -780,8 +1215,12 @@ select:focus-visible {
 
 .relay-product-shell .relay-panel,
 .relay-product-shell .card {
+  background: color-mix(in oklab, var(--surface) 89%, transparent);
+  backdrop-filter: blur(14px) saturate(116%);
   border-color: var(--separator);
-  box-shadow: var(--surface-shadow);
+  box-shadow:
+    var(--surface-shadow),
+    inset 0 1px 0 color-mix(in oklab, white 3.5%, transparent);
 }
 
 .relay-product-shell .relay-panel:hover,
@@ -818,19 +1257,22 @@ select:focus-visible {
 }
 
 .relay-product-shell .relay-soft-panel {
+  background: color-mix(in oklab, var(--surface-secondary) 86%, transparent);
+  backdrop-filter: blur(12px) saturate(112%);
   border-color: var(--separator);
 }
 
 .relay-product-shell .sidebar-shell {
   background:
-    linear-gradient(180deg, color-mix(in oklab, var(--accent) 2%, transparent), transparent 18rem),
-    var(--sidebar);
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--accent) 2%, transparent),
+      transparent 18rem
+    ),
+    color-mix(in oklab, var(--sidebar) 91%, transparent);
+  backdrop-filter: blur(16px) saturate(114%);
   border-right: 1px solid var(--separator);
   box-shadow: none;
-}
-
-.relay-product-shell .relay-topbar {
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--separator) 80%, transparent);
 }
 
 .relay-product-shell .nav-item::before {
@@ -922,16 +1364,33 @@ select:focus-visible {
 .relay-product-shell .command-hero {
   background:
     linear-gradient(115deg, #062f3c, #075b72 56%, #0787a3),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 40px),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 40px);
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 0 1px,
+      transparent 1px 40px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.04) 0 1px,
+      transparent 1px 40px
+    );
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 60px rgba(6, 47, 60, 0.18);
 }
 
 .relay-product-shell .command-hero::before {
   background:
-    linear-gradient(90deg, transparent, color-mix(in oklab, var(--signal) 28%, transparent), transparent),
-    radial-gradient(circle at 82% 10%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 38%);
+    linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--signal) 28%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      circle at 82% 10%,
+      color-mix(in oklab, var(--accent) 22%, transparent),
+      transparent 38%
+    );
 }
 
 .relay-product-shell .command-hero::after {
@@ -945,14 +1404,107 @@ select:focus-visible {
 
 .relay-product-shell .profile-identity-band {
   background:
-    linear-gradient(120deg, #062f3c, #075b72 58%, #0787a3),
-    var(--surface);
+    linear-gradient(120deg, #062f3c, #075b72 58%, #0787a3), var(--surface);
 }
 
 .relay-product-shell .interactive-row:hover {
   background: var(--surface-secondary);
   border-color: var(--border);
   transform: none;
+}
+
+.relay-product-shell .relay-dashboard .dashboard-row:hover {
+  background: transparent;
+}
+
+.relay-product-shell .relay-dashboard .dashboard-task-row {
+  background: transparent;
+  transition:
+    background-color 180ms ease,
+    opacity 220ms ease,
+    transform 220ms ease;
+}
+
+.relay-product-shell .relay-dashboard .dashboard-task-row:hover {
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+}
+
+.relay-product-shell .relay-dashboard .dashboard-task-row.is-completing {
+  background: color-mix(in oklab, var(--success) 7%, var(--surface));
+}
+
+.relay-product-shell .dashboard-task-done {
+  --button-bg: transparent;
+  --button-bg-hover: var(--success-soft);
+  --button-bg-pressed: var(--success-soft);
+  --button-fg: var(--success);
+  border: 1.5px solid color-mix(in oklab, var(--success) 86%, transparent);
+  border-radius: 999px;
+  height: 2rem;
+  min-width: 2rem;
+  padding: 0;
+  width: 2rem;
+}
+
+.relay-product-shell .dashboard-task-done.is-completing {
+  --button-bg: var(--success);
+  --button-bg-hover: var(--success);
+  --button-bg-pressed: var(--success);
+  --button-fg: var(--success-foreground);
+  animation: dashboard-task-complete 520ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  border-color: var(--success);
+  box-shadow: 0 0 0 5px var(--success-soft);
+}
+
+.relay-product-shell .task-filter-disclosure {
+  background: color-mix(in oklab, var(--surface-secondary) 44%, transparent);
+}
+
+.relay-product-shell .task-filter-trigger {
+  --button-bg: color-mix(in oklab, var(--accent) 5%, var(--surface));
+  --button-bg-hover: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  --button-bg-pressed: color-mix(in oklab, var(--accent) 14%, var(--surface));
+  --button-fg: var(--text);
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--separator));
+}
+
+.relay-product-shell .task-filter-active-dot {
+  background: var(--accent);
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  height: 0.4rem;
+  width: 0.4rem;
+}
+
+.relay-product-shell .relay-dashboard .interactive-row:hover {
+  background: var(--surface-secondary);
+  border-color: var(--separator);
+}
+
+.relay-product-shell .relay-dashboard .dashboard-row.is-selected {
+  background: color-mix(in oklab, var(--accent) 13%, var(--surface));
+  box-shadow: none;
+}
+
+.relay-product-shell .relay-dashboard .dashboard-mail-row {
+  border-radius: 0 !important;
+  outline-offset: -2px;
+}
+
+.relay-product-shell .relay-dashboard .relay-panel:hover {
+  border-color: var(--separator);
+  box-shadow: var(--surface-shadow);
+  transform: none;
+}
+
+.relay-product-shell .file-browser-row:hover {
+  background: var(--surface-secondary);
+}
+
+.relay-product-shell .file-browser-row.is-selected,
+.relay-product-shell .file-browser-row.is-selected:hover {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .relay-product-shell .interactive-row::after,
@@ -983,11 +1535,7 @@ select:focus-visible {
 
 @media (max-width: 1023px) {
   .relay-product-shell .relay-page {
-    min-height: calc(100vh - 64px);
-  }
-
-  .relay-product-shell .relay-topbar {
-    height: 64px;
+    min-height: 100vh;
   }
 }
 
@@ -1051,6 +1599,24 @@ select:focus-visible {
   50% {
     filter: saturate(1.35);
     opacity: 1;
+  }
+}
+
+@keyframes dashboard-task-complete {
+  0% {
+    transform: scale(1);
+  }
+
+  46% {
+    transform: scale(1.18);
+  }
+
+  72% {
+    transform: scale(0.94);
+  }
+
+  100% {
+    transform: scale(1);
   }
 }
 

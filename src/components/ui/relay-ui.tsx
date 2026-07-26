@@ -133,8 +133,8 @@ export function Select({
         <HeroSelect.Value />
         <HeroSelect.Indicator />
       </HeroSelect.Trigger>
-      <HeroSelect.Popover>
-        <ListBox>
+      <HeroSelect.Popover className="relay-themed-overlay relay-select-popover">
+        <ListBox className="relay-themed-listbox">
           {options.map((option) => (
             <ListBox.Item
               id={option.id}
