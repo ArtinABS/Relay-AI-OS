@@ -9363,7 +9363,7 @@ function BrandSymbol() {
         aria-hidden="true"
         className="brand-symbol-image h-11 w-11 object-contain"
         height={44}
-        src="/brand/relay-mark.svg"
+        src="/brand/relay-mark-cyan.svg"
         unoptimized
         width={44}
       />
