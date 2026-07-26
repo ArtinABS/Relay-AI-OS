@@ -3,8 +3,8 @@
 @import "@copilotkit/react-ui/styles.css";
 
 :root {
-  --background: #faf7fc;
-  --foreground: #27172e;
+  --background: #f4f6f9;
+  --foreground: #182033;
 }
 
 @theme inline {
@@ -22,7 +22,7 @@ body {
 }
 
 ::selection {
-  background: rgba(216, 96, 255, 0.24);
+  background: rgba(81, 70, 155, 0.2);
 }
 
 button,
@@ -50,23 +50,23 @@ select:focus-visible {
 }
 
 .assistant-shell {
-  --app-bg: #faf7fc;
-  --sidebar: rgba(247, 240, 250, 0.9);
-  --surface: rgba(255, 252, 255, 0.94);
-  --surface-soft: rgba(247, 240, 250, 0.92);
-  --surface-glass: rgba(255, 250, 255, 0.82);
-  --text: #27172e;
-  --muted: #74667c;
-  --line: rgba(72, 24, 96, 0.11);
-  --line-strong: rgba(72, 24, 96, 0.22);
-  --track: rgba(72, 24, 96, 0.11);
-  --accent: #7830a8;
-  --accent-strong: #601890;
-  --accent-soft: rgba(168, 72, 216, 0.14);
-  --signal: #a848d8;
-  --signal-soft: rgba(168, 72, 216, 0.13);
-  --violet: #d860ff;
-  --violet-soft: rgba(216, 96, 255, 0.13);
+  --app-bg: #f4f6f9;
+  --sidebar: rgba(238, 241, 246, 0.92);
+  --surface: rgba(255, 255, 255, 0.96);
+  --surface-soft: rgba(238, 241, 246, 0.94);
+  --surface-glass: rgba(255, 255, 255, 0.86);
+  --text: #182033;
+  --muted: #677085;
+  --line: rgba(24, 32, 51, 0.1);
+  --line-strong: rgba(24, 32, 51, 0.19);
+  --track: rgba(24, 32, 51, 0.1);
+  --accent: #51469b;
+  --accent-strong: #403681;
+  --accent-soft: rgba(81, 70, 155, 0.1);
+  --signal: #6b5fc7;
+  --signal-soft: rgba(107, 95, 199, 0.1);
+  --violet: #8176d6;
+  --violet-soft: rgba(129, 118, 214, 0.1);
   --brand-ink: #180048;
   --brand-orbit: #7830a8;
   --brand-violet: #a848d8;
@@ -77,33 +77,33 @@ select:focus-visible {
   --warning-soft: rgba(228, 152, 43, 0.16);
   --danger: #c2415a;
   --danger-soft: rgba(194, 65, 90, 0.12);
-  --shadow: 0 18px 45px rgba(48, 0, 72, 0.09);
-  --shadow-strong: 0 30px 70px rgba(48, 0, 72, 0.18);
+  --shadow: 0 18px 45px rgba(18, 25, 40, 0.08);
+  --shadow-strong: 0 30px 70px rgba(18, 25, 40, 0.16);
   background:
-    radial-gradient(circle at 82% -8%, rgba(216, 96, 255, 0.13), transparent 30rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 34rem),
+    radial-gradient(circle at 82% -8%, rgba(81, 70, 155, 0.07), transparent 30rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.66), transparent 34rem),
     var(--app-bg);
   isolation: isolate;
 }
 
 .assistant-shell[data-theme="dark"] {
-  --app-bg: #0b0612;
-  --sidebar: #12091f;
-  --surface: rgba(24, 12, 37, 0.94);
-  --surface-soft: rgba(31, 16, 47, 0.9);
-  --surface-glass: rgba(18, 9, 31, 0.82);
-  --text: #fbf7fd;
-  --muted: #b8a7c0;
-  --line: rgba(225, 180, 255, 0.11);
-  --line-strong: rgba(225, 180, 255, 0.22);
-  --track: rgba(225, 180, 255, 0.13);
-  --accent: #d860ff;
-  --accent-strong: #e78aff;
-  --accent-soft: rgba(216, 96, 255, 0.17);
-  --signal: #b650e0;
-  --signal-soft: rgba(182, 80, 224, 0.16);
-  --violet: #ed9cff;
-  --violet-soft: rgba(237, 156, 255, 0.15);
+  --app-bg: #0b0f17;
+  --sidebar: #0f141e;
+  --surface: rgba(18, 24, 35, 0.96);
+  --surface-soft: rgba(24, 31, 44, 0.94);
+  --surface-glass: rgba(15, 20, 30, 0.86);
+  --text: #f3f5f8;
+  --muted: #9da7b8;
+  --line: rgba(190, 198, 214, 0.12);
+  --line-strong: rgba(190, 198, 214, 0.22);
+  --track: rgba(190, 198, 214, 0.13);
+  --accent: #9a91e5;
+  --accent-strong: #b0a9ef;
+  --accent-soft: rgba(154, 145, 229, 0.14);
+  --signal: #7e73cf;
+  --signal-soft: rgba(126, 115, 207, 0.14);
+  --violet: #b0a9ef;
+  --violet-soft: rgba(176, 169, 239, 0.13);
   --brand-ink: #180048;
   --brand-orbit: #7830a8;
   --brand-violet: #a848d8;
@@ -116,28 +116,33 @@ select:focus-visible {
   --danger-soft: rgba(255, 123, 147, 0.14);
   --shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
   --shadow-strong: 0 30px 70px rgba(0, 0, 0, 0.34);
+  background:
+    radial-gradient(circle at 82% -8%, rgba(129, 118, 214, 0.07), transparent 30rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 34rem),
+    var(--app-bg);
 }
 
 /*
  * Relay workspace theme
- * A quiet, high-information flight deck using the Relay mark's purple spectrum.
+ * A quiet, high-information flight deck using graphite, slate, and restrained
+ * indigo. The Relay mark carries the brighter end of the brand spectrum.
  * These semantic tokens preserve accessible contrast across product surfaces.
  */
 .relay-product-shell[data-theme="light"] {
-  --background: #faf7fc;
-  --foreground: #27172e;
-  --surface: #fffaff;
+  --background: #f4f6f9;
+  --foreground: #182033;
+  --surface: #ffffff;
   --surface-foreground: var(--foreground);
-  --surface-secondary: #f6eff8;
+  --surface-secondary: #eef1f5;
   --surface-secondary-foreground: var(--foreground);
-  --surface-tertiary: #ebdef0;
+  --surface-tertiary: #e4e8ef;
   --surface-tertiary-foreground: var(--foreground);
-  --overlay: #fffaff;
+  --overlay: #ffffff;
   --overlay-foreground: var(--foreground);
-  --muted: #74667c;
-  --default: #f0e6f3;
+  --muted: #677085;
+  --default: #e9edf3;
   --default-foreground: var(--foreground);
-  --accent: #7830a8;
+  --accent: #51469b;
   --accent-foreground: #ffffff;
   --success: oklch(0.64 0.145 165);
   --success-foreground: oklch(0.18 0.02 165);
@@ -145,9 +150,9 @@ select:focus-visible {
   --warning-foreground: oklch(0.25 0.045 75);
   --danger: oklch(0.62 0.2 25);
   --danger-foreground: oklch(0.99 0.003 250);
-  --border: #d8c5df;
-  --separator: #eaddec;
-  --field-background: #fffaff;
+  --border: #cbd2dd;
+  --separator: #e0e5ec;
+  --field-background: #ffffff;
   --field-foreground: var(--foreground);
   --field-border: var(--separator);
   --focus: var(--accent);
@@ -161,43 +166,43 @@ select:focus-visible {
   --line-strong: var(--border);
   --track: var(--default);
   --accent-strong: var(--accent-hover);
-  --signal: #a848d8;
+  --signal: #6b5fc7;
   --signal-soft: color-mix(in oklab, var(--signal) 14%, transparent);
-  --violet: #d860ff;
+  --violet: #8176d6;
   --violet-soft: color-mix(in oklab, var(--violet) 14%, transparent);
   --shadow: var(--surface-shadow);
   --shadow-strong: var(--overlay-shadow);
   --radius: 0.75rem;
   background:
-    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 30rem),
+    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 5%, transparent), transparent 30rem),
     var(--background);
 }
 
 .relay-product-shell[data-theme="dark"] {
-  --background: #0b0612;
-  --foreground: #fbf7fd;
-  --surface: #180c25;
+  --background: #0b0f17;
+  --foreground: #f3f5f8;
+  --surface: #121823;
   --surface-foreground: var(--foreground);
-  --surface-secondary: #1f102f;
+  --surface-secondary: #181f2c;
   --surface-secondary-foreground: var(--foreground);
-  --surface-tertiary: #2a1739;
+  --surface-tertiary: #202938;
   --surface-tertiary-foreground: var(--foreground);
-  --overlay: #1b0e29;
+  --overlay: #161d29;
   --overlay-foreground: var(--foreground);
-  --muted: #b8a7c0;
-  --default: #291837;
+  --muted: #9da7b8;
+  --default: #202938;
   --default-foreground: var(--foreground);
-  --accent: #d860ff;
-  --accent-foreground: #180048;
+  --accent: #9a91e5;
+  --accent-foreground: #10141f;
   --success: oklch(0.72 0.13 165);
   --success-foreground: oklch(0.15 0.025 165);
   --warning: oklch(0.8 0.13 78);
   --warning-foreground: oklch(0.2 0.04 78);
   --danger: oklch(0.7 0.18 25);
   --danger-foreground: oklch(0.98 0.006 250);
-  --border: #4b2b59;
-  --separator: #34203e;
-  --field-background: #1c1029;
+  --border: #3b4658;
+  --separator: #283243;
+  --field-background: #161d29;
   --field-foreground: var(--foreground);
   --field-border: var(--separator);
   --focus: var(--accent);
@@ -211,15 +216,15 @@ select:focus-visible {
   --line-strong: var(--border);
   --track: var(--default);
   --accent-strong: var(--accent-hover);
-  --signal: #b650e0;
+  --signal: #7e73cf;
   --signal-soft: color-mix(in oklab, var(--signal) 16%, transparent);
-  --violet: #ed9cff;
+  --violet: #b0a9ef;
   --violet-soft: color-mix(in oklab, var(--violet) 16%, transparent);
   --shadow: var(--surface-shadow);
   --shadow-strong: var(--overlay-shadow);
   --radius: 0.75rem;
   background:
-    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 32rem),
+    radial-gradient(circle at 78% -10%, color-mix(in oklab, var(--accent) 7%, transparent), transparent 32rem),
     var(--background);
 }
 
@@ -308,7 +313,7 @@ select:focus-visible {
 .command-hero {
   animation: fade-in 420ms ease-out both;
   background:
-    linear-gradient(135deg, #180048 0%, #481878 52%, #7830a8 100%),
+    linear-gradient(135deg, #111827 0%, #222842 52%, #3f3b75 100%),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 34px),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 34px);
   isolation: isolate;
@@ -317,9 +322,9 @@ select:focus-visible {
 
 .command-hero::before {
   background:
-    linear-gradient(90deg, transparent, rgba(216, 96, 255, 0.2), transparent),
-    radial-gradient(circle at 22% 26%, rgba(216, 120, 240, 0.2), transparent 22%),
-    radial-gradient(circle at 80% 0%, rgba(216, 96, 255, 0.3), transparent 34%);
+    linear-gradient(90deg, transparent, rgba(129, 118, 214, 0.14), transparent),
+    radial-gradient(circle at 22% 26%, rgba(154, 145, 229, 0.12), transparent 22%),
+    radial-gradient(circle at 80% 0%, rgba(107, 95, 199, 0.2), transparent 34%);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -351,7 +356,7 @@ select:focus-visible {
 
 .signal-map::after {
   animation: signal-scan 5s ease-in-out infinite;
-  background: linear-gradient(90deg, transparent, rgba(216, 96, 255, 0.28), transparent);
+  background: linear-gradient(90deg, transparent, rgba(129, 118, 214, 0.22), transparent);
   content: "";
   height: 1px;
   inset: 20% 0 auto;
@@ -371,7 +376,7 @@ select:focus-visible {
 }
 
 .signal-node[data-tone="blue"] {
-  --node-color: #d860ff;
+  --node-color: #7ba7d9;
 }
 
 .signal-node[data-tone="green"] {
@@ -383,11 +388,11 @@ select:focus-visible {
 }
 
 .signal-node[data-tone="violet"] {
-  --node-color: #ed9cff;
+  --node-color: #b0a9ef;
 }
 
 .signal-node[data-tone="cyan"] {
-  --node-color: #b650e0;
+  --node-color: #70b8c1;
 }
 
 .signal-node-icon {
@@ -599,7 +604,7 @@ select:focus-visible {
 
 .profile-identity-band {
   background:
-    linear-gradient(135deg, rgba(24, 0, 72, 0.97), rgba(72, 24, 120, 0.94) 52%, rgba(120, 48, 168, 0.92)),
+    linear-gradient(135deg, rgba(17, 24, 39, 0.98), rgba(34, 40, 66, 0.96) 56%, rgba(63, 59, 117, 0.94)),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 30px);
   position: relative;
 }
@@ -643,24 +648,20 @@ select:focus-visible {
 }
 
 .brand-symbol::before {
-  background: radial-gradient(circle, color-mix(in oklab, var(--brand-electric) 28%, transparent), transparent 68%);
+  background: radial-gradient(circle, color-mix(in oklab, var(--brand-orbit) 12%, transparent), transparent 68%);
   content: "";
-  inset: -22%;
+  inset: -10%;
   pointer-events: none;
   position: absolute;
   z-index: -1;
 }
 
 .brand-symbol-image {
-  filter:
-    drop-shadow(0 7px 10px color-mix(in oklab, var(--brand-ink) 28%, transparent))
-    drop-shadow(0 0 8px color-mix(in oklab, var(--brand-electric) 22%, transparent));
+  filter: drop-shadow(0 6px 9px color-mix(in oklab, var(--brand-ink) 22%, transparent));
 }
 
 .brand-wordmark {
-  background: linear-gradient(102deg, var(--text) 18%, var(--brand-violet) 72%, var(--brand-electric));
-  background-clip: text;
-  color: transparent;
+  color: var(--text);
   letter-spacing: -0.025em;
 }
 
@@ -800,11 +801,11 @@ select:focus-visible {
 }
 
 .relay-product-shell .task-rail-card:hover {
-  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
-  border-color: color-mix(in oklab, var(--accent) 62%, var(--border));
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--border));
   box-shadow:
     0 22px 44px color-mix(in oklab, var(--foreground) 16%, transparent),
-    0 8px 18px color-mix(in oklab, var(--accent) 12%, transparent);
+    0 8px 18px color-mix(in oklab, var(--accent) 8%, transparent);
   transform: translateY(-6px);
   z-index: 1;
 }
@@ -822,7 +823,7 @@ select:focus-visible {
 
 .relay-product-shell .sidebar-shell {
   background:
-    linear-gradient(180deg, color-mix(in oklab, var(--accent) 4%, transparent), transparent 18rem),
+    linear-gradient(180deg, color-mix(in oklab, var(--accent) 2%, transparent), transparent 18rem),
     var(--sidebar);
   border-right: 1px solid var(--separator);
   box-shadow: none;
@@ -920,11 +921,11 @@ select:focus-visible {
 
 .relay-product-shell .command-hero {
   background:
-    linear-gradient(115deg, #180048, #481878 54%, #7830a8),
+    linear-gradient(115deg, #111827, #222842 56%, #3f3b75),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 40px),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 40px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 60px color-mix(in oklab, var(--accent) 16%, transparent);
+  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.18);
 }
 
 .relay-product-shell .command-hero::before {
@@ -944,7 +945,7 @@ select:focus-visible {
 
 .relay-product-shell .profile-identity-band {
   background:
-    linear-gradient(120deg, #180048, #481878 58%, #7830a8),
+    linear-gradient(120deg, #111827, #222842 58%, #3f3b75),
     var(--surface);
 }
 
@@ -975,9 +976,9 @@ select:focus-visible {
 }
 
 .relay-product-shell .markdown-content pre {
-  background: #180c25;
+  background: #101521;
   border-color: color-mix(in oklab, white 10%, transparent);
-  color: #f8effb;
+  color: #f1f4f8;
 }
 
 @media (max-width: 1023px) {
