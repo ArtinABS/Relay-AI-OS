@@ -624,6 +624,9 @@ function mapDriveFile(file: {
   mimeType?: string | null;
   webViewLink?: string | null;
   modifiedTime?: string | null;
+  size?: string | number | null;
+  appProperties?: Record<string, string> | null;
+  properties?: Record<string, string> | null;
   owners?: Array<{
     displayName?: string | null;
     emailAddress?: string | null;
@@ -636,6 +639,12 @@ function mapDriveFile(file: {
     mimeType: file.mimeType ?? "application/octet-stream",
     webViewLink: file.webViewLink ?? null,
     modifiedTime: file.modifiedTime ?? null,
+    size:
+      file.size != null && Number.isFinite(Number(file.size))
+        ? Number(file.size)
+        : null,
+    appProperties: file.appProperties ?? {},
+    properties: file.properties ?? {},
     owner:
       file.owners?.[0]?.displayName ??
       file.owners?.[0]?.emailAddress ??
@@ -670,7 +679,7 @@ export async function listRecentDriveFilesForUser(
       .join(" and "),
     orderBy: "modifiedTime desc",
     fields:
-      "files(id,name,mimeType,webViewLink,modifiedTime,owners(displayName,emailAddress),parents)",
+      "files(id,name,mimeType,webViewLink,modifiedTime,size,appProperties,properties,owners(displayName,emailAddress),parents)",
   });
 
   return {
@@ -1256,6 +1265,44 @@ function createRawEmail(input: {
   return encodeBase64Url(`${headers.join("\r\n")}\r\n\r\n${input.body}`);
 }
 
+type GmailPayloadPart = {
+  body?: {
+    attachmentId?: string | null;
+    size?: number | null;
+  } | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  parts?: GmailPayloadPart[] | null;
+};
+
+function collectGmailAttachments(
+  part: GmailPayloadPart | null | undefined,
+  attachments: Array<{
+    attachmentId: string | null;
+    filename: string;
+    mimeType: string;
+    size: number;
+  }> = [],
+) {
+  if (!part) return attachments;
+
+  const filename = part.filename?.trim();
+  if (filename) {
+    attachments.push({
+      attachmentId: part.body?.attachmentId ?? null,
+      filename,
+      mimeType: part.mimeType ?? "application/octet-stream",
+      size: part.body?.size ?? 0,
+    });
+  }
+
+  for (const child of part.parts ?? []) {
+    collectGmailAttachments(child, attachments);
+  }
+
+  return attachments;
+}
+
 function mapGmailMessage(message: {
   id?: string | null;
   threadId?: string | null;
@@ -1263,6 +1310,10 @@ function mapGmailMessage(message: {
   labelIds?: string[] | null;
   payload?: {
     headers?: Array<{ name?: string | null; value?: string | null }> | null;
+    body?: GmailPayloadPart["body"];
+    filename?: string | null;
+    mimeType?: string | null;
+    parts?: GmailPayloadPart[] | null;
   } | null;
   internalDate?: string | null;
 }) {
@@ -1281,6 +1332,7 @@ function mapGmailMessage(message: {
         : null),
     snippet: message.snippet ?? null,
     labelIds: message.labelIds ?? [],
+    attachments: collectGmailAttachments(message.payload),
   };
 }
 
@@ -1311,8 +1363,7 @@ export async function listGmailMessagesForUser(
         auth,
         userId: "me",
         id: message.id ?? "",
-        format: "metadata",
-        metadataHeaders: ["Subject", "From", "To", "Date"],
+        format: "full",
       });
 
       return mapGmailMessage(response.data);

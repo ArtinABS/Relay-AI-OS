@@ -62,6 +62,20 @@ type GithubPullResponse = {
   };
 };
 
+type GithubTreeResponse = {
+  sha: string;
+  truncated: boolean;
+  tree: Array<{
+    mode: string;
+    path: string;
+    sha: string;
+    size?: number;
+    type: "blob" | "tree" | "commit";
+    url: string;
+  }>;
+  url: string;
+};
+
 export type GithubRepository = {
   id: number;
   name: string;
@@ -113,6 +127,14 @@ export type GithubPullRequest = {
   headRef?: string | null;
   baseRef?: string | null;
   repositoryFullName: string;
+};
+
+export type GithubTreeEntry = {
+  mode: string;
+  path: string;
+  sha: string;
+  size?: number;
+  type: "blob" | "tree" | "commit";
 };
 
 function toRepository(repo: GithubRepoResponse): GithubRepository {
@@ -204,6 +226,31 @@ export async function listGithubRepositoriesForUser(
   return {
     ok: true,
     repositories: repos.map(toRepository),
+  };
+}
+
+export async function listGithubRepositoryTree(
+  tokens: DirectGithubTokens,
+  owner: string,
+  repo: string,
+  ref: string,
+) {
+  const result = await githubApi<GithubTreeResponse>(
+    tokens,
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
+  );
+
+  return {
+    ok: true,
+    sha: result.sha,
+    truncated: result.truncated,
+    entries: result.tree.map((entry) => ({
+      mode: entry.mode,
+      path: entry.path,
+      sha: entry.sha,
+      size: entry.size,
+      type: entry.type,
+    })),
   };
 }
 

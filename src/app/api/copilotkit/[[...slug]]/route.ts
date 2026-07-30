@@ -6,9 +6,9 @@ import {
 
 import { workAgentPrompt } from "@/lib/agent/prompt";
 import { agentTools } from "@/lib/agent/tools";
-import { getAssistantModelConfig } from "@/lib/ai/provider";
+import { getCopilotModelConfig } from "@/lib/ai/copilot-provider";
 
-const assistantModel = getAssistantModelConfig();
+const assistantModel = getCopilotModelConfig();
 
 const runtime = new CopilotRuntime({
   agents: {
@@ -26,12 +26,28 @@ const runtime = new CopilotRuntime({
   openGenerativeUI: true,
 });
 
-const handler = createCopilotRuntimeHandler({
+const singleRouteHandler = createCopilotRuntimeHandler({
   runtime,
   basePath: "/api/copilotkit",
   mode: "single-route",
 });
 
-export const GET = handler;
-export const POST = handler;
-export const OPTIONS = handler;
+const multiRouteHandler = createCopilotRuntimeHandler({
+  runtime,
+  basePath: "/api/copilotkit",
+  mode: "multi-route",
+});
+
+function isBaseRuntimeRequest(request: Request) {
+  const pathname = new URL(request.url).pathname.replace(/\/$/, "");
+  return pathname === "/api/copilotkit";
+}
+
+export const GET = multiRouteHandler;
+export const PATCH = multiRouteHandler;
+export const DELETE = multiRouteHandler;
+export const POST = (request: Request) =>
+  isBaseRuntimeRequest(request)
+    ? singleRouteHandler(request)
+    : multiRouteHandler(request);
+export const OPTIONS = singleRouteHandler;

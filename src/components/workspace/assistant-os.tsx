@@ -1,14 +1,14 @@
 "use client";
 
 import type {
+  CSSProperties,
+  DragEvent as ReactDragEvent,
   FormEvent,
   KeyboardEvent,
-  MouseEvent,
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from "react";
 import {
-  Avatar,
   Calendar,
   Card,
   Checkbox,
@@ -30,32 +30,92 @@ import {
   toast,
 } from "@heroui/react";
 import { parseDate, type DateValue } from "@internationalized/date";
+import {
+  useAui,
+  useAuiState,
+  type ThreadMessage,
+} from "@assistant-ui/react";
+import {
+  convertFileListToFileUIParts,
+  type FileUIPart,
+} from "ai";
+import { RelayAssistantRuntimeProvider } from "@/components/assistant-ui/relay-runtime";
+import { RelayThread } from "@/components/assistant-ui/relay-thread";
+import { GithubRepositoryExplorer } from "@/components/github/github-repository-explorer";
 import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentTitle,
+  AttachmentTrigger,
+} from "@/components/ui/attachment";
+import {
+  Marker,
+  MarkerContent,
+  MarkerIcon,
+} from "@/components/ui/marker";
+import {
+  TaskRichTextEditor,
+  type TaskRichDocument,
+} from "@/components/ui/task-rich-text-editor";
+import {
+  TreeExpander,
+  TreeIcon,
+  TreeLabel,
+  TreeNode,
+  TreeNodeContent,
+  TreeNodeTrigger,
+  TreeProvider,
+  TreeView,
+  useTree,
+} from "@/components/ui/tree";
 import SoftAurora from "@/components/ui/soft-aurora";
+import {
+  relayMessageFiles,
+  relayMessageText,
+  type RelayChatMessage,
+} from "@/lib/ai/relay-chat";
 import Image from "next/image";
 import {
   Activity,
   AlertCircle,
+  Archive,
+  ArchiveRestore,
+  ArrowDown,
+  ArrowUp,
   ArrowRight,
   Bell,
+  BookOpen,
   Bot,
   Brain,
+  BriefcaseBusiness,
   CalendarDays,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Cloud,
   Columns3,
-  Command,
+  Copy,
   Database,
   ExternalLink,
   Filter,
   FileSpreadsheet,
   FileText,
+  FolderTree,
   FolderOpen,
   GitBranch,
   Globe,
+  Heart,
+  Home,
   KeyRound,
   LayoutDashboard,
   Link2,
@@ -65,22 +125,29 @@ import {
   LogIn,
   LogOut,
   Mail,
-  Menu,
   MessageSquare,
   Mic,
   MoreHorizontal,
   Paperclip,
+  Palette,
+  Pencil,
   Plus,
+  Plane,
   RefreshCcw,
   Search,
-  Send,
   Settings,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
+  Square,
+  Trash2,
   UploadCloud,
   User,
   Users,
+  Volume2,
   Wand2,
+  Dumbbell,
+  Target,
   X,
   Zap,
   type LucideIcon,
@@ -99,7 +166,6 @@ type ViewId =
   | "tasks"
   | "files"
   | "github"
-  | "memory"
   | "profile"
   | "settings";
 
@@ -145,7 +211,35 @@ type GoogleTaskInput = {
   due: string | null;
   priority: GoogleTaskPriority;
   taskListId: string | null;
+  categoryId: string | null;
+  repositoryFullName?: string | null;
 };
+
+type TaskCategoryIconName =
+  | "book"
+  | "briefcase"
+  | "fitness"
+  | "folder"
+  | "globe"
+  | "heart"
+  | "home"
+  | "palette"
+  | "plane"
+  | "shopping"
+  | "sparkles"
+  | "target"
+  | "users";
+
+type TaskCategory = {
+  icon: TaskCategoryIconName;
+  id: string;
+  name: string;
+  parentId: string | null;
+};
+
+type TaskCategoryAssignments = Record<string, string>;
+type TaskRepositoryAssignments = Record<string, string>;
+type TaskRichDescriptions = Record<string, TaskRichDocument>;
 
 type RelayNote = {
   id: string;
@@ -228,7 +322,11 @@ type DriveFile = {
   mimeType: string;
   webViewLink?: string | null;
   modifiedTime?: string | null;
+  size?: number | null;
   owner?: string | null;
+  parents?: string[];
+  appProperties?: Record<string, string>;
+  properties?: Record<string, string>;
 };
 
 type GoogleTask = {
@@ -241,6 +339,7 @@ type GoogleTask = {
   updated?: string | null;
   taskListId?: string | null;
   taskListTitle?: string | null;
+  repositoryFullName?: string | null;
 };
 
 type GmailMessage = {
@@ -252,6 +351,12 @@ type GmailMessage = {
   date?: string | null;
   snippet?: string | null;
   labelIds?: string[];
+  attachments?: Array<{
+    attachmentId?: string | null;
+    filename: string;
+    mimeType: string;
+    size: number;
+  }>;
 };
 
 type ScheduledEmail = {
@@ -291,6 +396,7 @@ type GoogleContact = {
 };
 
 type GithubRepository = {
+  defaultBranch?: string;
   id: number;
   name: string;
   fullName: string;
@@ -331,7 +437,7 @@ type GithubPullRequest = {
 
 type Briefing = {
   localTime: string;
-  focus: RelayTask | null;
+  focus: GoogleTask | null;
   counts: {
     openTasks: number;
     completedTasks: number;
@@ -426,23 +532,7 @@ type ContextWorkspaceMode =
   | "contacts"
   | "email";
 
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-  surface?: GeneratedSurface;
-  surfaceContext?: GeneratedSurfaceContext;
-  surfaceStatus?: "active" | "done";
-  toolSummary?: string;
-  toolLink?: string | null;
-};
-
-type AssistantEndpointResponse = {
-  role?: "assistant";
-  content?: string;
-  aiUsed?: boolean;
-};
+type Message = RelayChatMessage;
 
 type NavItem = {
   id: ViewId;
@@ -457,22 +547,11 @@ const primaryNavItems: NavItem[] = [
   { id: "tasks", label: "Tasks", icon: ListTodo },
   { id: "files", label: "Files", icon: FolderOpen },
   { id: "github", label: "GitHub", icon: GitBranch },
-  { id: "memory", label: "Memory", icon: Brain },
 ];
 
-const utilityNavItems: NavItem[] = [
-  { id: "profile", label: "Profile", icon: User },
-  { id: "settings", label: "Settings", icon: Settings },
-];
-
-const starterMessages: Message[] = [
-  {
-    id: "m-start",
-    role: "assistant",
-    content:
-      "Good evening. I am connected to your configured AI provider when available, with local tools for tasks, notes, OAuth status, calendar checks, and generated work surfaces.",
-    timestamp: "Now",
-  },
+const sidebarNavGroups: Array<{ label: string; items: NavItem[] }> = [
+  { label: "Start", items: primaryNavItems.slice(0, 2) },
+  { label: "Workspace", items: primaryNavItems.slice(2) },
 ];
 
 const integrationRows = [
@@ -521,24 +600,60 @@ const primaryButtonClass =
   "inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButtonClass =
   "interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-separator bg-surface-secondary px-4 text-sm font-semibold text-foreground transition hover:border-border-secondary hover:bg-surface-tertiary";
+const taskCategoryStorageKey = "relay.task-categories.v1";
+const taskCategoryAssignmentStorageKey = "relay.task-category-assignments.v1";
+const taskArchiveStorageKey = "relay.task-archive.v1";
+const taskRichDescriptionStorageKey = "relay.task-rich-descriptions.v1";
+const taskRepositoryAssignmentStorageKey =
+  "relay.task-repository-assignments.v1";
+const taskLayoutStorageKey = "relay.task-layout.v1";
+const defaultTaskLayout = { railWidth: 288, calendarHeight: 240 };
+const defaultTaskCategories: TaskCategory[] = [
+  { icon: "heart", id: "personal", name: "Personal", parentId: null },
+  {
+    icon: "shopping",
+    id: "personal-errands",
+    name: "Errands",
+    parentId: "personal",
+  },
+  {
+    icon: "home",
+    id: "personal-home",
+    name: "Home",
+    parentId: "personal",
+  },
+  { icon: "briefcase", id: "work", name: "Work", parentId: null },
+  {
+    icon: "target",
+    id: "work-projects",
+    name: "Projects",
+    parentId: "work",
+  },
+  {
+    icon: "users",
+    id: "work-meetings",
+    name: "Meetings",
+    parentId: "work",
+  },
+];
+const taskCategoryIconMap: Record<TaskCategoryIconName, LucideIcon> = {
+  book: BookOpen,
+  briefcase: BriefcaseBusiness,
+  fitness: Dumbbell,
+  folder: FolderOpen,
+  globe: Globe,
+  heart: Heart,
+  home: Home,
+  palette: Palette,
+  plane: Plane,
+  shopping: ShoppingBag,
+  sparkles: Sparkles,
+  target: Target,
+  users: Users,
+};
 const calendarStartHour = 7;
 const calendarEndHour = 24;
 const calendarHourHeight = 56;
-
-function createId(prefix: string) {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-
-  return `${prefix}-${Math.random().toString(36).slice(2)}`;
-}
-
-function nowLabel() {
-  return new Intl.DateTimeFormat("en", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date());
-}
 
 function formatEventTime(value?: string | null) {
   if (!value) return "Time unavailable";
@@ -564,60 +679,281 @@ function formatFileTime(value?: string | null) {
   );
 }
 
-function driveFileType(mimeType: string) {
-  if (mimeType.includes("document")) return "Docs";
-  if (mimeType.includes("spreadsheet")) return "Sheets";
-  if (mimeType.includes("presentation")) return "Slides";
-  if (mimeType.includes("pdf")) return "PDF";
-  if (mimeType.includes("image")) return "Image";
-  if (mimeType.includes("folder")) return "Folder";
-  return "File";
+function formatFileSize(value?: number | null) {
+  if (!value || value < 1) return "Size unavailable";
+  const units = ["B", "KB", "MB", "GB"];
+  const unitIndex = Math.min(
+    Math.floor(Math.log(value) / Math.log(1024)),
+    units.length - 1,
+  );
+  const amount = value / 1024 ** unitIndex;
+  return `${amount >= 10 || unitIndex === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[unitIndex]}`;
 }
 
-type DriveFileCategory = "all" | "folder" | "document" | "image";
+function driveFileFormat(file: DriveFile) {
+  const extension = file.name.includes(".")
+    ? file.name.split(".").pop()?.trim()
+    : null;
+  if (extension && extension.length <= 8) return extension.toUpperCase();
 
-function driveFileCategory(
-  mimeType: string,
-): Exclude<DriveFileCategory, "all"> {
-  if (mimeType.includes("folder")) return "folder";
-  if (mimeType.includes("image")) return "image";
-  return "document";
+  const mimeType =
+    file.appProperties?.attachmentMimeType ?? file.mimeType ?? "";
+  const subtype = mimeType.split("/").pop()?.split(".").pop();
+  return subtype ? subtype.replaceAll("-", " ").toUpperCase() : "FILE";
 }
 
-async function readJsonResponse<T>(response: Response): Promise<T | null> {
-  const text = await response.text();
-  if (!text) return null;
+type DriveFileKind =
+  | "aistudio"
+  | "docs"
+  | "drive"
+  | "folder"
+  | "gmail"
+  | "image"
+  | "pdf"
+  | "sheets"
+  | "slides";
 
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return null;
+type DriveFileFilter = "all" | DriveFileKind;
+
+const driveFileKindMeta: Record<
+  DriveFileKind,
+  {
+    badgeClass: string;
+    label: string;
+    openLabel: string;
+    icon: LucideIcon;
   }
+> = {
+  aistudio: {
+    badgeClass: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
+    icon: Bot,
+    label: "AI Studio",
+    openLabel: "Open in AI Studio",
+  },
+  docs: {
+    badgeClass: "bg-blue-500/15 text-blue-600 dark:text-blue-300",
+    icon: FileText,
+    label: "Google Docs",
+    openLabel: "Open in Google Docs",
+  },
+  drive: {
+    badgeClass: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+    icon: Cloud,
+    label: "Drive",
+    openLabel: "Open in Drive",
+  },
+  folder: {
+    badgeClass: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
+    icon: FolderOpen,
+    label: "Drive folder",
+    openLabel: "Open folder in Drive",
+  },
+  gmail: {
+    badgeClass: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
+    icon: Mail,
+    label: "Gmail",
+    openLabel: "Open in Gmail",
+  },
+  image: {
+    badgeClass: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-300",
+    icon: FileText,
+    label: "Image",
+    openLabel: "Open image in Drive",
+  },
+  pdf: {
+    badgeClass: "bg-red-500/15 text-red-600 dark:text-red-300",
+    icon: FileText,
+    label: "PDF",
+    openLabel: "Open PDF in Drive",
+  },
+  sheets: {
+    badgeClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    icon: FileSpreadsheet,
+    label: "Google Sheets",
+    openLabel: "Open in Google Sheets",
+  },
+  slides: {
+    badgeClass: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    icon: Columns3,
+    label: "Google Slides",
+    openLabel: "Open in Google Slides",
+  },
+};
+
+function driveFileKind(file: DriveFile): DriveFileKind {
+  const mimeType = file.mimeType.toLowerCase();
+  const name = file.name.toLowerCase();
+  const webViewLink = file.webViewLink?.toLowerCase() ?? "";
+  const appMetadata = JSON.stringify({
+    ...file.appProperties,
+    ...file.properties,
+  }).toLowerCase();
+
+  if (
+    webViewLink.includes("aistudio.google.com") ||
+    mimeType.includes("makersuite") ||
+    appMetadata.includes("aistudio") ||
+    appMetadata.includes("ai studio") ||
+    appMetadata.includes("makersuite") ||
+    name.endsWith(".prompt")
+  ) {
+    return "aistudio";
+  }
+  if (
+    webViewLink.includes("mail.google.com") ||
+    mimeType.includes("message/rfc822") ||
+    mimeType.includes("gmail")
+  ) {
+    return "gmail";
+  }
+  if (mimeType.includes("spreadsheet")) return "sheets";
+  if (mimeType.includes("presentation")) return "slides";
+  if (mimeType.includes("document")) return "docs";
+  if (mimeType.includes("folder")) return "folder";
+  if (mimeType.includes("pdf")) return "pdf";
+  if (mimeType.includes("image")) return "image";
+  return "drive";
+}
+
+function driveFileType(file: DriveFile) {
+  return driveFileKindMeta[driveFileKind(file)].label;
+}
+
+function driveFileDestination(file: DriveFile) {
+  const kind = driveFileKind(file);
+  const id = file.id ? encodeURIComponent(file.id) : null;
+  let href = file.webViewLink ?? null;
+
+  if (id && kind === "sheets") {
+    href = `https://docs.google.com/spreadsheets/d/${id}/edit`;
+  } else if (id && kind === "docs") {
+    href = `https://docs.google.com/document/d/${id}/edit`;
+  } else if (id && kind === "slides") {
+    href = `https://docs.google.com/presentation/d/${id}/edit`;
+  } else if (id && kind === "folder") {
+    href = `https://drive.google.com/drive/folders/${id}`;
+  } else if (!href && kind === "aistudio") {
+    href = "https://aistudio.google.com/app/library";
+  } else if (!href && kind === "gmail") {
+    href = `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(`"${file.name}"`)}`;
+  } else if (id && !href && kind !== "gmail" && kind !== "aistudio") {
+    href = `https://drive.google.com/file/d/${id}/view`;
+  }
+
+  return {
+    href,
+    label: driveFileKindMeta[kind].openLabel,
+  };
+}
+
+function driveFileOpenBehavior(file: DriveFile) {
+  const kind = driveFileKind(file);
+
+  if (kind === "gmail") {
+    return {
+      detail:
+        "Opens the original email so the attachment stays alongside its message context.",
+      title: "Original email in Gmail",
+    };
+  }
+  if (kind === "folder") {
+    return {
+      detail: "Opens the folder with its current Drive contents and sharing.",
+      title: "Folder in Google Drive",
+    };
+  }
+  if (kind === "sheets" || kind === "docs" || kind === "slides") {
+    return {
+      detail: "Opens the native editor. Changes continue syncing to Drive.",
+      title: driveFileKindMeta[kind].openLabel.replace("Open in ", ""),
+    };
+  }
+  if (kind === "aistudio") {
+    return {
+      detail: "Opens the saved prompt in AI Studio when its direct link is available.",
+      title: "Google AI Studio",
+    };
+  }
+
+  return {
+    detail: "Opens the Drive preview where you can inspect, share, or download it.",
+    title: "Google Drive preview",
+  };
+}
+
+function FileTypeBadge({ file }: { file: DriveFile }) {
+  const kind = driveFileKind(file);
+  const meta = driveFileKindMeta[kind];
+  const Glyph = meta.icon;
+
+  return (
+    <span
+      className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.badgeClass}`}
+    >
+      <Glyph className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{meta.label}</span>
+    </span>
+  );
 }
 
 function DriveFileGlyph({
   className,
-  mimeType,
+  file,
 }: {
   className: string;
-  mimeType: string;
+  file: DriveFile;
 }) {
-  if (mimeType.includes("spreadsheet"))
-    return <FileSpreadsheet className={className} />;
-  if (mimeType.includes("presentation"))
-    return <Columns3 className={className} />;
-  if (mimeType.includes("folder")) return <FolderOpen className={className} />;
-  return <FileText className={className} />;
+  const Glyph = driveFileKindMeta[driveFileKind(file)].icon;
+  return <Glyph className={className} />;
 }
 
 export function AssistantOS() {
   const [stage, setStage] = useState<AppStage>("auth");
+
+  if (stage === "workspace") {
+    return (
+      <RelayAssistantRuntimeProvider>
+        <AssistantOSRuntimeContent stage={stage} setStage={setStage} />
+      </RelayAssistantRuntimeProvider>
+    );
+  }
+
+  return <AssistantOSContent stage={stage} setStage={setStage} />;
+}
+
+function AssistantOSRuntimeContent({
+  setStage,
+  stage,
+}: {
+  setStage: (stage: AppStage) => void;
+  stage: AppStage;
+}) {
+  const aui = useAui();
+
+  return (
+    <AssistantOSContent
+      appendPrompt={(prompt) => {
+        if (aui.thread.getState().isRunning) return;
+        aui.thread.append(prompt);
+      }}
+      setStage={setStage}
+      stage={stage}
+    />
+  );
+}
+
+function AssistantOSContent({
+  appendPrompt,
+  setStage,
+  stage,
+}: {
+  appendPrompt?: (prompt: string) => void;
+  setStage: (stage: AppStage) => void;
+  stage: AppStage;
+}) {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [activeView, setActiveView] = useState<ViewId>("chat");
-  const [messages, setMessages] = useState<Message[]>(starterMessages);
-  const [input, setInput] = useState("");
-  const [agentLoading, setAgentLoading] = useState(false);
   const [tasks, setTasks] = useState<RelayTask[]>([]);
   const [taskColumns, setTaskColumns] = useState<TaskColumn[]>([]);
   const [notes, setNotes] = useState<RelayNote[]>([]);
@@ -627,13 +963,7 @@ export function AssistantOS() {
     null,
   );
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
-  const [commandOpen, setCommandOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    task: RelayTask;
-  } | null>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -692,25 +1022,7 @@ export function AssistantOS() {
       }, 0);
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, []);
-
-  useEffect(() => {
-    function handleKeydown(event: globalThis.KeyboardEvent) {
-      const key = typeof event.key === "string" ? event.key.toLowerCase() : "";
-      if ((event.metaKey || event.ctrlKey) && key === "k") {
-        event.preventDefault();
-        setCommandOpen((current) => !current);
-      }
-
-      if (key === "escape") {
-        setCommandOpen(false);
-        setContextMenu(null);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeydown);
-    return () => window.removeEventListener("keydown", handleKeydown);
-  }, []);
+  }, [setStage]);
 
   function addToast(
     title: string,
@@ -856,6 +1168,7 @@ export function AssistantOS() {
     addToast("Memory saved", "Stored in local notes.", "success");
   }
 
+  /*
   function completeSurfaceMessage(
     messageId: string,
     summary: string,
@@ -866,10 +1179,20 @@ export function AssistantOS() {
         message.id === messageId
           ? {
               ...message,
-              content: link ? `✓ [${summary}](${link})` : `✓ ${summary}`,
-              surfaceStatus: "done",
-              toolSummary: undefined,
-              toolLink: null,
+              metadata: {
+                ...message.metadata,
+                timestamp: message.metadata?.timestamp ?? nowLabel(),
+                surfaceStatus: "done",
+                toolSummary: undefined,
+                toolLink: null,
+              },
+              parts: [
+                {
+                  type: "text",
+                  text: link ? `✓ [${summary}](${link})` : `✓ ${summary}`,
+                  state: "done",
+                },
+              ],
             }
           : message,
       ),
@@ -879,165 +1202,60 @@ export function AssistantOS() {
   async function submitMessage(
     event?: FormEvent<HTMLFormElement>,
     overrideMessage?: string,
+    files?: FileUIPart[],
   ) {
     event?.preventDefault();
     const message = (overrideMessage ?? input).trim();
-    if (!message || agentLoading) return;
+    if ((!message && !files?.length) || agentLoading) return;
 
     if (!overrideMessage) setInput("");
     setActiveView("chat");
-    setAgentLoading(true);
-    setMessages((current) => [
-      ...current,
-      {
-        id: createId("user"),
-        role: "user",
-        content: message,
-        timestamp: nowLabel(),
-      },
-    ]);
 
     const generatedSurface = inferGeneratedSurface(message);
 
     try {
-      let responseOk = false;
-      let responseStatus = 0;
-      let data: AssistantEndpointResponse | null = null;
+      await sendMessage({
+        text: message || "Review the attached files.",
+        files,
+        metadata: { timestamp: nowLabel() },
+      });
 
-      try {
-        const response = await fetch("/api/assistant/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message,
-            history: [
-              ...messages.slice(-14).map((item) => ({
-                role: item.role,
-                content: item.toolSummary
-                  ? `${item.content} ${item.toolSummary}`.trim()
-                  : item.content,
-              })),
-              { role: "user", content: message },
-            ],
-          }),
-        });
-        responseOk = response.ok;
-        responseStatus = response.status;
-        data = await readJsonResponse<AssistantEndpointResponse>(response);
-      } catch (error) {
-        data = {
-          content:
-            error instanceof Error
-              ? `AI endpoint request failed: ${error.message}`
-              : "AI endpoint request failed before it returned a response.",
-          aiUsed: false,
-        };
-      }
-
-      if (!responseOk || data?.aiUsed === false || !data) {
-        const fallbackResponse = await fetch("/api/local-agent/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message }),
-        });
-        const fallbackData =
-          await readJsonResponse<AssistantEndpointResponse>(fallbackResponse);
-
-        if (!fallbackResponse.ok || !fallbackData?.content) {
-          throw new Error(
-            fallbackData?.content ??
-              `Local fallback failed with HTTP ${fallbackResponse.status}.`,
-          );
-        }
-
+      if (generatedSurface) {
         setMessages((current) => [
           ...current,
           {
-            id: createId("assistant"),
+            id: createId("surface"),
             role: "assistant",
-            content: [
-              data?.content
-                ? `Provider status: ${data.content}`
-                : responseStatus
-                  ? `Provider status: AI endpoint returned HTTP ${responseStatus} without JSON.`
-                  : "Provider status: AI endpoint did not respond.",
-              `Local fallback: ${fallbackData.content}`,
-            ]
-              .filter(Boolean)
-              .join("\n\n"),
-            timestamp: nowLabel(),
+            metadata: {
+              timestamp: nowLabel(),
+              surface: generatedSurface.surface,
+              surfaceContext: generatedSurface.context,
+              surfaceStatus: "active",
+            },
+            parts: [],
           },
-          ...(generatedSurface
-            ? [
-                {
-                  id: createId("surface"),
-                  role: "assistant" as const,
-                  content: "",
-                  timestamp: nowLabel(),
-                  surface: generatedSurface.surface,
-                  surfaceContext: generatedSurface.context,
-                  surfaceStatus: "active" as const,
-                },
-              ]
-            : []),
         ]);
-
-        await refreshWorkspace();
-        return;
       }
-
-      if (!data?.content) {
-        throw new Error(
-          responseStatus
-            ? `AI endpoint returned HTTP ${responseStatus} without content.`
-            : "AI endpoint returned no content.",
-        );
-      }
-      const assistantContent = data.content;
-
-      setMessages((current) => [
-        ...current,
-        {
-          id: createId("assistant"),
-          role: "assistant" as const,
-          content: assistantContent,
-          timestamp: nowLabel(),
-        },
-        ...(generatedSurface
-          ? [
-              {
-                id: createId("surface"),
-                role: "assistant" as const,
-                content: "",
-                timestamp: nowLabel(),
-                surface: generatedSurface.surface,
-                surfaceContext: generatedSurface.context,
-                surfaceStatus: "active" as const,
-              },
-            ]
-          : []),
-      ]);
 
       await refreshWorkspace();
-    } catch {
-      setMessages((current) => [
-        ...current,
-        {
-          id: createId("assistant"),
-          role: "assistant",
-          content:
-            "The local agent endpoint did not respond. The dashboard is still available in local mode.",
-          timestamp: nowLabel(),
-        },
-      ]);
-    } finally {
-      setAgentLoading(false);
+    } catch (error) {
+      addToast(
+        "Chat request failed",
+        error instanceof Error
+          ? error.message
+          : "The assistant did not return a response.",
+        "warning",
+      );
     }
   }
 
+  */
   function runPrompt(prompt: string) {
-    setInput("");
-    void submitMessage(undefined, prompt);
+    const message = prompt.trim();
+    if (!message || !appendPrompt) return;
+
+    setActiveView("chat");
+    appendPrompt(message);
   }
 
   function enterAfterAuth() {
@@ -1104,52 +1322,6 @@ export function AssistantOS() {
     }
   }
 
-  const commandActions = [
-    {
-      label: "Open dashboard",
-      icon: LayoutDashboard,
-      run: () => setActiveView("dashboard"),
-    },
-    {
-      label: "Open chat",
-      icon: MessageSquare,
-      run: () => setActiveView("chat"),
-    },
-    {
-      label: "Plan a meeting",
-      icon: CalendarDays,
-      run: () => runPrompt("Schedule a meeting"),
-    },
-    {
-      label: "Create task",
-      icon: ListTodo,
-      run: () => runPrompt("add task Review weekly priorities"),
-    },
-    {
-      label: "Check OAuth status",
-      icon: ShieldCheck,
-      run: () => runPrompt("OAuth status"),
-    },
-    {
-      label: "Review GitHub",
-      icon: GitBranch,
-      run: () =>
-        runPrompt(
-          "Summarize my GitHub repositories, issues, and pull requests",
-        ),
-    },
-    {
-      label: "Open integrations",
-      icon: Cloud,
-      run: () => setActiveView("settings"),
-    },
-    {
-      label: "Open profile",
-      icon: User,
-      run: () => setActiveView("profile"),
-    },
-  ];
-
   const shared = {
     theme,
     setTheme,
@@ -1173,7 +1345,6 @@ export function AssistantOS() {
     <div
       className={`assistant-shell ${theme} ${stage === "auth" ? "" : "relay-product-shell"} min-h-screen bg-[var(--app-bg)] text-[var(--text)] transition-colors duration-300`}
       data-theme={theme}
-      onClick={() => setContextMenu(null)}
     >
       <Toast.Provider maxVisibleToasts={4} placement="bottom end" width={380} />
 
@@ -1200,7 +1371,6 @@ export function AssistantOS() {
           addTask={addTask}
           aiStatus={aiStatus}
           briefing={briefing}
-          completeSurfaceMessage={completeSurfaceMessage}
           completeTask={completeTask}
           connectGithub={connectGithub}
           connectGoogle={connectGoogle}
@@ -1208,8 +1378,6 @@ export function AssistantOS() {
           disconnectGoogle={disconnectGoogle}
           githubConfigured={githubConfigured}
           googleConfigured={googleConfigured}
-          input={input}
-          messages={messages}
           notes={notes}
           oauthStatus={oauthStatus}
           onSignOut={handleSignOut}
@@ -1218,35 +1386,17 @@ export function AssistantOS() {
           refreshWorkspace={refreshWorkspace}
           runPrompt={runPrompt}
           setActiveView={setActiveView}
-          setCommandOpen={setCommandOpen}
-          setContextMenu={setContextMenu}
-          setInput={setInput}
           setSidebarOpen={setSidebarOpen}
           setTheme={setTheme}
           sidebarOpen={sidebarOpen}
           signedInToGithub={signedInToGithub}
           signedInToGoogle={signedInToGoogle}
-          submitMessage={submitMessage}
           taskColumns={taskColumns}
           tasks={tasks}
           theme={theme}
-          loading={agentLoading}
         />
       ) : null}
 
-      <CommandPalette
-        actions={commandActions}
-        open={commandOpen}
-        setOpen={setCommandOpen}
-      />
-
-      {contextMenu ? (
-        <TaskContextMenu
-          contextMenu={contextMenu}
-          onComplete={() => completeTask(contextMenu.task)}
-          onClose={() => setContextMenu(null)}
-        />
-      ) : null}
     </div>
   );
 }
@@ -1875,7 +2025,6 @@ function WorkspaceExperience({
   addTask,
   aiStatus,
   briefing,
-  completeSurfaceMessage,
   completeTask,
   connectGithub,
   connectGoogle,
@@ -1883,9 +2032,6 @@ function WorkspaceExperience({
   disconnectGoogle,
   githubConfigured,
   googleConfigured,
-  input,
-  loading,
-  messages,
   notes,
   oauthStatus,
   onSignOut,
@@ -1894,15 +2040,11 @@ function WorkspaceExperience({
   refreshWorkspace,
   runPrompt,
   setActiveView,
-  setCommandOpen,
-  setContextMenu,
-  setInput,
   setSidebarOpen,
   setTheme,
   sidebarOpen,
   signedInToGithub,
   signedInToGoogle,
-  submitMessage,
   taskColumns,
   tasks,
   theme,
@@ -1912,11 +2054,6 @@ function WorkspaceExperience({
   addTask: (input: AddTaskInput) => Promise<void>;
   aiStatus: AiStatus | null;
   briefing: Briefing | null;
-  completeSurfaceMessage: (
-    messageId: string,
-    summary: string,
-    link?: string | null,
-  ) => void;
   completeTask: (task: RelayTask) => Promise<void>;
   connectGithub: () => void;
   connectGoogle: () => void;
@@ -1924,9 +2061,6 @@ function WorkspaceExperience({
   disconnectGoogle: () => void;
   githubConfigured: boolean;
   googleConfigured: boolean;
-  input: string;
-  loading: boolean;
-  messages: Message[];
   notes: RelayNote[];
   oauthStatus: OAuthStatus | null;
   onSignOut: () => Promise<void>;
@@ -1935,56 +2069,83 @@ function WorkspaceExperience({
   refreshWorkspace: () => Promise<void>;
   runPrompt: (prompt: string) => void;
   setActiveView: (view: ViewId) => void;
-  setCommandOpen: (open: boolean) => void;
-  setContextMenu: (
-    menu: { x: number; y: number; task: RelayTask } | null,
-  ) => void;
-  setInput: (value: string) => void;
   setSidebarOpen: (open: boolean) => void;
   setTheme: (theme: ThemeMode) => void;
   sidebarOpen: boolean;
   signedInToGithub: boolean;
   signedInToGoogle: boolean;
-  submitMessage: (event?: FormEvent<HTMLFormElement>) => Promise<void>;
   taskColumns: TaskColumn[];
   tasks: RelayTask[];
   theme: ThemeMode;
 }) {
   const [navCollapsed, setNavCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [sidebarWidth, setSidebarWidth] = useState(296);
+  const {
+    repositoryAssignments,
+    setTaskRepository,
+  } = useTaskRepositoryAssignments();
+  const repositoryLinkedTasks = useMemo(
+    () =>
+      (briefing?.googleTasks?.tasks ?? []).map((task) => {
+        const taskKey = googleTaskKey(task);
+        return {
+          ...task,
+          repositoryFullName:
+            (taskKey ? repositoryAssignments[taskKey] : null) ??
+            task.repositoryFullName ??
+            null,
+        };
+      }),
+    [briefing?.googleTasks?.tasks, repositoryAssignments],
+  );
   const showGlobalRightSidebar = false;
+  const workspaceContentClass =
+    activeView === "chat" ||
+    activeView === "calendar" ||
+    activeView === "files"
+      ? "overflow-hidden"
+      : "overflow-y-auto overscroll-contain";
 
   return (
     <div
       className="workspace-frame min-h-screen transition-[grid-template-columns] duration-300 ease-out lg:grid lg:h-screen lg:min-h-0 lg:overflow-hidden"
       style={{
         gridTemplateColumns: showGlobalRightSidebar
-          ? `${navCollapsed ? 76 : sidebarWidth}px minmax(0,1fr) 340px`
-          : `${navCollapsed ? 76 : sidebarWidth}px minmax(0,1fr)`,
+          ? `${navCollapsed ? 72 : sidebarWidth}px minmax(0,1fr) 340px`
+          : `${navCollapsed ? 72 : sidebarWidth}px minmax(0,1fr)`,
       }}
     >
       <Sidebar
         activeView={activeView}
         collapsed={navCollapsed}
         mobileOpen={sidebarOpen}
-        onToggleCollapsed={() => setNavCollapsed((current) => !current)}
+        oauthStatus={oauthStatus}
+        onToggleCollapsed={() =>
+          setNavCollapsed((current) => !current)
+        }
+        onSignOut={onSignOut}
+        passwordAuth={passwordAuth}
         setActiveView={setActiveView}
-        setCommandOpen={setCommandOpen}
         setDesktopWidth={setSidebarWidth}
         setMobileOpen={setSidebarOpen}
-        setTheme={setTheme}
-        theme={theme}
         width={sidebarWidth}
       />
 
-      <main className="workspace-main min-w-0 border-l border-separator lg:h-screen lg:overflow-y-auto lg:overscroll-contain">
+      <main className="workspace-main flex h-[100dvh] min-w-0 flex-col overflow-hidden border-l border-separator">
         <div
-          className={
-            activeView === "chat"
-              ? "relay-page relay-page--chat p-3 sm:p-4"
-              : "relay-page p-4 sm:p-6 xl:p-8"
-          }
+          className={`workspace-main-content min-h-0 flex-1 pt-[4.75rem] lg:pt-0 ${workspaceContentClass}`}
         >
+          <div
+            className={
+              activeView === "chat"
+                ? "relay-page relay-page--chat h-full min-h-0 p-0"
+                : activeView === "calendar"
+                  ? "relay-page relay-page--calendar p-3 sm:p-4 xl:p-5"
+                  : activeView === "files"
+                    ? "relay-page relay-page--files p-3 sm:p-4 xl:p-5"
+                    : "relay-page min-h-full p-4 sm:p-6 xl:p-8"
+            }
+          >
           {activeView === "dashboard" ? (
             <DashboardView
               briefing={briefing}
@@ -1992,7 +2153,6 @@ function WorkspaceExperience({
               notes={notes}
               openTasks={openTasks}
               runPrompt={runPrompt}
-              setActiveView={setActiveView}
               tasks={tasks}
             />
           ) : null}
@@ -2002,18 +2162,12 @@ function WorkspaceExperience({
               addMemory={addMemory}
               addTask={addTask}
               briefing={briefing}
-              completeSurfaceMessage={completeSurfaceMessage}
               completeTask={completeTask}
-              input={input}
-              loading={loading}
-              messages={messages}
               notes={notes}
               openTasks={openTasks}
               refreshWorkspace={refreshWorkspace}
               runPrompt={runPrompt}
-              setInput={setInput}
               signedInToGoogle={signedInToGoogle}
-              submitMessage={submitMessage}
               taskColumns={taskColumns}
               tasks={tasks}
             />
@@ -2028,31 +2182,25 @@ function WorkspaceExperience({
 
           {activeView === "tasks" ? (
             <TasksView
-              addTask={addTask}
               briefing={briefing}
-              completeTask={completeTask}
-              openTasks={openTasks}
+              repositories={briefing?.githubRepositories?.repositories ?? []}
+              repositoryAssignments={repositoryAssignments}
               refreshWorkspace={refreshWorkspace}
-              setContextMenu={setContextMenu}
-              taskColumns={taskColumns}
-              tasks={tasks}
+              setTaskRepository={setTaskRepository}
             />
           ) : null}
 
           {activeView === "files" ? (
-            <FilesView briefing={briefing} runPrompt={runPrompt} />
+            <FilesWorkspaceView briefing={briefing} />
           ) : null}
 
           {activeView === "github" ? (
-            <GithubView
-              briefing={briefing}
-              runPrompt={runPrompt}
-              signedInToGithub={signedInToGithub}
+            <GithubRepositoryExplorer
+              repositories={briefing?.githubRepositories?.repositories ?? []}
+              repositoryError={briefing?.githubRepositories?.reason}
+              signedIn={signedInToGithub}
+              tasks={repositoryLinkedTasks}
             />
-          ) : null}
-
-          {activeView === "memory" ? (
-            <MemoryView addMemory={addMemory} notes={notes} />
           ) : null}
 
           {activeView === "profile" ? (
@@ -2074,6 +2222,7 @@ function WorkspaceExperience({
 
           {activeView === "settings" ? (
             <SettingsView
+              addMemory={addMemory}
               aiStatus={aiStatus}
               connectGithub={connectGithub}
               connectGoogle={connectGoogle}
@@ -2081,11 +2230,15 @@ function WorkspaceExperience({
               disconnectGoogle={disconnectGoogle}
               githubConfigured={githubConfigured}
               googleConfigured={googleConfigured}
+              notes={notes}
               oauthStatus={oauthStatus}
+              setTheme={setTheme}
               signedInToGithub={signedInToGithub}
               signedInToGoogle={signedInToGoogle}
+              theme={theme}
             />
           ) : null}
+          </div>
         </div>
       </main>
 
@@ -2106,137 +2259,291 @@ function Sidebar({
   activeView,
   collapsed,
   mobileOpen,
+  oauthStatus,
+  onSignOut,
   onToggleCollapsed,
+  passwordAuth,
   setActiveView,
-  setCommandOpen,
   setDesktopWidth,
   setMobileOpen,
-  setTheme,
-  theme,
   width,
 }: {
   activeView: ViewId;
   collapsed: boolean;
   mobileOpen: boolean;
+  oauthStatus: OAuthStatus | null;
+  onSignOut: () => Promise<void>;
   onToggleCollapsed: () => void;
+  passwordAuth: PasswordAuthStatus | null;
   setActiveView: (view: ViewId) => void;
-  setCommandOpen: (open: boolean) => void;
   setDesktopWidth: (width: number) => void;
   setMobileOpen: (open: boolean) => void;
-  setTheme: (theme: ThemeMode) => void;
-  theme: ThemeMode;
   width: number;
 }) {
   const effectiveCollapsed = collapsed && !mobileOpen;
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const displayName =
+    passwordAuth?.user?.name ||
+    oauthStatus?.github?.name ||
+    oauthStatus?.github?.login ||
+    "Relay user";
+  const displayEmail =
+    passwordAuth?.user?.email ||
+    oauthStatus?.googleEmail ||
+    oauthStatus?.github?.email ||
+    "Local workspace";
+  const initials =
+    displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "R";
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+
+    const closeOnOutsidePress = (event: globalThis.PointerEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenuOpen(false);
+    };
+
+    window.addEventListener("pointerdown", closeOnOutsidePress);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePress);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileMenuOpen]);
+
+  const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    const resize = (moveEvent: globalThis.PointerEvent) => {
+      setDesktopWidth(
+        Math.min(360, Math.max(248, startWidth + moveEvent.clientX - startX)),
+      );
+    };
+    const stopResizing = () => {
+      window.removeEventListener("pointermove", resize);
+      window.removeEventListener("pointerup", stopResizing);
+      window.removeEventListener("pointercancel", stopResizing);
+    };
+
+    window.addEventListener("pointermove", resize);
+    window.addEventListener("pointerup", stopResizing);
+    window.addEventListener("pointercancel", stopResizing);
+  };
+
   const content = (
     <aside
-      className={`sidebar-shell relative flex h-full flex-col bg-[var(--sidebar)] py-5 text-left transition-all duration-300 ease-out ${effectiveCollapsed ? "px-3" : "px-4"}`}
+      className="sidebar-shell relative flex h-full flex-col overflow-hidden text-left transition-all duration-300 ease-out motion-reduce:transition-none"
+      data-collapsed={effectiveCollapsed ? "true" : "false"}
     >
-      <div className="mb-7 flex min-h-10 items-center justify-between">
-        {effectiveCollapsed ? <BrandSymbol compact /> : <BrandMark />}
-        <Button
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted lg:hidden"
-          onClick={() => setMobileOpen(false)}
-          type="button"
-          title="Close"
-        >
-          <X className="h-5 w-5" />
-        </Button>
-      </div>
-
-      <nav className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1">
-        {primaryNavItems.map((item) => {
-          const Icon = item.icon;
-          const active = activeView === item.id;
-
-          return (
-            <Button
-              className={`nav-item flex h-11 w-full items-center gap-3 rounded-xl px-4 text-sm font-semibold transition ${
-                active
-                  ? "is-active bg-surface text-foreground shadow-surface"
-                  : "text-muted hover:bg-surface-secondary hover:text-foreground"
-              } ${
-                effectiveCollapsed
-                  ? "justify-center px-0"
-                  : "justify-start text-left"
-              }`}
-              key={item.id}
-              onClick={() => {
-                setActiveView(item.id);
-                setMobileOpen(false);
-              }}
-              type="button"
-              title={item.label}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {effectiveCollapsed ? null : item.label}
-            </Button>
-          );
-        })}
-      </nav>
-
-      <div className="mt-4 shrink-0 border-t border-separator pt-4">
-        <nav className="space-y-1.5">
-          {utilityNavItems.map((item) => {
-            const Icon = item.icon;
-            const active = activeView === item.id;
-
-            return (
-              <Button
-                className={`nav-item flex h-11 w-full items-center gap-3 rounded-xl px-4 text-sm font-semibold transition ${
-                  active
-                    ? "is-active bg-surface text-foreground shadow-surface"
-                    : "text-muted hover:bg-surface-secondary hover:text-foreground"
-                } ${
-                  effectiveCollapsed
-                    ? "justify-center px-0"
-                    : "justify-start text-left"
-                }`}
-                key={item.id}
-                onClick={() => {
-                  setActiveView(item.id);
-                  setMobileOpen(false);
-                }}
-                type="button"
-                title={item.label}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {effectiveCollapsed ? null : item.label}
-              </Button>
-            );
-          })}
-        </nav>
-        <div
-          className={`mt-3 flex gap-2 ${
-            effectiveCollapsed ? "flex-col items-center" : ""
-          }`}
-        >
+      <header className="sidebar-header shrink-0">
+        <div className="sidebar-brand flex min-h-12 items-center">
           <Button
-            className={iconButtonClass}
-            onClick={() => setCommandOpen(true)}
+            aria-label={
+              mobileOpen
+                ? "Close navigation"
+                : collapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
+            className="sidebar-brand-toggle grid h-11 w-11 min-w-11 shrink-0 place-items-center rounded-xl"
+            isIconOnly
+            onClick={() => {
+              if (mobileOpen) {
+                setMobileOpen(false);
+                return;
+              }
+              onToggleCollapsed();
+            }}
             type="button"
-            title="Open command palette"
+            title={
+              mobileOpen
+                ? "Close navigation"
+                : collapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
           >
-            <Command className="h-4 w-4" />
+            <BrandSymbol compact={effectiveCollapsed} />
           </Button>
-          <AnimatedThemeToggler
-            className={iconButtonClass}
-            onThemeChange={setTheme}
-            theme={theme}
-          />
+          {!effectiveCollapsed ? (
+            <div className="min-w-0">
+              <p className="brand-wordmark truncate text-[0.95rem] font-semibold leading-5">
+                Relay
+              </p>
+              <p className="truncate text-[0.68rem] font-medium tracking-[0.08em] text-muted">
+                PERSONAL WORKSPACE
+              </p>
+            </div>
+          ) : null}
         </div>
+        {mobileOpen ? (
+          <Button
+            className="sidebar-mobile-close h-9 w-9 min-w-9 place-items-center rounded-lg text-muted"
+            isIconOnly
+            onClick={() => setMobileOpen(false)}
+            type="button"
+            title="Close navigation"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </header>
+
+      <div className="sidebar-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        {sidebarNavGroups.map((group) => (
+          <SidebarNavGroup
+            activeView={activeView}
+            collapsed={effectiveCollapsed}
+            items={group.items}
+            key={group.label}
+            label={group.label}
+            onNavigate={(view) => {
+              setActiveView(view);
+              setMobileOpen(false);
+            }}
+          />
+        ))}
       </div>
+
+      <footer className="sidebar-footer shrink-0">
+        <div
+          className="sidebar-profile-control relative"
+          ref={profileMenuRef}
+        >
+          {profileMenuOpen ? (
+            <div
+              className="sidebar-profile-menu"
+              role="menu"
+              aria-label="Account menu"
+            >
+              <div className="sidebar-profile-menu-identity">
+                <span className="sidebar-profile-avatar sidebar-profile-avatar--large">
+                  {initials}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {displayName}
+                  </p>
+                  <p className="truncate text-xs text-muted">{displayEmail}</p>
+                </div>
+              </div>
+
+              <div className="sidebar-profile-menu-actions">
+                {[
+                  { id: "profile" as const, label: "Profile", icon: User },
+                  { id: "settings" as const, label: "Settings", icon: Settings },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const active = activeView === item.id;
+
+                  return (
+                    <Button
+                      aria-current={active ? "page" : undefined}
+                      className={`sidebar-profile-menu-item ${
+                        active
+                          ? "bg-surface text-foreground shadow-surface"
+                          : "text-muted hover:bg-surface-secondary hover:text-foreground"
+                      }`}
+                      key={item.id}
+                      onClick={() => {
+                        setActiveView(item.id);
+                        setProfileMenuOpen(false);
+                        setMobileOpen(false);
+                      }}
+                      role="menuitem"
+                      type="button"
+                    >
+                      <span>{item.label}</span>
+                      <Icon className="h-4 w-4" />
+                    </Button>
+                  );
+                })}
+
+                <div className="sidebar-profile-menu-separator" />
+                <Button
+                  className="sidebar-profile-menu-item text-danger hover:bg-danger-soft"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    void onSignOut();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span>Log out</span>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <Button
+            aria-expanded={profileMenuOpen}
+            aria-haspopup="menu"
+            className={`sidebar-profile-trigger ${
+              effectiveCollapsed ? "justify-center px-0" : "justify-start"
+            }`}
+            onClick={() => setProfileMenuOpen((current) => !current)}
+            type="button"
+            title="Open account menu"
+          >
+            <span className="sidebar-profile-avatar">{initials}</span>
+            {!effectiveCollapsed ? (
+              <>
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-sm font-semibold text-foreground">
+                    {displayName}
+                  </span>
+                  <span className="block truncate text-[0.7rem] text-muted">
+                    {displayEmail}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-muted transition-transform ${
+                    profileMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </>
+            ) : null}
+          </Button>
+        </div>
+      </footer>
 
       {!effectiveCollapsed ? (
-        <Input
+        <div
           aria-label="Resize sidebar"
-          className="absolute right-1 top-1/2 hidden h-28 w-1 -translate-y-1/2 cursor-ew-resize appearance-none rounded-full bg-[var(--line-strong)] opacity-0 transition hover:opacity-100 lg:block"
-          max={360}
-          min={220}
-          onChange={(event) => setDesktopWidth(Number(event.target.value))}
+          aria-orientation="vertical"
+          aria-valuemax={360}
+          aria-valuemin={248}
+          aria-valuenow={width}
+          className="sidebar-resize-control absolute right-0 top-0 hidden h-full w-2 cursor-ew-resize lg:block"
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              setDesktopWidth(Math.max(248, width - 8));
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              setDesktopWidth(Math.min(360, width + 8));
+            }
+          }}
+          onPointerDown={handleResizeStart}
+          role="separator"
+          tabIndex={0}
           title="Resize sidebar"
-          type="range"
-          value={width}
         />
       ) : null}
     </aside>
@@ -2244,35 +2551,92 @@ function Sidebar({
 
   return (
     <>
-      <div className="relative hidden h-screen lg:block">
-        {content}
-        <Button
-          className="absolute -right-4 top-7 z-30 h-8 w-8 min-w-8 rounded-full border border-separator bg-overlay text-muted shadow-overlay transition hover:border-accent hover:text-accent"
-          isIconOnly
-          onClick={onToggleCollapsed}
-          type="button"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <Columns3 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
       {!mobileOpen ? (
         <Button
-          className="fixed left-4 top-4 z-30 border border-separator bg-overlay text-foreground shadow-overlay lg:hidden"
+          aria-label="Open navigation"
+          className="sidebar-mobile-brand-trigger fixed left-4 top-4 z-30 grid h-11 w-11 min-w-11 place-items-center rounded-xl bg-overlay shadow-overlay lg:hidden"
           isIconOnly
           onClick={() => setMobileOpen(true)}
           type="button"
           title="Open navigation"
         >
-          <Menu className="h-4 w-4" />
+          <BrandSymbol compact />
         </Button>
       ) : null}
+      <div className="relative hidden h-screen lg:block">
+        {content}
+      </div>
       {mobileOpen ? (
-        <div className="mobile-sidebar-backdrop fixed inset-0 z-40 bg-[var(--backdrop)] backdrop-blur-sm lg:hidden">
-          <div className="mobile-sidebar-panel h-full w-[280px]">{content}</div>
+        <div className="mobile-sidebar-backdrop fixed inset-0 z-40 lg:hidden">
+          <Button
+            className="absolute inset-0 h-full w-full rounded-none bg-[var(--backdrop)] backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+            type="button"
+            title="Close navigation"
+          />
+          <div className="mobile-sidebar-panel relative h-full w-[min(296px,86vw)]">
+            {content}
+          </div>
         </div>
       ) : null}
     </>
+  );
+}
+
+function SidebarNavGroup({
+  activeView,
+  collapsed,
+  items,
+  label,
+  onNavigate,
+}: {
+  activeView: ViewId;
+  collapsed: boolean;
+  items: NavItem[];
+  label: string;
+  onNavigate: (view: ViewId) => void;
+}) {
+  return (
+    <section className="sidebar-nav-group" aria-label={label}>
+      {!collapsed ? (
+        <div className="sidebar-group-label" aria-hidden="true">
+          <span className="sidebar-group-signal" />
+          <span>{label}</span>
+        </div>
+      ) : (
+        <div className="sidebar-group-divider" aria-hidden="true" />
+      )}
+      <nav className="space-y-1.5">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const active = activeView === item.id;
+
+          return (
+            <Button
+              aria-current={active ? "page" : undefined}
+              className={`nav-item flex h-11 w-full items-center gap-3 rounded-xl px-4 text-sm font-semibold transition ${
+                active
+                  ? "is-active bg-surface text-foreground shadow-surface"
+                  : "text-muted hover:bg-surface-secondary hover:text-foreground"
+              } ${
+                collapsed
+                  ? "justify-center px-0"
+                  : "justify-start text-left"
+              }`}
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
+              type="button"
+              title={item.label}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {collapsed ? null : (
+                <span className="truncate">{item.label}</span>
+              )}
+            </Button>
+          );
+        })}
+      </nav>
+    </section>
   );
 }
 
@@ -2282,7 +2646,6 @@ function DashboardView({
   notes,
   openTasks,
   runPrompt,
-  setActiveView,
   tasks,
 }: {
   briefing: Briefing | null;
@@ -2290,7 +2653,6 @@ function DashboardView({
   notes: RelayNote[];
   openTasks: RelayTask[];
   runPrompt: (prompt: string) => void;
-  setActiveView: (view: ViewId) => void;
   tasks: RelayTask[];
 }) {
   return (
@@ -2301,7 +2663,6 @@ function DashboardView({
         notes={notes}
         openTasks={openTasks}
         runPrompt={runPrompt}
-        tasks={tasks}
       />
 
       {!briefing ? <DashboardSkeleton /> : null}
@@ -2309,7 +2670,6 @@ function DashboardView({
       <section className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(340px,0.72fr)_minmax(340px,0.72fr)]">
         <InboxHighlights briefing={briefing} runPrompt={runPrompt} />
         <TaskSnapshot
-          briefing={briefing}
           completeTask={completeTask}
           openTasks={openTasks}
           runPrompt={runPrompt}
@@ -2318,18 +2678,7 @@ function DashboardView({
         <GithubActivityPanel briefing={briefing} runPrompt={runPrompt} />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <AiActionPlanner
-          briefing={briefing}
-          openTasks={openTasks}
-          runPrompt={runPrompt}
-          setActiveView={setActiveView}
-          tasks={tasks}
-        />
-        <RecentFilesPanel briefing={briefing} />
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <ControlMetric
           icon={CalendarDays}
           label="Schedule"
@@ -2361,12 +2710,6 @@ function DashboardView({
               : "Off"
           }
           detail="recent repos"
-        />
-        <ControlMetric
-          icon={Brain}
-          label="Memory"
-          value={`${notes.length}`}
-          detail="approved notes"
         />
       </section>
     </div>
@@ -2407,7 +2750,6 @@ function WeeklyCommandCalendar({
   notes: RelayNote[];
   openTasks: RelayTask[];
   runPrompt: (prompt: string) => void;
-  tasks: RelayTask[];
 }) {
   const days = useMemo(() => {
     const today = new Date();
@@ -2415,17 +2757,13 @@ function WeeklyCommandCalendar({
     return Array.from({ length: 7 }, (_, index) => addDays(today, index));
   }, []);
   const events = briefing?.calendar.events ?? [];
-  const googleTasks =
-    briefing?.googleTasks?.tasks.filter(
-      (task) => task.status !== "completed",
-    ) ?? [];
   const githubIssues = briefing?.githubIssues?.issues ?? [];
   const [activeInspectorDay, setActiveInspectorDay] = useState<string | null>(
     null,
   );
 
   return (
-    <section className={`${panelClass} overflow-visible p-5 sm:p-6`}>
+    <section className={`${panelClass} overflow-hidden p-5 sm:p-6`}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-separator bg-surface-secondary px-3 py-1 text-xs font-semibold uppercase text-muted">
@@ -2460,15 +2798,12 @@ function WeeklyCommandCalendar({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-7">
+      <div className="grid auto-rows-fr gap-3 md:grid-cols-7">
         {days.map((day) => {
           const dayEvents = events.filter((event) =>
             sameCalendarDay(parseEventDate(event.start), day),
           );
           const dayTasks = openTasks.filter((task) =>
-            sameCalendarDay(parseEventDate(task.due), day),
-          );
-          const dayGoogleTasks = googleTasks.filter((task) =>
             sameCalendarDay(parseEventDate(task.due), day),
           );
           const dayNotes = notes.filter((note) =>
@@ -2477,68 +2812,57 @@ function WeeklyCommandCalendar({
           const dayIssues = githubIssues.filter((issue) =>
             sameCalendarDay(parseEventDate(issue.updatedAt), day),
           );
-          const count =
-            dayEvents.length +
-            dayTasks.length +
-            dayGoogleTasks.length +
-            dayNotes.length +
-            dayIssues.length;
+          const taskCount = dayTasks.length;
           const isToday = sameCalendarDay(day, new Date());
           const dayKey = day.toISOString();
           const inspectorActive = activeInspectorDay === dayKey;
+          const dayLabel = day.toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+          });
 
           return (
-            <div className="min-w-0" key={dayKey}>
+            <div className="h-full min-w-0" key={dayKey}>
               <Button
-                aria-pressed={inspectorActive}
-                className={`relay-content-card week-day-card min-h-44 w-full rounded-2xl border p-3 text-left transition duration-200 ${
+                aria-expanded={inspectorActive}
+                aria-haspopup="dialog"
+                aria-label={`View ${taskCount} task${taskCount === 1 ? "" : "s"} and ${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"} for ${dayLabel}`}
+                className={`relay-content-card week-day-card !h-52 w-full overflow-hidden rounded-2xl border-2 p-3.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-accent ${
                   isToday
-                    ? "border-[var(--accent)] bg-accent-soft"
+                    ? "border-[var(--accent)] bg-accent-soft shadow-[0_14px_32px_color-mix(in_oklab,var(--accent)_14%,transparent)]"
                     : "border-separator bg-surface-secondary"
                 }`}
                 onClick={() => setActiveInspectorDay(dayKey)}
                 type="button"
               >
-                <span className="block text-[11px] font-semibold uppercase text-muted">
+                <span className="block text-xs font-bold uppercase tracking-[0.12em] text-muted">
                   {day.toLocaleDateString(undefined, { weekday: "short" })}
                 </span>
-                <span className="mt-1 block text-2xl font-semibold">
+                <span className="mt-1 block text-4xl font-bold leading-none tracking-tight text-foreground">
                   {day.getDate()}
                 </span>
-                <span className="mt-1 block text-xs text-muted">
+                <span className="mt-2 block text-xs font-semibold uppercase tracking-wide text-muted">
                   {day.toLocaleDateString(undefined, { month: "short" })}
                 </span>
-                <div className="mt-4 space-y-2">
-                  {dayEvents.slice(0, 2).map((event) => (
-                    <span
-                      className="block truncate rounded-lg bg-surface px-2 py-1 text-xs font-semibold"
-                      key={event.id ?? `${event.title}-${event.start}`}
-                    >
-                      {formatEventTime(event.start)} · {event.title}
+                <div className="mt-auto grid grid-cols-2 divide-x divide-separator overflow-hidden rounded-xl border border-separator bg-surface shadow-sm">
+                  <span className="grid min-w-0 gap-1.5 px-2.5 py-2.5">
+                    <span className="text-2xl font-bold leading-none tracking-tight text-accent tabular-nums">
+                      {taskCount}
                     </span>
-                  ))}
-                  {[...dayTasks, ...dayGoogleTasks].slice(0, 2).map((task) => (
-                    <span
-                      className="flex items-center gap-2 truncate rounded-lg bg-surface px-2 py-1 text-xs font-semibold"
-                      key={task.id ?? task.title}
-                    >
-                      <PriorityDot
-                        priority={
-                          "priority" in task ? task.priority : undefined
-                        }
-                      />
-                      {task.title}
+                    <span className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
+                      Tasks due
                     </span>
-                  ))}
-                  {count === 0 ? (
-                    <span className="block rounded-lg border border-dashed border-separator px-2 py-2 text-xs text-muted">
-                      No loaded items
+                  </span>
+                  <span className="grid min-w-0 gap-1.5 px-2.5 py-2.5">
+                    <span className="text-2xl font-bold leading-none tracking-tight text-accent tabular-nums">
+                      {dayEvents.length}
                     </span>
-                  ) : null}
+                    <span className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
+                      Events
+                    </span>
+                  </span>
                 </div>
-                <span className="mt-4 inline-flex rounded-full bg-surface px-2 py-1 text-[11px] font-semibold text-muted">
-                  {count} signal{count === 1 ? "" : "s"}
-                </span>
               </Button>
 
               <DayInspector
@@ -2547,7 +2871,6 @@ function WeeklyCommandCalendar({
                 date={day}
                 events={dayEvents}
                 githubIssues={dayIssues}
-                googleTasks={dayGoogleTasks}
                 notes={dayNotes}
                 onClose={() => setActiveInspectorDay(null)}
                 runPrompt={runPrompt}
@@ -2567,7 +2890,6 @@ function DayInspector({
   date,
   events,
   githubIssues,
-  googleTasks,
   notes,
   onClose,
   runPrompt,
@@ -2578,12 +2900,14 @@ function DayInspector({
   date: Date;
   events: CalendarEvent[];
   githubIssues: GithubIssue[];
-  googleTasks: GoogleTask[];
   notes: RelayNote[];
   onClose: () => void;
   runPrompt: (prompt: string) => void;
   tasks: RelayTask[];
 }) {
+  const itemCount =
+    events.length + tasks.length + githubIssues.length + notes.length;
+
   return (
     <Modal isOpen={active} onOpenChange={(open) => !open && onClose()}>
       <Modal.Backdrop variant="blur">
@@ -2606,7 +2930,7 @@ function DayInspector({
                 </div>
                 <StatusBadge
                   ready
-                  label={`${events.length + tasks.length + googleTasks.length + githubIssues.length} active`}
+                  label={`${itemCount} item${itemCount === 1 ? "" : "s"}`}
                 />
               </div>
 
@@ -2626,22 +2950,13 @@ function DayInspector({
               <InspectorGroup
                 empty="No task deadlines."
                 icon={ListTodo}
-                items={[
-                  ...tasks.map((task) => ({
-                    id: task.id,
-                    title: task.title,
-                    detail: task.notes || priorityLabel(task.priority),
-                    action: "Complete",
-                    onClick: () => void completeTask(task),
-                  })),
-                  ...googleTasks.map((task) => ({
-                    id: task.id ?? task.title,
-                    title: task.title,
-                    detail: task.notes || task.taskListTitle || "Google Tasks",
-                    action: "Plan",
-                    onClick: () => runPrompt(`Plan ${task.title}`),
-                  })),
-                ]}
+                items={tasks.map((task) => ({
+                  id: task.id,
+                  title: task.title,
+                  detail: task.notes || priorityLabel(task.priority),
+                  action: "Complete",
+                  onClick: () => void completeTask(task),
+                }))}
                 title="Tasks"
               />
               <InspectorGroup
@@ -2729,7 +3044,7 @@ function InspectorGroup({
       </div>
       <div className="space-y-1.5">
         {items.length > 0 ? (
-          items.slice(0, 4).map((item) => (
+          items.map((item) => (
             <Button
               className="dashboard-row pointer-events-auto grid w-full grid-cols-[1fr_auto] gap-2 rounded-lg px-2 py-1.5 text-left transition"
               key={item.id}
@@ -2758,13 +3073,11 @@ function InspectorGroup({
 }
 
 function TaskSnapshot({
-  briefing,
   completeTask,
   openTasks,
   runPrompt,
   tasks,
 }: {
-  briefing: Briefing | null;
   completeTask: (task: RelayTask) => Promise<void>;
   openTasks: RelayTask[];
   runPrompt: (prompt: string) => void;
@@ -2773,10 +3086,6 @@ function TaskSnapshot({
   const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const googleTasks =
-    briefing?.googleTasks?.tasks.filter(
-      (task) => task.status !== "completed",
-    ) ?? [];
   const sortedTasks = sortTasksByUrgency(openTasks).slice(0, 6);
   const overdueCount = openTasks.filter((task) => isOverdue(task.due)).length;
 
@@ -2804,8 +3113,7 @@ function TaskSnapshot({
           <p className="mt-1 text-sm text-muted">
             {overdueCount > 0
               ? `${overdueCount} overdue`
-              : `${openTasks.length} open in Google Tasks`}{" "}
-            · {googleTasks.length} Google open
+              : `${openTasks.length} open in Google Tasks`}
           </p>
         </div>
         <Button
@@ -2948,79 +3256,6 @@ function GithubActivityPanel({
               briefing?.githubIssues?.reason ??
               "Connect GitHub to see repository work."
             }
-          />
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function AiActionPlanner({
-  briefing,
-  openTasks,
-  runPrompt,
-  setActiveView,
-}: {
-  briefing: Briefing | null;
-  openTasks: RelayTask[];
-  runPrompt: (prompt: string) => void;
-  setActiveView: (view: ViewId) => void;
-  tasks: RelayTask[];
-}) {
-  const actions = buildPlannerActions(
-    briefing,
-    openTasks,
-    runPrompt,
-    setActiveView,
-  );
-
-  return (
-    <section className={`${panelClass} ai-planner overflow-hidden p-5`}>
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-separator bg-surface-secondary px-3 py-1 text-xs font-semibold uppercase text-muted">
-            <Sparkles className="h-3.5 w-3.5 text-accent" />
-            Executive decision layer
-          </div>
-          <h2 className="text-xl font-semibold">What to do next</h2>
-          <p className="mt-1 text-sm text-muted">
-            Prioritized from live calendar, tasks, inbox, files, and GitHub
-            signals.
-          </p>
-        </div>
-        <StatusBadge
-          ready={actions.length > 0}
-          label={`${actions.length} action${actions.length === 1 ? "" : "s"}`}
-        />
-      </div>
-      <div className="grid gap-3 lg:grid-cols-3">
-        {actions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Button
-              className="relay-content-card rounded-2xl border border-separator bg-surface p-4 text-left transition"
-              key={action.title}
-              onClick={action.onClick}
-              type="button"
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent">
-                  <Icon className="h-4 w-4" />
-                </span>
-                <ArrowRight className="h-4 w-4 text-muted transition group-hover:translate-x-0.5 group-hover:text-accent" />
-              </div>
-              <p className="font-semibold">{action.title}</p>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                {action.detail}
-              </p>
-            </Button>
-          );
-        })}
-        {actions.length === 0 ? (
-          <EmptyState
-            icon={Sparkles}
-            title="No urgent decision loaded"
-            detail="Connect services or add tasks to give the planner live context."
           />
         ) : null}
       </div>
@@ -3250,51 +3485,35 @@ function ChatView({
   addMemory,
   addTask,
   briefing,
-  completeSurfaceMessage,
   completeTask,
-  input,
-  loading,
-  messages,
   notes,
   openTasks,
   refreshWorkspace,
   runPrompt,
-  setInput,
   signedInToGoogle,
-  submitMessage,
   taskColumns,
   tasks,
 }: {
   addMemory: (body: string) => Promise<void>;
   addTask: (input: AddTaskInput) => Promise<void>;
   briefing: Briefing | null;
-  completeSurfaceMessage: (
-    messageId: string,
-    summary: string,
-    link?: string | null,
-  ) => void;
   completeTask: (task: RelayTask) => Promise<void>;
-  input: string;
-  loading: boolean;
-  messages: Message[];
   notes: RelayNote[];
   openTasks: RelayTask[];
   refreshWorkspace: () => Promise<void>;
   runPrompt: (prompt: string) => void;
-  setInput: (value: string) => void;
   signedInToGoogle: boolean;
-  submitMessage: (event?: FormEvent<HTMLFormElement>) => Promise<void>;
   taskColumns: TaskColumn[];
   tasks: RelayTask[];
 }) {
   const showContextWorkspace = false;
   const [workspaceCollapsed, setWorkspaceCollapsed] = useState(false);
   const [workspaceWidth, setWorkspaceWidth] = useState(430);
-  const mode = inferContextWorkspaceMode(messages);
+  const mode: ContextWorkspaceMode = "focus";
 
   return (
     <div
-      className={`h-[calc(100vh-24px)] min-h-0 overflow-hidden sm:h-[calc(100vh-32px)] ${
+      className={`h-[100dvh] min-h-0 overflow-hidden lg:h-screen ${
         showContextWorkspace
           ? "flex flex-col gap-4 transition-[grid-template-columns] duration-300 ease-out xl:grid"
           : ""
@@ -3312,15 +3531,9 @@ function ChatView({
       <AgentConsole
         addMemory={addMemory}
         addTask={addTask}
-        completeSurfaceMessage={completeSurfaceMessage}
-        input={input}
-        loading={loading}
-        messages={messages}
         openTasks={openTasks}
         refreshWorkspace={refreshWorkspace}
         runPrompt={runPrompt}
-        setInput={setInput}
-        submitMessage={submitMessage}
       />
       {showContextWorkspace ? (
         <ContextWorkspace
@@ -3348,6 +3561,158 @@ function ChatView({
 function AgentConsole({
   addMemory,
   addTask,
+  openTasks,
+  refreshWorkspace,
+  runPrompt,
+}: {
+  addMemory: (body: string) => Promise<void>;
+  addTask: (input: AddTaskInput) => Promise<void>;
+  openTasks: RelayTask[];
+  refreshWorkspace: () => Promise<void>;
+  runPrompt: (prompt: string) => void;
+}) {
+  return (
+    <RelayThread
+      assistantExtras={
+        <RelayAssistantExtras
+          addMemory={addMemory}
+          addTask={addTask}
+          openTasks={openTasks}
+          refreshWorkspace={refreshWorkspace}
+          runPrompt={runPrompt}
+        />
+      }
+      onPrompt={runPrompt}
+      onRunEnd={() => {
+        void refreshWorkspace();
+      }}
+    />
+  );
+}
+
+function RelayAssistantExtras({
+  addMemory,
+  addTask,
+  openTasks,
+  refreshWorkspace,
+  runPrompt,
+}: {
+  addMemory: (body: string) => Promise<void>;
+  addTask: (input: AddTaskInput) => Promise<void>;
+  openTasks: RelayTask[];
+  refreshWorkspace: () => Promise<void>;
+  runPrompt: (prompt: string) => void;
+}) {
+  const message = useAuiState((state) => state.message);
+  const messages = useAuiState((state) => state.thread.messages);
+  const [surfaceCompletion, setSurfaceCompletion] = useState<{
+    link?: string | null;
+    summary: string;
+  } | null>(null);
+  const [completedRequestIds, setCompletedRequestIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const messageContent = threadMessageText(message);
+  const parsedContent = parseAssistantUiRequests(messageContent);
+  const precedingUserMessage = [...messages.slice(0, message.index)]
+    .reverse()
+    .find((candidate) => candidate.role === "user");
+  const precedingPrompt = precedingUserMessage
+    ? threadMessageText(precedingUserMessage)
+    : "";
+  const generatedSurface = inferGeneratedSurface(precedingPrompt);
+  const showGeneratedSurface =
+    generatedSurface &&
+    generatedSurface.surface !== "schedule" &&
+    generatedSurface.surface !== "task";
+
+  return (
+    <>
+      {showGeneratedSurface && !surfaceCompletion ? (
+        <GeneratedMessageSurface
+          addMemory={addMemory}
+          addTask={addTask}
+          onComplete={(summary, link) =>
+            setSurfaceCompletion({ summary, link })
+          }
+          refreshWorkspace={refreshWorkspace}
+          runPrompt={runPrompt}
+          surface={generatedSurface.surface}
+          surfaceContext={generatedSurface.context}
+        />
+      ) : null}
+
+      {surfaceCompletion ? (
+        surfaceCompletion.link ? (
+          <Marker asChild className="mt-3">
+            <a
+              href={surfaceCompletion.link}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <MarkerIcon>
+                <Check />
+              </MarkerIcon>
+              <MarkerContent>{surfaceCompletion.summary}</MarkerContent>
+            </a>
+          </Marker>
+        ) : (
+          <Marker className="mt-3">
+            <MarkerIcon>
+              <Check className="text-success" />
+            </MarkerIcon>
+            <MarkerContent>{surfaceCompletion.summary}</MarkerContent>
+          </Marker>
+        )
+      ) : null}
+
+      {parsedContent.requests.length > 0 ? (
+        <div className="mt-3 grid gap-3">
+          {parsedContent.requests.map((request) =>
+            completedRequestIds.has(request.id) ? (
+              <Marker key={request.id}>
+                <MarkerIcon>
+                  <Check className="text-success" />
+                </MarkerIcon>
+                <MarkerContent>Action completed</MarkerContent>
+              </Marker>
+            ) : (
+              <AssistantUiRequestCard
+                key={request.id}
+                onComplete={() =>
+                  setCompletedRequestIds((current) => {
+                    const next = new Set(current);
+                    next.add(request.id);
+                    return next;
+                  })
+                }
+                openTasks={openTasks}
+                refreshWorkspace={refreshWorkspace}
+                request={request}
+                runPrompt={runPrompt}
+              />
+            ),
+          )}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function threadMessageText(message: ThreadMessage) {
+  return message.content
+    .filter(
+      (part): part is Extract<(typeof message.content)[number], { type: "text" }> =>
+        part.type === "text",
+    )
+    .map((part) => part.text)
+    .join("");
+}
+
+function LegacyAgentConsole({
+  addMemory,
+  addTask,
   completeSurfaceMessage,
   input,
   loading,
@@ -3356,6 +3721,7 @@ function AgentConsole({
   refreshWorkspace,
   runPrompt,
   setInput,
+  stopChat,
   submitMessage,
 }: {
   addMemory: (body: string) => Promise<void>;
@@ -3372,25 +3738,80 @@ function AgentConsole({
   refreshWorkspace: () => Promise<void>;
   runPrompt: (prompt: string) => void;
   setInput: (value: string) => void;
-  submitMessage: (event?: FormEvent<HTMLFormElement>) => Promise<void>;
+  stopChat: () => void;
+  submitMessage: (
+    event?: FormEvent<HTMLFormElement>,
+    overrideMessage?: string,
+    files?: FileUIPart[],
+  ) => Promise<void>;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const pinnedToBottomRef = useRef(true);
+  const previousLoadingRef = useRef(false);
+  const [draggingFiles, setDraggingFiles] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [listening, setListening] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<FileUIPart[]>([]);
+  const [preparingFiles, setPreparingFiles] = useState(false);
 
-  function attachFiles(files: FileList | null) {
-    const names = Array.from(files ?? []).map((file) => file.name);
-    if (names.length === 0) return;
+  async function attachFiles(files: FileList | null) {
+    if (!files?.length) return;
 
-    setInput(
-      [
-        input,
-        `Attached local files: ${names.join(", ")}`,
-        "Use the file intelligence tools when file upload parsing is connected.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    );
+    setPreparingFiles(true);
+    try {
+      const fileParts = await convertFileListToFileUIParts(files);
+      setPendingFiles((current) => [...current, ...fileParts]);
+    } finally {
+      setPreparingFiles(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function submitWithFiles(event: FormEvent<HTMLFormElement>) {
+    const files = pendingFiles;
+    setPendingFiles([]);
+    await submitMessage(event, undefined, files);
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (
+      event.key !== "Enter" ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  }
+
+  async function handleFileDrop(event: ReactDragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDraggingFiles(false);
+    await attachFiles(event.dataTransfer.files);
+  }
+
+  function updateScrollPosition() {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+
+    const distanceFromBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    const pinned = distanceFromBottom < 72;
+    pinnedToBottomRef.current = pinned;
+    setShowScrollToBottom(!pinned);
+  }
+
+  function scrollToBottom(behavior: ScrollBehavior = "smooth") {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+
+    pinnedToBottomRef.current = true;
+    setShowScrollToBottom(false);
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior });
   }
 
   function startVoiceInput() {
@@ -3441,101 +3862,285 @@ function AgentConsole({
   }
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
+    const justStarted = loading && !previousLoadingRef.current;
+    previousLoadingRef.current = loading;
+
+    if (!pinnedToBottomRef.current && !justStarted) return;
+    const frame = window.requestAnimationFrame(() => {
+      const viewport = scrollRef.current;
+      if (!viewport) return;
+      pinnedToBottomRef.current = true;
+      setShowScrollToBottom(false);
+      viewport.scrollTo({
+        top: viewport.scrollHeight,
+        behavior: "smooth",
+      });
     });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [messages, loading]);
 
-  return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-4 border-b border-separator px-5 py-4">
-        <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent-soft text-accent">
-            <Bot className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="font-semibold">Executive assistant</h2>
-            <p className="text-xs text-muted">
-              Neutral routing, generated UI, and session memory
-            </p>
-          </div>
-        </div>
-      </div>
+  useEffect(() => {
+    const composer = composerInputRef.current;
+    if (!composer) return;
 
+    composer.style.height = "0px";
+    composer.style.height = `${Math.min(composer.scrollHeight, 160)}px`;
+  }, [input]);
+
+  const showThinking =
+    loading && messages.at(-1)?.role !== "assistant";
+  const showSuggestions = messages.length === 0 && !loading;
+
+  return (
+    <section className="relative flex h-full min-h-0 flex-col overflow-hidden">
       <div
-        className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5"
+        className="relay-chat-viewport min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8 pt-5 sm:px-6 sm:pt-8"
+        onScroll={updateScrollPosition}
         ref={scrollRef}
       >
-        {messages.map((message) => (
-          <ChatMessage
-            addMemory={addMemory}
-            addTask={addTask}
-            completeSurfaceMessage={completeSurfaceMessage}
-            key={message.id}
-            message={message}
-            openTasks={openTasks}
-            refreshWorkspace={refreshWorkspace}
-            runPrompt={runPrompt}
-          />
-        ))}
-        {loading ? <AssistantThinkingCard messages={messages} /> : null}
+        <div
+          className={`mx-auto flex min-h-full w-full max-w-[48rem] flex-col ${
+            showSuggestions ? "justify-center pb-16" : ""
+          }`}
+        >
+          {showSuggestions ? (
+            <ChatWelcomeSuggestions runPrompt={runPrompt} />
+          ) : (
+            <>
+              <Marker className="mb-8" variant="separator">
+                <MarkerContent>Today</MarkerContent>
+              </Marker>
+              <div className="flex flex-col gap-8 sm:gap-10">
+                {messages.map((message) => (
+                  <ChatMessage
+                    addMemory={addMemory}
+                    addTask={addTask}
+                    completeSurfaceMessage={completeSurfaceMessage}
+                    key={message.id}
+                    message={message}
+                    openTasks={openTasks}
+                    refreshWorkspace={refreshWorkspace}
+                    runPrompt={runPrompt}
+                  />
+                ))}
+                {showThinking ? (
+                  <AssistantThinkingCard messages={messages} />
+                ) : null}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      <form className="px-1 py-4" id="agent-chat-form" onSubmit={submitMessage}>
-        <Input
-          className="hidden"
-          multiple
-          onChange={(event) => attachFiles(event.target.files)}
-          ref={fileInputRef}
-          type="file"
-        />
-        <div className="flex items-center gap-2">
-          <Button
-            className={
-              iconButtonClass + " h-11 w-11 border-transparent bg-transparent"
-            }
-            onClick={() => fileInputRef.current?.click()}
-            type="button"
-            title="Attach files"
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-          <Button
-            className={
-              iconButtonClass + " h-11 w-11 border-transparent bg-transparent"
-            }
-            onClick={startVoiceInput}
-            type="button"
-            title="Voice input"
-          >
-            {listening ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Mic className="h-4 w-4" />
-            )}
-          </Button>
-          <Input
-            className="min-h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted"
-            onChange={(event) => setInput(event.target.value)}
-            placeholder="Ask the assistant to plan, schedule, draft, search, or remember..."
-            value={input}
-          />
-          <Button
-            className={`${primaryButtonClass} h-11 w-11 px-0`}
-            disabled={loading}
-            type="submit"
-            title="Send"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+      <div className="relative z-10 bg-[linear-gradient(to_top,var(--background)_72%,transparent)] px-3 pb-3 pt-8 sm:px-6 sm:pb-5">
+        <div className="relative mx-auto w-full max-w-[48rem]">
+          {showScrollToBottom ? (
+            <Button
+              className={`${iconButtonClass} absolute -top-14 left-1/2 z-20 h-9 w-9 -translate-x-1/2 rounded-full bg-surface shadow-surface`}
+              onClick={() => scrollToBottom()}
+              type="button"
+              title="Scroll to bottom"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          ) : null}
+          <form id="agent-chat-form" onSubmit={submitWithFiles}>
+            <Input
+              className="hidden"
+              multiple
+              onChange={(event) => void attachFiles(event.target.files)}
+              ref={fileInputRef}
+              type="file"
+            />
+            <div
+              className={`relay-chat-composer relative rounded-[1.65rem] border bg-surface-secondary p-2 shadow-surface transition ${
+                draggingFiles
+                  ? "border-accent bg-accent-soft"
+                  : "border-separator focus-within:border-border"
+              }`}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setDraggingFiles(true);
+              }}
+              onDragLeave={() => setDraggingFiles(false)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => void handleFileDrop(event)}
+            >
+              {pendingFiles.length > 0 ? (
+                <AttachmentGroup
+                  aria-label="Files ready to send"
+                  className="mb-2 px-1"
+                  role="group"
+                >
+                  {pendingFiles.map((file, index) => (
+                    <ChatAttachment
+                      file={file}
+                      key={`${file.filename ?? file.mediaType}-${index}`}
+                      onRemove={() =>
+                        setPendingFiles((current) =>
+                          current.filter(
+                            (_, fileIndex) => fileIndex !== index,
+                          ),
+                        )
+                      }
+                      size="sm"
+                    />
+                  ))}
+                </AttachmentGroup>
+              ) : null}
+              {preparingFiles ? (
+                <Marker className="mb-2 px-2" role="status">
+                  <MarkerIcon>
+                    <Loader2 className="animate-spin" />
+                  </MarkerIcon>
+                  <MarkerContent className="shimmer">
+                    Preparing attachments
+                  </MarkerContent>
+                </Marker>
+              ) : null}
+              <TextArea
+                aria-label="Message Relay"
+                className="max-h-40 min-h-12 w-full resize-none bg-transparent px-3 py-2 text-[15px] leading-6 outline-none placeholder:text-muted"
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder="Message Relay"
+                ref={composerInputRef}
+                rows={1}
+                value={input}
+              />
+              <div className="flex items-center justify-between px-1 pb-1">
+                <div className="flex items-center gap-1">
+                  <Button
+                    className={`${iconButtonClass} h-9 w-9 rounded-full border-transparent bg-transparent`}
+                    disabled={loading || preparingFiles}
+                    onClick={() => fileInputRef.current?.click()}
+                    type="button"
+                    title="Attach files"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    className={`${iconButtonClass} h-9 w-9 rounded-full border-transparent bg-transparent`}
+                    disabled={loading}
+                    onClick={startVoiceInput}
+                    type="button"
+                    title="Voice input"
+                  >
+                    {listening ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Mic className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {loading ? (
+                  <Button
+                    className={`${primaryButtonClass} h-9 w-9 rounded-full px-0`}
+                    onClick={stopChat}
+                    type="button"
+                    title="Stop generating"
+                  >
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    className={`${primaryButtonClass} h-9 w-9 rounded-full px-0`}
+                    disabled={
+                      preparingFiles ||
+                      (!input.trim() && pendingFiles.length === 0)
+                    }
+                    type="submit"
+                    title="Send message"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {draggingFiles ? (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 grid place-items-center rounded-[1.65rem] border border-dashed border-accent bg-surface/90 text-sm font-medium text-accent backdrop-blur-sm"
+                >
+                  Drop files to add them
+                </div>
+              ) : null}
+            </div>
+          </form>
+          <p className="mt-2 hidden text-center text-[11px] leading-4 text-muted sm:block">
+            Relay can make mistakes. Check important actions before approving
+            them.
+          </p>
         </div>
-      </form>
+      </div>
     </section>
+  );
+}
+
+void LegacyAgentConsole;
+
+function ChatWelcomeSuggestions({
+  runPrompt,
+}: {
+  runPrompt: (prompt: string) => void;
+}) {
+  const suggestions = [
+    {
+      icon: CalendarDays,
+      label: "Plan my day",
+      prompt: "Plan my day from my calendar and open tasks",
+    },
+    {
+      icon: ListTodo,
+      label: "Prioritize tasks",
+      prompt: "Review and prioritize my open tasks",
+    },
+    {
+      icon: Mail,
+      label: "Draft an email",
+      prompt: "Help me draft an email",
+    },
+    {
+      icon: FolderOpen,
+      label: "Find a file",
+      prompt: "Help me find a file in Drive",
+    },
+  ];
+
+  return (
+    <div className="animate-fade-in px-2 text-center">
+      <div className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-accent-soft text-accent">
+        <Sparkles className="h-5 w-5" />
+      </div>
+      <h1 className="mt-4 text-balance text-2xl font-semibold tracking-[-0.025em] text-foreground sm:text-3xl">
+        What can I help you move forward?
+      </h1>
+      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted">
+        Plan work, search your connected tools, draft a response, or turn an
+        idea into an action.
+      </p>
+      <div
+        aria-label="Suggested prompts"
+        className="mt-6 flex flex-wrap justify-center gap-2"
+        role="group"
+      >
+        {suggestions.map((suggestion) => {
+          const Icon = suggestion.icon;
+
+          return (
+            <Button
+              className="interactive-control inline-flex h-9 items-center gap-2 rounded-full border border-separator bg-surface px-3.5 text-sm font-normal text-foreground transition hover:border-border hover:bg-surface-secondary"
+              key={suggestion.label}
+              onClick={() => runPrompt(suggestion.prompt)}
+              type="button"
+            >
+              <Icon className="h-3.5 w-3.5 text-accent" />
+              {suggestion.label}
+            </Button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -3543,29 +4148,16 @@ function AssistantThinkingCard({ messages }: { messages: Message[] }) {
   const steps = inferExecutionTrace(messages);
 
   return (
-    <div className="flex max-w-[85%] gap-3">
-      <AvatarIcon role="assistant" />
-      <div className="surface-pop rounded-xl border border-separator bg-surface-secondary px-4 py-3 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-          <span className="flex items-center gap-1">
-            <span className="thinking-dot" />
-            <span className="thinking-dot" />
-            <span className="thinking-dot" />
-          </span>
-          Coordinating
-        </div>
-        <div className="grid gap-2">
-          {steps.map((step) => (
-            <div
-              className="flex items-center gap-2 text-xs text-muted"
-              key={step}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-              {step}
-            </div>
-          ))}
-        </div>
-      </div>
+    <div className="px-2">
+      <Marker role="status">
+        <MarkerIcon>
+          <Loader2 className="animate-spin text-accent" />
+        </MarkerIcon>
+        <MarkerContent className="shimmer font-medium text-foreground">
+          Thinking...
+        </MarkerContent>
+      </Marker>
+      <p className="mt-1 pl-6 text-xs text-muted">{steps[0]}</p>
     </div>
   );
 }
@@ -3592,27 +4184,73 @@ function ChatMessage({
   runPrompt: (prompt: string) => void;
 }) {
   const fromUser = message.role === "user";
+  const [copied, setCopied] = useState(false);
+  const messageContent = relayMessageText(message);
   const parsedContent = fromUser
-    ? { markdown: message.content, requests: [] as AssistantUiRequest[] }
-    : parseAssistantUiRequests(message.content);
-  const visibleContent = fromUser ? message.content : parsedContent.markdown;
+    ? { markdown: messageContent, requests: [] as AssistantUiRequest[] }
+    : parseAssistantUiRequests(messageContent);
+  const visibleContent = fromUser ? messageContent : parsedContent.markdown;
+  const files = relayMessageFiles(message);
+  const activityParts = message.parts.filter(
+    (part) =>
+      part.type !== "text" &&
+      part.type !== "file" &&
+      part.type !== "source-url" &&
+      part.type !== "source-document",
+  );
+  const sourceParts = message.parts.filter(
+    (part) =>
+      part.type === "source-url" || part.type === "source-document",
+  );
+  const metadata = message.metadata;
+
+  async function copyMessage() {
+    if (!visibleContent || !navigator.clipboard) return;
+
+    await navigator.clipboard.writeText(visibleContent);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+
+  function readMessageAloud() {
+    if (!visibleContent || !("speechSynthesis" in window)) return;
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(visibleContent));
+  }
 
   return (
-    <div
-      className={
-        fromUser
-          ? "ml-auto flex max-w-[88%] flex-row-reverse gap-3"
-          : "mr-auto flex max-w-[92%] gap-3"
-      }
+    <article
+      className="group/message relative w-full animate-fade-in"
+      data-role={fromUser ? "user" : "assistant"}
     >
-      <AvatarIcon role={message.role} />
-      <div className="min-w-0">
+      <div className={fromUser ? "ml-auto w-fit max-w-[85%]" : "w-full"}>
+        {!fromUser && activityParts.length > 0 ? (
+          <ChatActivity parts={activityParts} />
+        ) : null}
+        {files.length > 0 ? (
+          <div className={fromUser ? "flex justify-end" : ""}>
+            <AttachmentGroup
+              aria-label={fromUser ? "Your attachments" : "Relay attachments"}
+              className="mb-3"
+              role="group"
+            >
+              {files.map((file, index) => (
+                <ChatAttachment
+                  file={file}
+                  key={`${file.filename ?? file.mediaType}-${index}`}
+                  size="sm"
+                />
+              ))}
+            </AttachmentGroup>
+          </div>
+        ) : null}
         {visibleContent ? (
           <div
             className={
               fromUser
-                ? "rounded-xl bg-accent px-4 py-3 text-sm leading-6 text-white"
-                : "rounded-xl border border-separator bg-surface-secondary px-4 py-3 text-sm leading-6 text-foreground"
+                ? "rounded-[1.3rem] rounded-br-md border border-separator bg-surface-secondary px-4 py-2.5 text-[15px] leading-6 text-foreground shadow-[0_1px_2px_color-mix(in_oklab,var(--foreground)_5%,transparent)]"
+                : "px-2 text-[15px] leading-7 text-foreground"
             }
           >
             {fromUser ? (
@@ -3622,15 +4260,10 @@ function ChatMessage({
             )}
           </div>
         ) : null}
-        <div
-          className={`mt-1 text-xs text-muted ${fromUser ? "text-right" : ""}`}
-        >
-          {message.timestamp}
-        </div>
-        {message.surface &&
-        message.surface !== "schedule" &&
-        message.surface !== "task" &&
-        message.surfaceStatus !== "done" ? (
+        {metadata?.surface &&
+        metadata.surface !== "schedule" &&
+        metadata.surface !== "task" &&
+        metadata.surfaceStatus !== "done" ? (
           <GeneratedMessageSurface
             addMemory={addMemory}
             addTask={addTask}
@@ -3639,8 +4272,8 @@ function ChatMessage({
             }
             refreshWorkspace={refreshWorkspace}
             runPrompt={runPrompt}
-            surface={message.surface}
-            surfaceContext={message.surfaceContext}
+            surface={metadata.surface}
+            surfaceContext={metadata.surfaceContext}
           />
         ) : null}
         {!fromUser && parsedContent.requests.length > 0 ? (
@@ -3659,9 +4292,362 @@ function ChatMessage({
             ))}
           </div>
         ) : null}
+        {!fromUser && sourceParts.length > 0 ? (
+          <div className="mt-4 border-t border-separator pt-3">
+            <p className="mb-2 text-xs font-medium text-muted">Sources</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {sourceParts.map((part, index) => (
+                <ChatPartMarker
+                  key={`${part.type}-${"id" in part ? (part.id ?? index) : index}`}
+                  part={part}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {visibleContent ? (
+          <div
+            className={`relay-message-actions mt-2 flex min-h-7 items-center gap-1 text-muted opacity-0 transition-opacity group-focus-within/message:opacity-100 group-hover/message:opacity-100 ${
+              fromUser ? "justify-end" : "px-1"
+            }`}
+          >
+            <span className="mr-1 text-[11px]">
+              {metadata?.timestamp ?? "Now"}
+            </span>
+            <Button
+              className="interactive-control grid h-7 w-7 place-items-center rounded-lg text-muted transition hover:bg-surface-secondary hover:text-foreground"
+              onClick={() => void copyMessage()}
+              type="button"
+              title={copied ? "Copied" : "Copy message"}
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-success" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+            </Button>
+            {!fromUser ? (
+              <Button
+                className="interactive-control grid h-7 w-7 place-items-center rounded-lg text-muted transition hover:bg-surface-secondary hover:text-foreground"
+                onClick={readMessageAloud}
+                type="button"
+                title="Read aloud"
+              >
+                <Volume2 className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
+    </article>
+  );
+}
+
+function ChatActivity({
+  parts,
+}: {
+  parts: Message["parts"];
+}) {
+  const visibleParts = parts.filter((part) => part.type !== "step-start");
+  const running = visibleParts.some(isChatPartRunning);
+  const failed = visibleParts.some(isChatPartFailed);
+  const previousRunningRef = useRef(running);
+  const [manualOpen, setManualOpen] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (previousRunningRef.current !== running) {
+      setManualOpen(null);
+      previousRunningRef.current = running;
+    }
+  }, [running]);
+
+  if (visibleParts.length === 0) return null;
+
+  const open = manualOpen ?? running;
+  const label = running
+    ? "Relay is working"
+    : failed
+      ? "Relay activity needs attention"
+      : `Worked through ${visibleParts.length} ${
+          visibleParts.length === 1 ? "step" : "steps"
+        }`;
+
+  return (
+    <div className="mb-4 px-2">
+      <button
+        aria-expanded={open}
+        className="group/activity inline-flex max-w-full items-center gap-2 rounded-lg py-1.5 text-left text-sm text-muted transition hover:text-foreground"
+        onClick={() => setManualOpen(!open)}
+        type="button"
+      >
+        {running ? (
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent" />
+        ) : failed ? (
+          <AlertCircle className="h-4 w-4 shrink-0 text-danger" />
+        ) : (
+          <Brain className="h-4 w-4 shrink-0 text-accent" />
+        )}
+        <span
+          className={
+            running
+              ? "shimmer truncate font-medium text-foreground"
+              : "truncate font-medium"
+          }
+        >
+          {label}
+        </span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open ? (
+        <div
+          aria-busy={running}
+          className="ml-2 mt-1 grid gap-2 border-l border-separator py-1 pl-5"
+        >
+          {visibleParts.map((part, index) => (
+            <ChatPartMarker
+              key={`${part.type}-${"id" in part ? (part.id ?? index) : index}`}
+              part={part}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function isChatPartRunning(part: Message["parts"][number]) {
+  if (part.type === "reasoning") return part.state === "streaming";
+  if (part.type === "data-activity") return part.data.state === "running";
+  if (part.type === "tool-routeRequest" || part.type === "dynamic-tool") {
+    return (
+      part.state === "input-streaming" || part.state === "input-available"
+    );
+  }
+  return false;
+}
+
+function isChatPartFailed(part: Message["parts"][number]) {
+  if (part.type === "data-activity") return part.data.state === "error";
+  if (part.type === "tool-routeRequest" || part.type === "dynamic-tool") {
+    return part.state === "output-error";
+  }
+  return false;
+}
+
+function ChatPartMarker({
+  part,
+}: {
+  part: Message["parts"][number];
+}) {
+  if (part.type === "step-start") {
+    return (
+      <Marker variant="separator">
+        <MarkerContent>Relay activity</MarkerContent>
+      </Marker>
+    );
+  }
+
+  if (part.type === "reasoning") {
+    const streaming = part.state === "streaming";
+    return (
+      <Marker role={streaming ? "status" : undefined}>
+        <MarkerIcon>
+          {streaming ? (
+            <Loader2 className="animate-spin text-accent" />
+          ) : (
+            <Brain className="text-accent" />
+          )}
+        </MarkerIcon>
+        <MarkerContent className={streaming ? "shimmer" : undefined}>
+          {part.text}
+        </MarkerContent>
+      </Marker>
+    );
+  }
+
+  if (part.type === "data-activity") {
+    const running = part.data.state === "running";
+    const failed = part.data.state === "error";
+    return (
+      <Marker role={running ? "status" : undefined}>
+        <MarkerIcon>
+          {running ? (
+            <Loader2 className="animate-spin text-accent" />
+          ) : failed ? (
+            <AlertCircle className="text-danger" />
+          ) : (
+            <Check className="text-success" />
+          )}
+        </MarkerIcon>
+        <MarkerContent className={running ? "shimmer" : undefined}>
+          {part.data.label}
+          {part.data.detail ? ` · ${part.data.detail}` : ""}
+        </MarkerContent>
+      </Marker>
+    );
+  }
+
+  if (part.type === "tool-routeRequest") {
+    const running =
+      part.state === "input-streaming" || part.state === "input-available";
+    const failed = part.state === "output-error";
+    const mode =
+      part.state === "output-available" ? part.output.mode : undefined;
+    return (
+      <Marker role={running ? "status" : undefined} variant="border">
+        <MarkerIcon>
+          {running ? (
+            <Loader2 className="animate-spin text-accent" />
+          ) : failed ? (
+            <AlertCircle className="text-danger" />
+          ) : (
+            <Zap className="text-accent" />
+          )}
+        </MarkerIcon>
+        <MarkerContent className={running ? "shimmer" : undefined}>
+          {part.title ?? "Relay request router"}
+          {mode ? ` · ${mode === "provider" ? "AI provider" : "local mode"}` : ""}
+        </MarkerContent>
+      </Marker>
+    );
+  }
+
+  if (part.type === "dynamic-tool") {
+    const running =
+      part.state === "input-streaming" || part.state === "input-available";
+    return (
+      <Marker role={running ? "status" : undefined} variant="border">
+        <MarkerIcon>
+          {running ? (
+            <Loader2 className="animate-spin text-accent" />
+          ) : (
+            <Check className="text-success" />
+          )}
+        </MarkerIcon>
+        <MarkerContent className={running ? "shimmer" : undefined}>
+          {part.title ?? part.toolName}
+        </MarkerContent>
+      </Marker>
+    );
+  }
+
+  if (part.type === "source-url") {
+    return (
+      <Marker asChild>
+        <a href={part.url} rel="noreferrer" target="_blank">
+          <MarkerIcon>
+            <ExternalLink />
+          </MarkerIcon>
+          <MarkerContent>{part.title ?? part.url}</MarkerContent>
+        </a>
+      </Marker>
+    );
+  }
+
+  if (part.type === "source-document") {
+    return (
+      <Marker variant="border">
+        <MarkerIcon>
+          <FileText />
+        </MarkerIcon>
+        <MarkerContent>
+          {part.title}
+          {part.filename ? ` · ${part.filename}` : ""}
+        </MarkerContent>
+      </Marker>
+    );
+  }
+
+  if (part.type === "reasoning-file") {
+    return (
+      <Marker variant="border">
+        <MarkerIcon>
+          <FileText />
+        </MarkerIcon>
+        <MarkerContent>Attached reasoning file · {part.mediaType}</MarkerContent>
+      </Marker>
+    );
+  }
+
+  if (part.type === "custom") {
+    return (
+      <Marker>
+        <MarkerIcon>
+          <Sparkles />
+        </MarkerIcon>
+        <MarkerContent>{part.kind}</MarkerContent>
+      </Marker>
+    );
+  }
+
+  return null;
+}
+
+function ChatAttachment({
+  file,
+  onRemove,
+  size = "default",
+}: {
+  file: FileUIPart;
+  onRemove?: () => void;
+  size?: "default" | "sm" | "xs";
+}) {
+  const title = file.filename ?? "Attachment";
+  const image = file.mediaType.startsWith("image/");
+
+  return (
+    <Attachment className="max-w-64" size={size} state="done">
+      <AttachmentMedia variant={image ? "image" : "icon"}>
+        {image ? (
+          <Image
+            alt=""
+            height={80}
+            src={file.url}
+            unoptimized
+            width={80}
+          />
+        ) : (
+          <FileText />
+        )}
+      </AttachmentMedia>
+      <AttachmentContent>
+        <AttachmentTitle>{title}</AttachmentTitle>
+        <AttachmentDescription>
+          {formatAttachmentType(file.mediaType)}
+        </AttachmentDescription>
+      </AttachmentContent>
+      {onRemove ? (
+        <AttachmentActions>
+          <AttachmentAction
+            aria-label={`Remove ${title}`}
+            onClick={onRemove}
+            type="button"
+          >
+            <X />
+          </AttachmentAction>
+        </AttachmentActions>
+      ) : null}
+      <AttachmentTrigger asChild>
+        <a
+          aria-label={`Open ${title}`}
+          href={file.url}
+          rel="noreferrer"
+          target="_blank"
+        />
+      </AttachmentTrigger>
+    </Attachment>
+  );
+}
+
+function formatAttachmentType(mediaType: string) {
+  const [group, detail] = mediaType.split("/");
+  if (!detail) return mediaType;
+  if (group === "image") return `${detail.toUpperCase()} image`;
+  return detail.replace(/[.+-]/g, " ").toUpperCase();
 }
 
 function MarkdownMessage({ content }: { content: string }) {
@@ -4159,10 +5145,6 @@ function FocusWorkspace({
 }) {
   const nextEvent = briefing?.calendar.events[0];
   const recentFile = briefing?.drive.files[0];
-  const googleTasks =
-    briefing?.googleTasks?.tasks.filter(
-      (task) => task.status !== "completed",
-    ) ?? [];
   const contacts = briefing?.contacts?.contacts ?? [];
   const actions = [
     {
@@ -4174,25 +5156,21 @@ function FocusWorkspace({
       prompt: nextEvent ? "Prepare me for my next meeting" : "Plan my day",
     },
     {
-      title: openTasks[0]?.title ?? googleTasks[0]?.title ?? "Capture a task",
+      title: openTasks[0]?.title ?? "Capture a task",
       detail: openTasks[0]
-        ? "Local priority task"
-        : googleTasks[0]
-          ? "Google Tasks item"
-          : "Start with one concrete next action.",
+        ? "Google Tasks item"
+        : "Start with one concrete next action.",
       icon: ListTodo,
       prompt: openTasks[0]
         ? `Plan the next step for ${openTasks[0].title}`
-        : googleTasks[0]
-          ? `Plan the next step for ${googleTasks[0].title}`
-          : "add task ",
+        : "add task ",
     },
     {
       title:
         recentFile?.name ??
         (signedInToGoogle ? "Review Drive" : "Connect Google"),
       detail: recentFile
-        ? driveFileType(recentFile.mimeType)
+        ? driveFileType(recentFile)
         : "Drive, Calendar, and Tasks unlock live workspace context.",
       icon: FolderOpen,
       prompt: recentFile ? `Summarize ${recentFile.name}` : "OAuth status",
@@ -4206,7 +5184,7 @@ function FocusWorkspace({
           <div>
             <h3 className="font-semibold">Current focus</h3>
             <p className="mt-1 text-sm text-muted">
-              {briefing?.focus?.title ?? "No local focus task selected yet."}
+              {briefing?.focus?.title ?? "No Google focus task selected yet."}
             </p>
           </div>
           <span className="pulse-dot mt-1" />
@@ -4222,7 +5200,7 @@ function FocusWorkspace({
           />
           <MiniControl
             label="Tasks"
-            value={`${openTasks.length + googleTasks.length} open`}
+            value={`${openTasks.length} open`}
           />
           <MiniControl
             label="Files"
@@ -4281,7 +5259,7 @@ function CalendarWorkspace({
   refreshWorkspace: () => Promise<void>;
 }) {
   const events = briefing?.calendar.events ?? [];
-  const [view, setView] = useState<"day" | "week" | "month">("month");
+  const [view, setView] = useState<"day" | "week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [calendarAction, setCalendarAction] = useState<CalendarAction | null>(
     null,
@@ -4385,63 +5363,92 @@ function CalendarWorkspace({
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section className={softPanelClass + " p-3"}>
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <Button
-              className={iconButtonClass}
-              onClick={() =>
-                setSelectedDate(shiftCalendarDate(selectedDate, view, -1))
-              }
-              type="button"
-              title="Previous"
-            >
-              <ArrowRight className="h-4 w-4 rotate-180" />
-            </Button>
-            <div className="min-w-0 text-center">
-              <p className="truncate text-sm font-semibold">
-                {selectedDate.toLocaleDateString(undefined, {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-              <p className="text-xs text-muted">
-                {briefing?.calendar.ok
-                  ? "Google Calendar"
-                  : (briefing?.calendar.reason ?? "Calendar not connected")}
-              </p>
-            </div>
-            <Button
-              className={iconButtonClass}
-              onClick={() =>
-                setSelectedDate(shiftCalendarDate(selectedDate, view, 1))
-              }
-              type="button"
-              title="Next"
-            >
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {(["day", "week", "month"] as const).map((option) => (
-              <Button
-                className={`h-9 w-full rounded-md text-xs font-semibold transition ${
-                  view === option
-                    ? "bg-accent text-white"
-                    : "border border-separator bg-surface text-muted hover:border-[var(--accent)] hover:text-accent"
-                }`}
-                key={option}
-                onClick={() => setView(option)}
-                type="button"
-              >
-                {option[0].toUpperCase() + option.slice(1)}
-              </Button>
-            ))}
-          </div>
+    <div className="calendar-workspace flex min-h-0 flex-col gap-3 animate-fade-in">
+      <section
+        aria-label="Calendar controls"
+        className={
+          softPanelClass +
+          " flex flex-col gap-3 p-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between lg:flex-nowrap"
+        }
+      >
+        <div className="flex min-w-0 items-center gap-2">
           <Button
-            className={`${primaryButtonClass} mt-3 w-full`}
+            aria-label="Previous date range"
+            className={iconButtonClass}
+            onClick={() =>
+              setSelectedDate(shiftCalendarDate(selectedDate, view, -1))
+            }
+            type="button"
+            title="Previous"
+          >
+            <ArrowRight className="h-4 w-4 rotate-180" />
+          </Button>
+          <Button
+            className="interactive-control min-w-0 rounded-xl px-2 py-1 text-left transition hover:bg-accent-soft sm:min-w-48"
+            onClick={() => setSelectedDate(new Date())}
+            type="button"
+            title="Go to today"
+          >
+            <span className="block truncate text-sm font-semibold">
+              {selectedDate.toLocaleDateString(undefined, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+            <span className="block truncate text-xs text-muted">
+              {briefing?.calendar.ok
+                ? "Google Calendar"
+                : (briefing?.calendar.reason ?? "Calendar not connected")}
+            </span>
+          </Button>
+          <Button
+            aria-label="Next date range"
+            className={iconButtonClass}
+            onClick={() =>
+              setSelectedDate(shiftCalendarDate(selectedDate, view, 1))
+            }
+            type="button"
+            title="Next"
+          >
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div
+          aria-label="Calendar view"
+          className="grid grid-cols-3 rounded-xl border border-separator bg-surface p-1"
+          role="group"
+        >
+          {(["day", "week", "month"] as const).map((option) => (
+            <Button
+              aria-pressed={view === option}
+              className={`h-8 min-w-16 rounded-lg px-3 text-xs font-semibold transition ${
+                view === option
+                  ? "bg-accent text-accent-foreground shadow-sm"
+                  : "text-muted hover:bg-accent-soft hover:text-accent"
+              }`}
+              key={option}
+              onClick={() => setView(option)}
+              type="button"
+            >
+              {option[0].toUpperCase() + option.slice(1)}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            aria-label="Refresh calendar"
+            className={iconButtonClass}
+            onClick={() => void refreshWorkspace()}
+            type="button"
+            title="Refresh calendar"
+          >
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
+          <Button
+            className={primaryButtonClass}
             onClick={() =>
               openSlot(selectedDate, Math.max(9, new Date().getHours() + 1))
             }
@@ -4450,16 +5457,8 @@ function CalendarWorkspace({
             <Plus className="h-4 w-4" />
             Add event
           </Button>
-        </section>
-
-        <CalendarSignalStrip
-          briefing={briefing}
-          dayEvents={dayEvents}
-          events={events}
-          selectedDate={selectedDate}
-          view={view}
-        />
-      </div>
+        </div>
+      </section>
 
       {view === "day" ? (
         <DayCalendar
@@ -4483,13 +5482,17 @@ function CalendarWorkspace({
       ) : null}
 
       {view === "month" ? (
-        <section className={softPanelClass + " overflow-hidden p-3"}>
+        <section
+          className={
+            softPanelClass + " flex min-h-0 flex-1 flex-col overflow-hidden p-3"
+          }
+        >
           <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase text-muted">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
               <span key={day}>{day}</span>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-1">
             {monthDays.map((day) => {
               const dayCount = events.filter((event) =>
                 sameCalendarDay(parseEventDate(event.start), day),
@@ -4499,13 +5502,14 @@ function CalendarWorkspace({
               const isToday = sameCalendarDay(day, new Date());
               return (
                 <Button
-                  className={`relay-content-card min-h-16 rounded-md border p-1.5 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
+                  className={`relay-content-card min-h-0 rounded-md border p-2 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
                     isSelected
                       ? "border-[var(--accent)] bg-accent-soft"
                       : "border-separator bg-surface"
                   } ${currentMonth ? "" : "opacity-45"}`}
                   key={day.toISOString()}
                   onClick={() => setSelectedDate(day)}
+                  style={{ height: "100%" }}
                   type="button"
                 >
                   <span className="flex items-center justify-between gap-1">
@@ -4544,26 +5548,6 @@ function CalendarWorkspace({
         </section>
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button
-          className={primaryButtonClass}
-          onClick={() =>
-            openSlot(selectedDate, Math.max(9, new Date().getHours() + 1))
-          }
-          type="button"
-        >
-          <Plus className="h-4 w-4" />
-          Add event
-        </Button>
-        <Button
-          className={secondaryButtonClass}
-          onClick={() => void refreshWorkspace()}
-          type="button"
-        >
-          <RefreshCcw className="h-4 w-4" />
-          Refresh
-        </Button>
-      </div>
       {calendarAction ? (
         <CalendarEventEditor
           action={calendarAction}
@@ -4574,61 +5558,6 @@ function CalendarWorkspace({
         />
       ) : null}
     </div>
-  );
-}
-
-function CalendarSignalStrip({
-  briefing,
-  dayEvents,
-  events,
-  selectedDate,
-  view,
-}: {
-  briefing: Briefing | null;
-  dayEvents: CalendarEvent[];
-  events: CalendarEvent[];
-  selectedDate: Date;
-  view: "day" | "week" | "month";
-}) {
-  const now = new Date();
-  const nextEvent = events
-    .map((event) => ({ event, start: parseEventDate(event.start) }))
-    .filter((item): item is { event: CalendarEvent; start: Date } =>
-      Boolean(item.start),
-    )
-    .filter((item) => item.start.getTime() >= now.getTime())
-    .sort((a, b) => a.start.getTime() - b.start.getTime())[0]?.event;
-  const selectedLabel = selectedDate.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-
-  return (
-    <section className="calendar-signal-strip grid gap-3 rounded-xl border border-separator p-3 shadow-sm sm:grid-cols-3">
-      <MiniControl
-        label="Selected"
-        value={`${selectedLabel} · ${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"}`}
-      />
-      <MiniControl
-        label="Next"
-        value={
-          nextEvent
-            ? `${nextEvent.title} · ${formatEventTime(nextEvent.start)}`
-            : "No upcoming event loaded"
-        }
-      />
-      <MiniControl
-        label="Source"
-        value={
-          briefing
-            ? briefing.calendar.ok
-              ? `Google Calendar · ${view}`
-              : "Calendar disconnected"
-            : "Loading"
-        }
-      />
-    </section>
   );
 }
 
@@ -4653,16 +5582,23 @@ function WeekCalendar({
     { length: calendarEndHour - calendarStartHour },
     (_, index) => index + calendarStartHour,
   );
-  const hourHeight = calendarHourHeight;
+  const calendarMinutes = (calendarEndHour - calendarStartHour) * 60;
   const now = new Date();
   const showNow = weekDays.some((day) => sameCalendarDay(day, now));
-  const nowTop =
-    ((now.getHours() * 60 + now.getMinutes() - calendarStartHour * 60) / 60) *
-    hourHeight;
+  const nowTopPercent =
+    ((now.getHours() * 60 +
+      now.getMinutes() -
+      calendarStartHour * 60) /
+      calendarMinutes) *
+    100;
 
   return (
-    <section className={softPanelClass + " overflow-hidden p-3"}>
-      <div className="grid grid-cols-[52px_repeat(7,minmax(86px,1fr))] border-b border-separator pb-2">
+    <section
+      className={
+        softPanelClass + " flex min-h-0 flex-1 flex-col overflow-hidden p-3"
+      }
+    >
+      <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] border-b border-separator pb-2 sm:grid-cols-[52px_repeat(7,minmax(0,1fr))]">
         <span />
         {weekDays.map((day) => {
           const isSelected = sameCalendarDay(day, selectedDate);
@@ -4670,21 +5606,23 @@ function WeekCalendar({
 
           return (
             <Button
-              className={`relay-content-card rounded-xl px-2 py-2 text-left transition hover:bg-accent-soft ${
+              className={`relay-content-card rounded-lg px-1 py-2 text-left transition hover:bg-accent-soft sm:px-2 ${
                 isSelected ? "bg-accent-soft text-accent" : ""
               }`}
               key={day.toISOString()}
               onClick={() => onSelectDate(day)}
               type="button"
             >
-              <span className="flex items-center justify-between gap-1 text-[10px] font-semibold uppercase text-muted">
+              <span className="flex items-center justify-between gap-1 text-[9px] font-semibold uppercase text-muted sm:text-[10px]">
                 {day.toLocaleDateString(undefined, { weekday: "short" })}
                 {isToday ? (
-                  <span className="text-[9px] text-accent">Today</span>
+                  <span className="hidden text-[9px] text-accent md:inline">
+                    Today
+                  </span>
                 ) : null}
               </span>
               <span
-                className={`mt-1 grid h-8 w-8 place-items-center rounded-full text-lg font-semibold ${
+                className={`mt-1 grid h-7 w-7 place-items-center rounded-full text-base font-semibold sm:h-8 sm:w-8 sm:text-lg ${
                   isToday ? "bg-accent text-accent-foreground shadow-sm" : ""
                 }`}
               >
@@ -4694,19 +5632,21 @@ function WeekCalendar({
           );
         })}
       </div>
-      <div className="relative max-h-[620px] overflow-auto">
-        <div className="grid grid-cols-[52px_repeat(7,minmax(86px,1fr))]">
+      <div className="relative min-h-0 flex-1">
+        <div
+          className="grid h-full grid-cols-[40px_repeat(7,minmax(0,1fr))] sm:grid-cols-[52px_repeat(7,minmax(0,1fr))]"
+          style={{
+            gridTemplateRows: `repeat(${hours.length}, minmax(0, 1fr))`,
+          }}
+        >
           {hours.map((hour) => (
             <div className="contents" key={hour}>
-              <div
-                className="border-t border-separator pt-1 text-[10px] font-semibold text-muted"
-                style={{ height: hourHeight }}
-              >
+              <div className="min-h-0 border-t border-separator pt-1 text-[10px] font-semibold text-muted">
                 {formatHour(hour)}
               </div>
               {weekDays.map((day) => (
                 <Button
-                  className="relay-calendar-slot border-l border-t border-separator text-left transition hover:bg-accent-soft"
+                  className="relay-calendar-slot h-auto min-h-0 border-l border-t border-separator text-left transition hover:bg-accent-soft"
                   key={`${day.toISOString()}-${hour}`}
                   onClick={() => onSlotClick(day, hour)}
                   onDragOver={(event) => event.preventDefault()}
@@ -4718,7 +5658,6 @@ function WeekCalendar({
                     const dropped = events.find((event) => event.id === id);
                     if (dropped) void onEventDrop(dropped, day, hour);
                   }}
-                  style={{ height: hourHeight }}
                   title={`Add event ${day.toLocaleDateString()} ${formatHour(hour)}`}
                   type="button"
                 />
@@ -4726,7 +5665,7 @@ function WeekCalendar({
             </div>
           ))}
         </div>
-        <div className="pointer-events-none absolute bottom-0 left-[52px] right-0 top-0 grid grid-cols-7">
+        <div className="pointer-events-none absolute bottom-0 left-10 right-0 top-0 grid grid-cols-7 sm:left-[52px]">
           {weekDays.map((day) => (
             <div
               className="relative border-l border-transparent"
@@ -4739,7 +5678,6 @@ function WeekCalendar({
                 .map((event) => (
                   <CalendarEventBlock
                     event={event}
-                    hourHeight={hourHeight}
                     key={event.id ?? `${event.title}-${event.start}`}
                     onClick={() => onEventClick(event)}
                   />
@@ -4747,10 +5685,10 @@ function WeekCalendar({
             </div>
           ))}
         </div>
-        {showNow && nowTop >= 0 && nowTop <= hours.length * hourHeight ? (
+        {showNow && nowTopPercent >= 0 && nowTopPercent <= 100 ? (
           <div
-            className="pointer-events-none absolute left-[52px] right-0 z-20 flex items-center"
-            style={{ top: nowTop }}
+            className="pointer-events-none absolute left-10 right-0 z-20 flex items-center sm:left-[52px]"
+            style={{ top: `${nowTopPercent}%` }}
           >
             <span className="h-2 w-2 rounded-full bg-[var(--danger)]" />
             <span className="h-px flex-1 bg-[var(--danger)]" />
@@ -4763,11 +5701,9 @@ function WeekCalendar({
 
 function CalendarEventBlock({
   event,
-  hourHeight,
   onClick,
 }: {
   event: CalendarEvent;
-  hourHeight: number;
   onClick: () => void;
 }) {
   const start = parseEventDate(event.start);
@@ -4781,15 +5717,18 @@ function CalendarEventBlock({
     startMinutes + 20,
     end.getHours() * 60 + end.getMinutes(),
   );
-  const top = ((startMinutes - calendarStartHour * 60) / 60) * hourHeight;
-  const height = Math.max(34, ((endMinutes - startMinutes) / 60) * hourHeight);
+  const calendarMinutes = (calendarEndHour - calendarStartHour) * 60;
+  const topPercent =
+    ((startMinutes - calendarStartHour * 60) / calendarMinutes) * 100;
+  const heightPercent =
+    ((endMinutes - startMinutes) / calendarMinutes) * 100;
 
   return (
     <div
       className="calendar-event-position pointer-events-auto absolute left-1 right-1"
       style={{
-        top: Math.max(0, top),
-        height,
+        top: `${Math.max(0, topPercent)}%`,
+        height: `max(22px, ${heightPercent}%)`,
       }}
     >
       <HoverPreview
@@ -4798,7 +5737,7 @@ function CalendarEventBlock({
         title={event.title}
       >
         <Button
-          className="relay-event-card h-full w-full overflow-hidden rounded-xl border border-[var(--accent)] bg-accent-soft p-2 text-left text-xs shadow-sm transition hover:-translate-y-0.5 hover:bg-surface"
+          className="relay-event-card h-full w-full overflow-hidden rounded-md border border-[var(--accent)] bg-accent-soft px-1.5 py-0.5 text-left text-[10px] shadow-sm transition hover:-translate-y-0.5 hover:bg-surface sm:text-xs"
           draggable={Boolean(event.id)}
           onClick={onClick}
           onDragStart={(dragEvent) => {
@@ -4811,9 +5750,6 @@ function CalendarEventBlock({
           type="button"
         >
           <span className="block truncate font-semibold">{event.title}</span>
-          <span className="mt-0.5 block truncate text-muted">
-            {formatEventTime(event.start)}
-          </span>
         </Button>
       </HoverPreview>
     </div>
@@ -4838,7 +5774,7 @@ function DayCalendar({
   const hourHeight = calendarHourHeight;
 
   return (
-    <section className={softPanelClass + " overflow-hidden p-3"}>
+    <section className={softPanelClass + " min-h-0 flex-1 overflow-y-auto p-3"}>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold">
           {selectedDate.toLocaleDateString(undefined, {
@@ -5153,33 +6089,6 @@ function TaskWorkspace({
   taskColumns: TaskColumn[];
   tasks: RelayTask[];
 }) {
-  const googleTasks = briefing?.googleTasks?.tasks ?? [];
-  const openGoogleTasks = googleTasks.filter(
-    (task) => task.status !== "completed",
-  );
-  const [googleStatus, setGoogleStatus] = useState<string | null>(null);
-
-  async function completeGoogleTask(task: GoogleTask) {
-    if (!task.id) return;
-
-    const response = await fetch("/api/google/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "complete",
-        id: task.id,
-        taskListId: task.taskListId,
-      }),
-    });
-    const data = (await response.json()) as { ok: boolean; reason?: string };
-    setGoogleStatus(
-      response.ok && data.ok
-        ? "Google task completed."
-        : (data.reason ?? "Google task was not completed."),
-    );
-    await refreshWorkspace();
-  }
-
   return (
     <div className="space-y-4 animate-fade-in">
       <TaskComposer addTask={addTask} refreshWorkspace={refreshWorkspace} />
@@ -5190,7 +6099,7 @@ function TaskWorkspace({
             <h3 className="font-semibold">Open tasks</h3>
             <p className="text-xs text-muted">
               {tasks.length} Google total, {taskColumns.length} task lists,{" "}
-              {openGoogleTasks.length} Google open
+              {openTasks.length} Google open
             </p>
           </div>
           <StatusBadge
@@ -5215,29 +6124,8 @@ function TaskWorkspace({
               <PriorityTag priority={task.priority} />
             </Button>
           ))}
-          {openGoogleTasks.slice(0, 6).map((task) => (
-            <Button
-              className="interactive-row flex w-full items-center gap-3 rounded-lg border border-separator bg-surface p-3 text-left"
-              key={`${task.taskListId}-${task.id}`}
-              onClick={() => void completeGoogleTask(task)}
-              type="button"
-            >
-              <CheckCircle2 className="h-4 w-4 text-accent" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">
-                  {task.title}
-                </span>
-                <span className="mt-1 block truncate text-xs text-muted">
-                  {task.due
-                    ? `Due ${formatEventTime(task.due)}`
-                    : (task.taskListTitle ?? "Google Tasks")}
-                </span>
-              </span>
-              <span className="text-xs text-muted">Google</span>
-            </Button>
-          ))}
         </div>
-        {openTasks.length === 0 && openGoogleTasks.length === 0 ? (
+        {openTasks.length === 0 ? (
           <EmptyState
             icon={ListTodo}
             title="No open tasks"
@@ -5246,9 +6134,6 @@ function TaskWorkspace({
               "Create one from the task builder."
             }
           />
-        ) : null}
-        {googleStatus ? (
-          <p className="mt-3 text-sm text-muted">{googleStatus}</p>
         ) : null}
       </section>
     </div>
@@ -5971,12 +6856,12 @@ function FileGeneratedSurface() {
               <>
                 <DriveFileGlyph
                   className="h-4 w-4 text-accent"
-                  mimeType={file.mimeType}
+                  file={file}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{file.name}</p>
                   <p className="text-xs text-muted">
-                    {driveFileType(file.mimeType)} by{" "}
+                    {driveFileType(file)} by{" "}
                     {file.owner ?? "Unknown owner"}
                   </p>
                 </div>
@@ -6222,28 +7107,73 @@ function CalendarView({
 
 function TaskMasterDetailView({
   briefing,
+  repositories,
+  repositoryAssignments,
   refreshWorkspace,
+  setTaskRepository,
 }: {
   briefing: Briefing | null;
+  repositories: GithubRepository[];
+  repositoryAssignments: TaskRepositoryAssignments;
   refreshWorkspace: () => Promise<void>;
+  setTaskRepository: (
+    taskKey: string,
+    repositoryFullName: string | null,
+  ) => void;
 }) {
   const googleTasks = briefing?.googleTasks;
   const tasks = useMemo(() => googleTasks?.tasks ?? [], [googleTasks?.tasks]);
   const taskLists = googleTasks?.taskLists ?? [];
+  const {
+    assignments,
+    categories,
+    addCategory,
+    deleteCategory,
+    renameCategory,
+    setTaskCategory,
+  } = useTaskCategories();
+  const {
+    archivedTaskKeys,
+    archiveTask: archiveTaskLocally,
+    forgetTaskArchive,
+    unarchiveTask: unarchiveTaskLocally,
+  } = useTaskArchive();
+  const {
+    deleteRichDescription,
+    richDescriptions,
+    setRichDescription,
+  } = useTaskRichDescriptions();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
     googleTaskKey(tasks[0] ?? null),
   );
+  const [calendarFocusRequest, setCalendarFocusRequest] = useState(0);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [layoutSizes, setLayoutSizes] = useState(readStoredTaskLayout);
+  const [activeResize, setActiveResize] = useState<
+    "rail" | "calendar" | null
+  >(null);
+  const taskLayoutRef = useRef<HTMLDivElement>(null);
+  const resizeStateRef = useRef<{
+    axis: "rail" | "calendar";
+    pointerId: number;
+    startCalendarHeight: number;
+    startRailWidth: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">(
-    "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "pending" | "done" | "archived"
+  >("all");
   const [priorityFilter, setPriorityFilter] = useState<
     "all" | GoogleTaskPriority
   >("all");
   const [dueFilter, setDueFilter] = useState<
     "all" | "overdue" | "today" | "week" | "none"
   >("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const orderedTasks = useMemo(() => {
     const open = sortGoogleTasksByUrgency(
       tasks.filter((task) => task.status !== "completed"),
@@ -6258,13 +7188,27 @@ function TaskMasterDetailView({
 
     return [...open, ...completed];
   }, [tasks]);
+  const categoryFilterIds = useMemo(
+    () =>
+      categoryFilter === "all"
+        ? null
+        : new Set([
+            categoryFilter,
+            ...taskCategoryDescendantIds(categories, categoryFilter),
+          ]),
+    [categories, categoryFilter],
+  );
   const filteredTasks = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const endOfWeek = addDays(today, 7);
 
     return orderedTasks.filter((task) => {
+      const taskKey = googleTaskKey(task);
+      const archived = taskKey ? archivedTaskKeys.has(taskKey) : false;
       const completed = task.status === "completed";
+      if (statusFilter === "archived" && !archived) return false;
+      if (statusFilter !== "archived" && archived) return false;
       if (statusFilter === "pending" && completed) return false;
       if (statusFilter === "done" && !completed) return false;
       if (
@@ -6289,16 +7233,134 @@ function TaskMasterDetailView({
         return false;
       }
       if (dueFilter === "none" && dueDate) return false;
+      if (categoryFilterIds) {
+        const assignedCategory = taskKey ? assignments[taskKey] : null;
+        if (!assignedCategory || !categoryFilterIds.has(assignedCategory)) {
+          return false;
+        }
+      }
 
       return true;
     });
-  }, [dueFilter, orderedTasks, priorityFilter, statusFilter]);
+  }, [
+    archivedTaskKeys,
+    assignments,
+    categoryFilterIds,
+    dueFilter,
+    orderedTasks,
+    priorityFilter,
+    statusFilter,
+  ]);
   const selectedTask =
     filteredTasks.find((task) => googleTaskKey(task) === selectedTaskId) ??
     filteredTasks[0] ??
     null;
   const filtersActive =
-    statusFilter !== "all" || priorityFilter !== "all" || dueFilter !== "all";
+    statusFilter !== "all" ||
+    priorityFilter !== "all" ||
+    dueFilter !== "all" ||
+    categoryFilter !== "all";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      taskLayoutStorageKey,
+      JSON.stringify(layoutSizes),
+    );
+  }, [layoutSizes]);
+
+  function selectTask(task: GoogleTask) {
+    setEditingTaskId(null);
+    setSelectedTaskId(googleTaskKey(task));
+  }
+
+  function showTaskDueDate(task: GoogleTask) {
+    if (!parseEventDate(task.due)) return;
+    setCalendarFocusRequest((current) => current + 1);
+    window.requestAnimationFrame(() => {
+      document.getElementById("task-mini-calendar")?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+  }
+
+  function taskLayoutBounds() {
+    const rect = taskLayoutRef.current?.getBoundingClientRect();
+    return {
+      maxCalendarHeight: Math.max(
+        180,
+        Math.min(420, (rect?.height ?? 720) - 280),
+      ),
+      maxRailWidth: Math.max(
+        240,
+        Math.min(480, (rect?.width ?? 1000) - 420),
+      ),
+    };
+  }
+
+  function setRailWidth(nextWidth: number) {
+    const { maxRailWidth } = taskLayoutBounds();
+    setLayoutSizes((current) => ({
+      ...current,
+      railWidth: Math.min(maxRailWidth, Math.max(240, nextWidth)),
+    }));
+  }
+
+  function setCalendarHeight(nextHeight: number) {
+    const { maxCalendarHeight } = taskLayoutBounds();
+    setLayoutSizes((current) => ({
+      ...current,
+      calendarHeight: Math.min(
+        maxCalendarHeight,
+        Math.max(180, nextHeight),
+      ),
+    }));
+  }
+
+  function startTaskPanelResize(
+    event: ReactPointerEvent<HTMLDivElement>,
+    axis: "rail" | "calendar",
+  ) {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeStateRef.current = {
+      axis,
+      pointerId: event.pointerId,
+      startCalendarHeight: layoutSizes.calendarHeight,
+      startRailWidth: layoutSizes.railWidth,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    setActiveResize(axis);
+    document.body.style.cursor =
+      axis === "rail" ? "col-resize" : "row-resize";
+    document.body.style.userSelect = "none";
+  }
+
+  function moveTaskPanelResize(event: ReactPointerEvent<HTMLDivElement>) {
+    const resize = resizeStateRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+
+    if (resize.axis === "rail") {
+      setRailWidth(resize.startRailWidth + event.clientX - resize.startX);
+      return;
+    }
+
+    setCalendarHeight(
+      resize.startCalendarHeight - (event.clientY - resize.startY),
+    );
+  }
+
+  function finishTaskPanelResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resizeStateRef.current = null;
+    setActiveResize(null);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }
 
   async function runGoogleTaskAction(body: Record<string, unknown>) {
     const response = await fetch("/api/google/tasks", {
@@ -6309,6 +7371,7 @@ function TaskMasterDetailView({
     const data = (await response.json()) as {
       ok?: boolean;
       reason?: string;
+      task?: GoogleTask;
     };
 
     if (!response.ok || !data.ok) {
@@ -6316,14 +7379,28 @@ function TaskMasterDetailView({
     }
 
     await refreshWorkspace();
+    return data;
   }
 
   async function createTask(input: GoogleTaskInput) {
-    await runGoogleTaskAction({
+    const result = await runGoogleTaskAction({
       action: "create",
-      ...input,
+      title: input.title,
       notes: input.notes ?? "",
+      due: input.due,
+      priority: input.priority,
+      taskListId: input.taskListId,
     });
+    const createdTask = result.task ?? null;
+    const createdTaskKey = googleTaskKey(createdTask);
+    if (createdTaskKey) {
+      setTaskCategory(createdTaskKey, input.categoryId);
+      setTaskRepository(
+        createdTaskKey,
+        input.repositoryFullName ?? null,
+      );
+      setSelectedTaskId(createdTaskKey);
+    }
   }
 
   async function updateTask(task: GoogleTask, input: GoogleTaskInput) {
@@ -6337,6 +7414,11 @@ function TaskMasterDetailView({
       due: input.due,
       priority: input.priority,
     });
+    const taskKey = googleTaskKey(task);
+    if (taskKey) {
+      setTaskCategory(taskKey, input.categoryId);
+      setTaskRepository(taskKey, input.repositoryFullName ?? null);
+    }
   }
 
   async function completeTask(task: GoogleTask) {
@@ -6348,143 +7430,252 @@ function TaskMasterDetailView({
     });
   }
 
+  async function reopenTask(task: GoogleTask) {
+    if (!task.id) throw new Error("This Google task has no editable ID.");
+    await runGoogleTaskAction({
+      action: "update",
+      id: task.id,
+      status: "needsAction",
+      taskListId: task.taskListId,
+    });
+  }
+
+  async function deleteTask(task: GoogleTask) {
+    if (!task.id) throw new Error("This Google task has no deletable ID.");
+    await runGoogleTaskAction({
+      action: "delete",
+      id: task.id,
+      taskListId: task.taskListId,
+    });
+    const taskKey = googleTaskKey(task);
+    if (taskKey) {
+      forgetTaskArchive(taskKey);
+      setTaskCategory(taskKey, null);
+      setTaskRepository(taskKey, null);
+      deleteRichDescription(taskKey);
+    }
+    setEditingTaskId(null);
+  }
+
+  function setTaskArchived(task: GoogleTask, archived: boolean) {
+    const taskKey = googleTaskKey(task);
+    if (!taskKey) return;
+    if (archived) archiveTaskLocally(taskKey);
+    else unarchiveTaskLocally(taskKey);
+    setEditingTaskId(null);
+  }
+
   return (
-    <div className="grid min-h-[calc(100vh-144px)] gap-5 lg:h-[calc(100vh-144px)] lg:grid-cols-[minmax(320px,2fr)_minmax(0,3fr)]">
+    <div
+      className="task-resizable-layout grid min-h-[calc(100dvh-2rem)] gap-4 sm:min-h-[calc(100dvh-3rem)] lg:h-[calc(100dvh-3rem)] lg:min-h-0 lg:gap-0 xl:h-[calc(100dvh-4rem)]"
+      ref={taskLayoutRef}
+      style={
+        {
+          "--task-calendar-height": `${layoutSizes.calendarHeight}px`,
+          "--task-rail-width": `${layoutSizes.railWidth}px`,
+        } as CSSProperties
+      }
+    >
       <section
         className={`${panelClass} flex min-h-[420px] flex-col overflow-hidden lg:h-full`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-separator p-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-              Google Tasks
-            </p>
-            <h2 className="mt-1 text-xl font-semibold">Your Google tasks</h2>
-            <p className="mt-1 text-sm text-muted">
-              {tasks.filter((task) => task.status !== "completed").length} open
-              {" · "}
-              {tasks.filter((task) => task.status === "completed").length}{" "}
-              complete
-            </p>
-          </div>
-          <Button
-            className={primaryButtonClass}
-            disabled={!googleTasks?.ok}
-            onClick={() => setTaskModalOpen(true)}
-            type="button"
-          >
-            <Plus className="h-4 w-4" />
-            Add task
-          </Button>
-        </div>
-
         <Disclosure
           className="task-filter-disclosure border-b border-separator"
           isExpanded={filtersExpanded}
           onExpandedChange={setFiltersExpanded}
         >
-          <Disclosure.Heading className="flex items-center justify-between gap-3 p-4">
-            <Button
-              className="task-filter-trigger"
-              slot="trigger"
-              type="button"
-              variant="secondary"
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-              {filtersActive ? (
-                <span className="task-filter-active-dot" aria-hidden="true" />
-              ) : null}
-              <Chip size="sm" variant="secondary">
-                {filteredTasks.length}
-              </Chip>
-              <Disclosure.Indicator />
-            </Button>
-            {filtersActive ? (
-              <Button
-                className="h-8 px-2 text-xs text-muted"
-                onClick={() => {
-                  setStatusFilter("all");
-                  setPriorityFilter("all");
-                  setDueFilter("all");
-                }}
-                type="button"
-                variant="ghost"
-              >
-                <X className="h-3.5 w-3.5" />
-                Clear
-              </Button>
-            ) : null}
+          <Disclosure.Heading className="flex items-start justify-between gap-3 bg-surface p-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+                Google Tasks
+              </p>
+              <h2 className="mt-1 text-lg font-semibold">My tasks</h2>
+              <p className="mt-1 text-xs text-muted">
+                {tasks.filter((task) => task.status !== "completed").length}{" "}
+                open ·{" "}
+                {tasks.filter((task) => task.status === "completed").length}{" "}
+                complete
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Tooltip>
+                <Button
+                  aria-label="Manage task categories"
+                  className={iconButtonClass}
+                  onClick={() => setCategoryModalOpen(true)}
+                  type="button"
+                >
+                  <FolderTree className="h-4 w-4" />
+                </Button>
+                <Tooltip.Content>Manage categories</Tooltip.Content>
+              </Tooltip>
+              <Tooltip>
+                <Button
+                  aria-expanded={filtersExpanded}
+                  aria-label={
+                    filtersExpanded
+                      ? "Collapse task filters"
+                      : "Expand task filters"
+                  }
+                  className={`task-filter-trigger relative h-10 w-10 p-0 ${
+                    filtersExpanded ? "is-expanded" : ""
+                  }`}
+                  slot="trigger"
+                  type="button"
+                  variant="secondary"
+                >
+                  <Filter className="h-4 w-4" />
+                  {filtersActive ? (
+                    <span
+                      aria-hidden="true"
+                      className="task-filter-active-dot absolute right-1.5 top-1.5"
+                    />
+                  ) : null}
+                </Button>
+                <Tooltip.Content>
+                  {filtersExpanded ? "Hide filters" : "Filter tasks"}
+                </Tooltip.Content>
+              </Tooltip>
+              <Tooltip>
+                <Button
+                  aria-label="Add task"
+                  className="h-10 w-10 shrink-0 rounded-xl bg-accent p-0 text-accent-foreground shadow-sm hover:bg-accent-hover"
+                  disabled={!googleTasks?.ok}
+                  onClick={() => setTaskModalOpen(true)}
+                  type="button"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Tooltip.Content>Add task</Tooltip.Content>
+              </Tooltip>
+            </div>
           </Disclosure.Heading>
           <Disclosure.Content>
-            <Disclosure.Body className="grid gap-2 px-4 pb-4 pt-0 sm:grid-cols-3">
-              <Select
-                aria-label="Filter tasks by status"
-                className="h-10 w-full rounded-xl border border-separator bg-surface px-3 text-sm"
-                onChange={(event) =>
-                  setStatusFilter(
-                    event.target.value as "all" | "pending" | "done",
-                  )
-                }
-                value={statusFilter}
-              >
-                <option value="all">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="done">Done</option>
-              </Select>
-              <Select
-                aria-label="Filter tasks by priority"
-                className="h-10 w-full rounded-xl border border-separator bg-surface px-3 text-sm"
-                onChange={(event) =>
-                  setPriorityFilter(
-                    event.target.value as "all" | GoogleTaskPriority,
-                  )
-                }
-                value={priorityFilter}
-              >
-                <option value="all">All priorities</option>
-                <option value="high">High priority</option>
-                <option value="medium">Medium priority</option>
-                <option value="low">Low priority</option>
-              </Select>
-              <Select
-                aria-label="Filter tasks by due date"
-                className="h-10 w-full rounded-xl border border-separator bg-surface px-3 text-sm"
-                onChange={(event) =>
-                  setDueFilter(
-                    event.target.value as
-                      | "all"
-                      | "overdue"
-                      | "today"
-                      | "week"
-                      | "none",
-                  )
-                }
-                value={dueFilter}
-              >
-                <option value="all">Any due date</option>
-                <option value="overdue">Overdue</option>
-                <option value="today">Due today</option>
-                <option value="week">Next 7 days</option>
-                <option value="none">No due date</option>
-              </Select>
+            <Disclosure.Body className="task-filter-strip px-3 py-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                  Showing {filteredTasks.length} tasks
+                </span>
+                {filtersActive ? (
+                  <Button
+                    className="h-7 px-2 text-[11px] text-muted"
+                    onClick={() => {
+                      setStatusFilter("all");
+                      setPriorityFilter("all");
+                      setDueFilter("all");
+                      setCategoryFilter("all");
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    <X className="h-3 w-3" />
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+              <div className="grid gap-2">
+                <Select
+                  aria-label="Filter tasks by status"
+                  className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-xs"
+                  onChange={(event) =>
+                    setStatusFilter(
+                      event.target.value as
+                        | "all"
+                        | "pending"
+                        | "done"
+                        | "archived",
+                    )
+                  }
+                  value={statusFilter}
+                >
+                  <option value="all">All active tasks</option>
+                  <option value="pending">Pending</option>
+                  <option value="done">Done</option>
+                  <option value="archived">Archived</option>
+                </Select>
+                <Select
+                  aria-label="Filter tasks by priority"
+                  className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-xs"
+                  onChange={(event) =>
+                    setPriorityFilter(
+                      event.target.value as "all" | GoogleTaskPriority,
+                    )
+                  }
+                  value={priorityFilter}
+                >
+                  <option value="all">All priorities</option>
+                  <option value="high">High priority</option>
+                  <option value="medium">Medium priority</option>
+                  <option value="low">Low priority</option>
+                </Select>
+                <Select
+                  aria-label="Filter tasks by due date"
+                  className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-xs"
+                  onChange={(event) =>
+                    setDueFilter(
+                      event.target.value as
+                        | "all"
+                        | "overdue"
+                        | "today"
+                        | "week"
+                        | "none",
+                    )
+                  }
+                  value={dueFilter}
+                >
+                  <option value="all">Any due date</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="today">Due today</option>
+                  <option value="week">Next 7 days</option>
+                  <option value="none">No due date</option>
+                </Select>
+                <Select
+                  aria-label="Filter tasks by category"
+                  className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-xs"
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  value={categoryFilter}
+                >
+                  <option value="all">All categories</option>
+                  {flattenTaskCategories(categories).map(
+                    ({ category, depth }) => (
+                      <option key={category.id} value={category.id}>
+                        {`${"— ".repeat(depth)}${category.name}`}
+                      </option>
+                    ),
+                  )}
+                </Select>
+              </div>
             </Disclosure.Body>
           </Disclosure.Content>
         </Disclosure>
 
         <ScrollShadow
-          className="min-h-0 flex-1 p-4"
+          className="min-h-0 flex-1 p-3"
           hideScrollBar={false}
           offset={8}
           size={56}
         >
-          <div className="space-y-3">
+          <div className="space-y-2">
             {filteredTasks.map((task) => (
               <TaskListCard
-                completeTask={completeTask}
+                archived={archivedTaskKeys.has(googleTaskKey(task) ?? "")}
+                categoryPath={taskCategoryPath(
+                  categories,
+                  assignments[googleTaskKey(task) ?? ""],
+                )}
                 key={googleTaskKey(task)}
-                onSelect={() => setSelectedTaskId(googleTaskKey(task))}
+                onArchiveToggle={() =>
+                  setTaskArchived(
+                    task,
+                    !archivedTaskKeys.has(googleTaskKey(task) ?? ""),
+                  )
+                }
+                onSelect={() => selectTask(task)}
                 selected={googleTaskKey(selectedTask) === googleTaskKey(task)}
                 task={task}
+                toggleTask={
+                  task.status === "completed" ? reopenTask : completeTask
+                }
               />
             ))}
             {filteredTasks.length === 0 ? (
@@ -6509,40 +7700,203 @@ function TaskMasterDetailView({
         </ScrollShadow>
       </section>
 
-      <TaskDetailPanel
-        completeTask={completeTask}
-        key={googleTaskKey(selectedTask) ?? "empty-task-detail"}
-        onSave={updateTask}
-        task={selectedTask}
+      <TaskResizeHandle
+        active={activeResize === "rail"}
+        ariaLabel="Resize task rail"
+        defaultValue={defaultTaskLayout.railWidth}
+        max={480}
+        min={240}
+        onChange={setRailWidth}
+        onPointerDown={(event) => startTaskPanelResize(event, "rail")}
+        onPointerMove={moveTaskPanelResize}
+        onPointerUp={finishTaskPanelResize}
+        orientation="vertical"
+        value={layoutSizes.railWidth}
       />
+
+      <div className="task-resizable-stack grid min-h-0 gap-4 lg:gap-0">
+        <TaskDetailPanel
+          archived={
+            selectedTask
+              ? archivedTaskKeys.has(googleTaskKey(selectedTask) ?? "")
+              : false
+          }
+          categories={categories}
+          categoryId={
+            selectedTask
+              ? (assignments[googleTaskKey(selectedTask) ?? ""] ?? null)
+              : null
+          }
+          deleteTask={deleteTask}
+          editing={
+            Boolean(selectedTask) &&
+            editingTaskId === googleTaskKey(selectedTask)
+          }
+          onEditingChange={(editing) =>
+            setEditingTaskId(
+              editing && selectedTask ? googleTaskKey(selectedTask) : null,
+            )
+          }
+          onToggleArchive={(archived) =>
+            selectedTask && setTaskArchived(selectedTask, archived)
+          }
+          onSave={updateTask}
+          onShowDueDate={showTaskDueDate}
+          repositories={repositories}
+          repositoryFullName={
+            selectedTask
+              ? (repositoryAssignments[
+                  googleTaskKey(selectedTask) ?? ""
+                ] ?? null)
+              : null
+          }
+          richDescription={
+            selectedTask
+              ? (richDescriptions[googleTaskKey(selectedTask) ?? ""] ?? null)
+              : null
+          }
+          setRichDescription={(document) => {
+            if (!selectedTask) return;
+            const taskKey = googleTaskKey(selectedTask);
+            if (taskKey) setRichDescription(taskKey, document);
+          }}
+          task={selectedTask}
+          toggleTask={
+            selectedTask?.status === "completed" ? reopenTask : completeTask
+          }
+        />
+        <TaskResizeHandle
+          active={activeResize === "calendar"}
+          ariaLabel="Resize task details and calendar"
+          defaultValue={defaultTaskLayout.calendarHeight}
+          max={420}
+          min={180}
+          onChange={setCalendarHeight}
+          onPointerDown={(event) => startTaskPanelResize(event, "calendar")}
+          onPointerMove={moveTaskPanelResize}
+          onPointerUp={finishTaskPanelResize}
+          orientation="horizontal"
+          value={layoutSizes.calendarHeight}
+        />
+        <TaskMiniCalendar
+          key={`${googleTaskKey(selectedTask) ?? "task-calendar"}-${calendarFocusRequest}`}
+          onSelectTask={selectTask}
+          selectedTask={selectedTask}
+          tasks={tasks}
+        />
+      </div>
 
       {taskModalOpen ? (
         <GoogleTaskCreationModal
+          categories={categories}
           onCreate={createTask}
           onClose={() => setTaskModalOpen(false)}
           taskLists={taskLists}
+        />
+      ) : null}
+      {categoryModalOpen ? (
+        <TaskCategoryManagerModal
+          addCategory={addCategory}
+          categories={categories}
+          deleteCategory={deleteCategory}
+          onClose={() => setCategoryModalOpen(false)}
+          renameCategory={renameCategory}
         />
       ) : null}
     </div>
   );
 }
 
+function TaskResizeHandle({
+  active,
+  ariaLabel,
+  defaultValue,
+  max,
+  min,
+  onChange,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  orientation,
+  value,
+}: {
+  active: boolean;
+  ariaLabel: string;
+  defaultValue: number;
+  max: number;
+  min: number;
+  onChange: (value: number) => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  orientation: "horizontal" | "vertical";
+  value: number;
+}) {
+  function resizeWithKeyboard(event: KeyboardEvent<HTMLDivElement>) {
+    const step = event.shiftKey ? 40 : 16;
+    let nextValue: number | null = null;
+
+    if (event.key === "Home") nextValue = min;
+    if (event.key === "End") nextValue = max;
+    if (orientation === "vertical") {
+      if (event.key === "ArrowLeft") nextValue = value - step;
+      if (event.key === "ArrowRight") nextValue = value + step;
+    } else {
+      if (event.key === "ArrowUp") nextValue = value + step;
+      if (event.key === "ArrowDown") nextValue = value - step;
+    }
+
+    if (nextValue === null) return;
+    event.preventDefault();
+    onChange(Math.min(max, Math.max(min, nextValue)));
+  }
+
+  return (
+    <div
+      aria-label={ariaLabel}
+      aria-orientation={orientation}
+      aria-valuemax={Math.round(max)}
+      aria-valuemin={Math.round(min)}
+      aria-valuenow={Math.round(value)}
+      aria-valuetext={`${Math.round(value)} pixels`}
+      className={`task-resize-handle task-resize-handle--${orientation} hidden lg:block`}
+      data-resizing={active || undefined}
+      onDoubleClick={() => onChange(defaultValue)}
+      onKeyDown={resizeWithKeyboard}
+      onLostPointerCapture={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      role="separator"
+      tabIndex={0}
+      title={`${ariaLabel}. Drag, use arrow keys, or double-click to reset.`}
+    />
+  );
+}
+
 function TaskListCard({
-  completeTask,
+  archived,
+  categoryPath,
+  onArchiveToggle,
   onSelect,
   selected,
   task,
+  toggleTask,
 }: {
-  completeTask: (task: GoogleTask) => Promise<void>;
+  archived: boolean;
+  categoryPath: TaskCategory[];
+  onArchiveToggle: () => void;
   onSelect: () => void;
   selected: boolean;
   task: GoogleTask;
+  toggleTask: (task: GoogleTask) => Promise<void>;
 }) {
   const completed = task.status === "completed";
 
   return (
     <article
-      className={`task-rail-card flex items-start gap-3 rounded-2xl border bg-surface p-3 shadow-sm ${
+      className={`task-rail-card flex items-start gap-2 rounded-xl border bg-surface p-2 pl-3 shadow-sm ${
         selected
           ? "border-[var(--accent)] ring-2 ring-[var(--accent-soft)]"
           : "border-separator"
@@ -6554,53 +7908,101 @@ function TaskListCard({
         type="button"
       >
         <span className="block min-w-0">
-          <span className="flex flex-wrap items-center gap-2">
+          <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
             <PriorityTag priority={googleTaskPriority(task)} />
             {completed ? (
               <Chip color="success" size="sm" variant="soft">
                 Complete
               </Chip>
             ) : null}
+            {categoryPath.length > 0 ? (
+              <TaskCategoryBadge categories={categoryPath} />
+            ) : null}
           </span>
           <span
-            className={`mt-2 block text-sm font-semibold leading-5 ${
+            className={`mt-1 line-clamp-1 block text-[13px] font-semibold leading-[1.1rem] ${
               completed ? "text-muted line-through" : "text-foreground"
             }`}
           >
             {task.title}
           </span>
-          <span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted">
-            {googleTaskNotes(task.notes) || "No notes added"}
-          </span>
-          <span className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <CalendarDays className="h-3.5 w-3.5" />
-              {task.due ? formatDueDate(task.due) : "No due date"}
+          <span className="mt-1 flex items-center gap-1.5 text-[10px] leading-4 text-muted">
+            <span
+              aria-label={
+                task.due
+                  ? `${formatRemainingDueDays(task.due)}. Due ${formatDueDate(task.due)}`
+                  : "No due date"
+              }
+              className="inline-flex items-center gap-1.5"
+              title={task.due ? formatDueDate(task.due) : "No due date"}
+            >
+              <CalendarDays className="h-3 w-3" />
+              {formatRemainingDueDays(task.due)}
             </span>
-            <span>{task.taskListTitle ?? "Google Tasks"}</span>
           </span>
         </span>
       </Button>
-      <TaskCompletionButton completeTask={completeTask} task={task} />
+      <span className="flex shrink-0 flex-col gap-1">
+        <TaskCompletionButton compact task={task} toggleTask={toggleTask} />
+        <Button
+          aria-label={archived ? "Unarchive task" : "Archive task"}
+          className="h-7 w-7 rounded-full p-0 text-muted hover:bg-accent-soft hover:text-accent"
+          onClick={onArchiveToggle}
+          title={archived ? "Unarchive task" : "Archive task"}
+          type="button"
+        >
+          {archived ? (
+            <ArchiveRestore className="h-3.5 w-3.5" />
+          ) : (
+            <Archive className="h-3.5 w-3.5" />
+          )}
+        </Button>
+      </span>
     </article>
   );
 }
 
+function TaskCategoryBadge({ categories }: { categories: TaskCategory[] }) {
+  const label = categories.map((category) => category.name).join(" / ");
+  const CategoryIcon =
+    taskCategoryIconMap[categories.at(-1)?.icon ?? "folder"];
+
+  return (
+    <span
+      aria-label={`Category: ${label}`}
+      className="task-category-badge inline-flex min-w-0 max-w-full items-center gap-0.5 overflow-hidden rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+      title={label}
+    >
+      <CategoryIcon className="mr-0.5 h-3 w-3 shrink-0" />
+      {categories.map((category, index) => (
+        <span className="inline-flex min-w-0 items-center" key={category.id}>
+          {index > 0 ? (
+            <ChevronRight className="mx-0.5 h-2.5 w-2.5 shrink-0 opacity-60" />
+          ) : null}
+          <span className="truncate">{category.name}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function TaskCompletionButton({
-  completeTask,
+  compact = false,
   task,
+  toggleTask,
 }: {
-  completeTask: (task: GoogleTask) => Promise<void>;
+  compact?: boolean;
   task: GoogleTask;
+  toggleTask: (task: GoogleTask) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const completed = task.status === "completed";
 
-  async function markComplete() {
-    if (completed || busy) return;
+  async function toggleCompletion() {
+    if (busy) return;
     setBusy(true);
     try {
-      await completeTask(task);
+      await toggleTask(task);
     } finally {
       setBusy(false);
     }
@@ -6608,41 +8010,74 @@ function TaskCompletionButton({
 
   return (
     <Button
+      aria-label={completed ? "Undo task completion" : "Mark task done"}
       aria-pressed={completed}
-      className={`h-9 w-9 shrink-0 rounded-full border-2 p-0 transition ${
+      className={`${compact ? "h-7 w-7 rounded-lg" : "h-10 w-10 rounded-xl"} shrink-0 border p-0 transition ${
         completed
-          ? "border-[var(--success)] bg-[var(--success)] text-white"
-          : "border-[var(--success)] bg-transparent text-[var(--success)] hover:bg-[var(--success-soft)]"
+          ? "border-[var(--success)] bg-[var(--success)] text-white hover:bg-[var(--success)] hover:text-white hover:brightness-110"
+          : "border-separator bg-surface-secondary text-[var(--success)] hover:border-[var(--success)] hover:bg-[var(--success-soft)] hover:text-[var(--success)]"
       }`}
-      onClick={() => void markComplete()}
-      title={completed ? "Task complete" : "Mark task complete"}
+      onClick={() => void toggleCompletion()}
+      title={completed ? "Undo task completion" : "Mark task done"}
       type="button"
     >
       {busy ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
-        <Check className="h-4 w-4 stroke-[2.5]" />
+        <Check
+          className={`${compact ? "h-3.5 w-3.5" : "h-4 w-4"} stroke-[2.5]`}
+        />
       )}
     </Button>
   );
 }
 
 function TaskDetailPanel({
-  completeTask,
+  archived,
+  categories,
+  categoryId,
+  deleteTask,
+  editing,
+  onEditingChange,
   onSave,
+  onShowDueDate,
+  onToggleArchive,
+  repositories,
+  repositoryFullName,
+  richDescription,
+  setRichDescription,
   task,
+  toggleTask,
 }: {
-  completeTask: (task: GoogleTask) => Promise<void>;
+  archived: boolean;
+  categories: TaskCategory[];
+  categoryId: string | null;
+  deleteTask: (task: GoogleTask) => Promise<void>;
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
   onSave: (task: GoogleTask, input: GoogleTaskInput) => Promise<void>;
+  onShowDueDate: (task: GoogleTask) => void;
+  onToggleArchive: (archived: boolean) => void;
+  repositories: GithubRepository[];
+  repositoryFullName: string | null;
+  richDescription: TaskRichDocument | null;
+  setRichDescription: (document: TaskRichDocument) => void;
   task: GoogleTask | null;
+  toggleTask: (task: GoogleTask) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task?.title ?? "");
   const [notes, setNotes] = useState(googleTaskNotes(task?.notes));
   const [priority, setPriority] = useState<GoogleTaskPriority>(
     googleTaskEditablePriority(task),
   );
   const [due, setDue] = useState<DateValue | null>(taskDateValue(task?.due));
+  const [draftCategoryId, setDraftCategoryId] = useState(categoryId ?? "none");
+  const [draftRepositoryFullName, setDraftRepositoryFullName] = useState(
+    repositoryFullName ?? "none",
+  );
+  const [draftRichDescription, setDraftRichDescription] =
+    useState<TaskRichDocument | null>(richDescription);
+  const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -6651,12 +8086,15 @@ function TaskDetailPanel({
     setNotes(googleTaskNotes(nextTask?.notes));
     setPriority(googleTaskEditablePriority(nextTask));
     setDue(taskDateValue(nextTask?.due));
+    setDraftCategoryId(categoryId ?? "none");
+    setDraftRepositoryFullName(repositoryFullName ?? "none");
+    setDraftRichDescription(richDescription);
     setStatus(null);
   }
 
   if (!task) {
     return (
-      <section className={`${panelClass} min-h-[420px] p-5`}>
+      <section className={`${panelClass} min-h-[360px] p-5 lg:min-h-0`}>
         <EmptyState
           detail="Choose a task from the left to inspect its full details."
           icon={ListTodo}
@@ -6679,8 +8117,16 @@ function TaskDetailPanel({
         due: due ? new Date(`${due.toString()}T23:59:00`).toISOString() : null,
         priority,
         taskListId: activeTask.taskListId ?? null,
+        categoryId: draftCategoryId === "none" ? null : draftCategoryId,
+        repositoryFullName:
+          draftRepositoryFullName === "none"
+            ? null
+            : draftRepositoryFullName,
       });
-      setEditing(false);
+      if (draftRichDescription) {
+        setRichDescription(draftRichDescription);
+      }
+      onEditingChange(false);
     } catch (error) {
       setStatus(
         error instanceof Error ? error.message : "Task could not be updated.",
@@ -6690,9 +8136,32 @@ function TaskDetailPanel({
     }
   }
 
+  async function removeTask() {
+    if (
+      deleting ||
+      !window.confirm(
+        `Delete "${activeTask.title}" from Google Tasks? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    setStatus(null);
+    try {
+      await deleteTask(activeTask);
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : "Task could not be deleted.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <section
-      className={`${panelClass} flex min-h-[520px] min-w-0 flex-col overflow-hidden`}
+      className={`${panelClass} flex min-h-[360px] min-w-0 flex-col overflow-hidden lg:min-h-0`}
     >
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-separator p-5">
         <div className="min-w-0">
@@ -6709,7 +8178,7 @@ function TaskDetailPanel({
               className={secondaryButtonClass}
               onClick={() => {
                 resetDraft(task);
-                setEditing(true);
+                onEditingChange(true);
               }}
               type="button"
             >
@@ -6717,7 +8186,38 @@ function TaskDetailPanel({
               Edit
             </Button>
           ) : null}
-          <TaskCompletionButton completeTask={completeTask} task={task} />
+          {!editing ? (
+            <>
+              <Button
+                aria-label={archived ? "Unarchive task" : "Archive task"}
+                className={iconButtonClass}
+                onClick={() => onToggleArchive(!archived)}
+                title={archived ? "Unarchive task" : "Archive task"}
+                type="button"
+              >
+                {archived ? (
+                  <ArchiveRestore className="h-4 w-4" />
+                ) : (
+                  <Archive className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                aria-label="Delete task"
+                className="h-10 w-10 rounded-xl border border-separator bg-surface-secondary p-0 text-muted hover:border-danger hover:bg-danger-soft hover:text-danger"
+                disabled={deleting}
+                onClick={() => void removeTask()}
+                title="Delete task"
+                type="button"
+              >
+                {deleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+            </>
+          ) : null}
+          <TaskCompletionButton task={task} toggleTask={toggleTask} />
         </div>
       </div>
 
@@ -6735,16 +8235,20 @@ function TaskDetailPanel({
               />
             </label>
 
-            <label className="grid gap-1.5">
+            <div className="grid gap-1.5">
               <span className="text-xs font-semibold uppercase text-muted">
-                Notes
+                Description
               </span>
-              <TextArea
-                className="min-h-32 w-full resize-y rounded-xl border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-                onChange={(event) => setNotes(event.target.value)}
-                value={notes}
+              <TaskRichTextEditor
+                defaultValue={draftRichDescription}
+                fallbackText={notes}
+                key={`${googleTaskKey(task)}-editor`}
+                onChange={(document, plainText) => {
+                  setDraftRichDescription(document);
+                  setNotes(plainText);
+                }}
               />
-            </label>
+            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <TaskDueDatePicker onChange={setDue} value={due} />
@@ -6762,6 +8266,48 @@ function TaskDetailPanel({
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
+                </Select>
+              </label>
+              <div className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-muted">
+                  Category
+                </span>
+                <TaskCategoryTreePicker
+                  categories={categories}
+                  onChange={setDraftCategoryId}
+                  value={draftCategoryId}
+                />
+              </div>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-muted">
+                  GitHub repository
+                </span>
+                <Select
+                  aria-label="Assigned GitHub repository"
+                  className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) =>
+                    setDraftRepositoryFullName(event.target.value)
+                  }
+                  value={draftRepositoryFullName}
+                >
+                  <option value="none">No repository</option>
+                  {repositoryFullName &&
+                  !repositories.some(
+                    (repository) =>
+                      repository.fullName === repositoryFullName,
+                  ) ? (
+                    <option value={repositoryFullName}>
+                      {repositoryFullName} (unavailable)
+                    </option>
+                  ) : null}
+                  {repositories.map((repository) => (
+                    <option
+                      key={repository.id}
+                      value={repository.fullName}
+                    >
+                      {repository.fullName}
+                    </option>
+                  ))}
                 </Select>
               </label>
             </div>
@@ -6790,7 +8336,7 @@ function TaskDetailPanel({
                 className={secondaryButtonClass}
                 onClick={() => {
                   resetDraft(task);
-                  setEditing(false);
+                  onEditingChange(false);
                 }}
                 type="button"
               >
@@ -6812,49 +8358,1169 @@ function TaskDetailPanel({
               <Chip size="sm" variant="secondary">
                 {task.taskListTitle ?? "Google Tasks"}
               </Chip>
+              {categoryId ? (
+                <TaskCategoryBadge
+                  categories={taskCategoryPath(categories, categoryId)}
+                />
+              ) : null}
+              {repositoryFullName ? (
+                <Chip size="sm" variant="secondary">
+                  <GitBranch className="h-3 w-3" />
+                  {repositoryFullName}
+                </Chip>
+              ) : null}
             </div>
 
             <div>
               <p className="text-xs font-semibold uppercase text-muted">
-                Notes
+                Description
               </p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-foreground">
-                {googleTaskNotes(task.notes) ||
-                  "No notes have been added to this task."}
-              </p>
+              <TaskRichTextEditor
+                className="mt-2"
+                defaultValue={richDescription}
+                fallbackText={
+                  googleTaskNotes(task.notes) ||
+                  "No description has been added to this task."
+                }
+                key={`${googleTaskKey(task)}-viewer`}
+                readOnly
+              />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <TaskDetailDatum
-                icon={CalendarDays}
-                label="Due date"
-                value={task.due ? formatDueDate(task.due) : "No due date"}
-              />
-              <TaskDetailDatum
-                icon={Clock}
-                label="Last updated"
-                value={formatTaskTimestamp(task.updated)}
-              />
-              <TaskDetailDatum
-                icon={CheckCircle2}
-                label="Completed"
-                value={
-                  task.completed
-                    ? formatTaskTimestamp(task.completed)
-                    : "Not completed"
-                }
-              />
-              <TaskDetailDatum
-                icon={ListTodo}
-                label="Google task list"
-                value={task.taskListTitle ?? "Google Tasks"}
-              />
+            <div className="-mx-1 overflow-x-auto px-1 pb-1">
+              <div className="grid min-w-[620px] grid-cols-4 gap-3">
+                <TaskDetailDatum
+                  actionLabel={
+                    task.due ? "Show due date in mini calendar" : undefined
+                  }
+                  icon={CalendarDays}
+                  label="Due date"
+                  onAction={
+                    task.due ? () => onShowDueDate(task) : undefined
+                  }
+                  value={task.due ? formatDueDate(task.due) : "No due date"}
+                />
+                <TaskDetailDatum
+                  icon={FolderTree}
+                  label="Category"
+                  value={
+                    categoryId
+                      ? taskCategoryPath(categories, categoryId)
+                          .map((category) => category.name)
+                          .join(" / ")
+                      : "No category"
+                  }
+                />
+                <TaskDetailDatum
+                  icon={CheckCircle2}
+                  label="Status"
+                  value={task.status === "completed" ? "Done" : "Open"}
+                />
+                <TaskDetailDatum
+                  icon={ListTodo}
+                  label="Google task list"
+                  value={task.taskListTitle ?? "Google Tasks"}
+                />
+              </div>
             </div>
           </div>
         )}
       </div>
     </section>
   );
+}
+
+function TaskMiniCalendar({
+  onSelectTask,
+  selectedTask,
+  tasks,
+}: {
+  onSelectTask: (task: GoogleTask) => void;
+  selectedTask: GoogleTask | null;
+  tasks: GoogleTask[];
+}) {
+  const selectedDueDate = parseEventDate(selectedTask?.due);
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const anchor = selectedDueDate ?? new Date();
+    return new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  });
+
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(
+      visibleMonth.getFullYear(),
+      visibleMonth.getMonth(),
+      1,
+    );
+    const gridStart = addDays(firstDay, -firstDay.getDay());
+    return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+  }, [visibleMonth]);
+  const dueTaskCount = tasks.filter((task) => Boolean(parseEventDate(task.due)))
+    .length;
+
+  return (
+    <section
+      aria-label="Task due date overview"
+      className={`${panelClass} task-mini-calendar flex min-h-[240px] flex-col overflow-hidden p-3.5 lg:min-h-[180px]`}
+      id="task-mini-calendar"
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-accent" />
+            <h3 className="truncate text-sm font-semibold">
+              {visibleMonth.toLocaleDateString(undefined, {
+                month: "long",
+                year: "numeric",
+              })}
+            </h3>
+          </div>
+          <p aria-live="polite" className="mt-0.5 truncate text-[10px] text-muted">
+            {selectedTask
+              ? selectedDueDate
+                ? `Selected · ${selectedDueDate.toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                  })}`
+                : "Selected task has no due date"
+              : `${dueTaskCount} dated task${dueTaskCount === 1 ? "" : "s"}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            aria-label="Previous month"
+            className="h-7 w-7 rounded-lg border border-separator bg-surface-secondary p-0 text-muted"
+            onClick={() =>
+              setVisibleMonth(
+                (month) =>
+                  new Date(month.getFullYear(), month.getMonth() - 1, 1),
+              )
+            }
+            type="button"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            aria-label="Next month"
+            className="h-7 w-7 rounded-lg border border-separator bg-surface-secondary p-0 text-muted"
+            onClick={() =>
+              setVisibleMonth(
+                (month) =>
+                  new Date(month.getFullYear(), month.getMonth() + 1, 1),
+              )
+            }
+            type="button"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-muted">
+        {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
+          <span key={`${day}-${index}`}>{day}</span>
+        ))}
+      </div>
+      <div className="mt-1 grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-0.5">
+        {calendarDays.map((day) => {
+          const dayTasks = tasks.filter((task) =>
+            sameCalendarDay(parseEventDate(task.due), day),
+          );
+          const isCurrentMonth = day.getMonth() === visibleMonth.getMonth();
+          const isToday = sameCalendarDay(day, new Date());
+          const selectedOnDay =
+            selectedDueDate && sameCalendarDay(selectedDueDate, day);
+          const dateLabel = day.toLocaleDateString(undefined, {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          });
+
+          return (
+            <button
+              aria-label={`${dateLabel}${
+                dayTasks.length
+                  ? `, ${dayTasks.length} task${dayTasks.length === 1 ? "" : "s"} due`
+                  : ""
+              }`}
+              className={`task-calendar-day ${
+                isCurrentMonth ? "" : "is-outside"
+              } ${isToday ? "is-today" : ""} ${
+                selectedOnDay ? "is-selected-task" : ""
+              }`}
+              disabled={dayTasks.length === 0}
+              key={day.toISOString()}
+              onClick={() => dayTasks[0] && onSelectTask(dayTasks[0])}
+              title={
+                dayTasks.length > 0
+                  ? dayTasks.map((task) => task.title).join("\n")
+                  : dateLabel
+              }
+              type="button"
+            >
+              <span>{day.getDate()}</span>
+              {dayTasks.length > 0 ? (
+                <span className="task-calendar-dots" aria-hidden="true">
+                  {dayTasks.slice(0, 3).map((task) => (
+                    <span
+                      className={
+                        googleTaskKey(task) === googleTaskKey(selectedTask)
+                          ? "is-selected"
+                          : task.status === "completed"
+                            ? "is-complete"
+                            : ""
+                      }
+                      key={googleTaskKey(task)}
+                    />
+                  ))}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function TaskCategoryTreePicker({
+  categories,
+  onChange,
+  value,
+}: {
+  categories: TaskCategory[];
+  onChange: (categoryId: string) => void;
+  value: string;
+}) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const selectedCategory = categories.find(
+    (category) => category.id === value,
+  );
+  const selectedPath = selectedCategory
+    ? taskCategoryPath(categories, selectedCategory.id)
+    : [];
+  const SelectedIcon = selectedCategory
+    ? taskCategoryIconMap[selectedCategory.icon]
+    : FolderTree;
+
+  useDismissableDetails(detailsRef);
+
+  function selectCategory(categoryId: string) {
+    onChange(categoryId);
+    if (detailsRef.current) detailsRef.current.open = false;
+  }
+
+  return (
+    <details className="task-category-picker group relative" ref={detailsRef}>
+      <summary
+        aria-label="Choose task category"
+        className="flex h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none transition hover:border-[var(--accent)] focus-visible:border-[var(--accent)]"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <SelectedIcon className="h-4 w-4 shrink-0 text-accent" />
+          <span className="truncate">
+            {selectedPath.length > 0
+              ? selectedPath.map((category) => category.name).join(" / ")
+              : "No category"}
+          </span>
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted transition group-open:rotate-180" />
+      </summary>
+      <div className="task-category-picker__panel absolute inset-x-0 top-[calc(100%+0.4rem)] z-30 max-h-72 overflow-y-auto rounded-xl border border-separator bg-overlay p-1.5 shadow-overlay">
+        <Button
+          aria-pressed={value === "none"}
+          className={`mb-1 h-9 w-full justify-start rounded-lg px-2.5 text-sm ${
+            value === "none"
+              ? "bg-accent-soft text-accent"
+              : "text-muted hover:bg-surface-tertiary hover:text-foreground"
+          }`}
+          onClick={() => selectCategory("none")}
+          type="button"
+          variant="ghost"
+        >
+          <FolderTree className="h-4 w-4" />
+          No category
+          {value === "none" ? <Check className="ml-auto h-4 w-4" /> : null}
+        </Button>
+        {categories.length > 0 ? (
+          <TreeProvider
+            defaultExpandedIds={categories.map((category) => category.id)}
+            indent={22}
+            onSelectionChange={(selectedIds) => {
+              const nextId = selectedIds[0];
+              if (nextId) selectCategory(nextId);
+              else if (detailsRef.current) detailsRef.current.open = false;
+            }}
+            selectedIds={value === "none" ? [] : [value]}
+            showLines
+          >
+            <TreeView className="p-0">
+              <TaskCategoryPickerBranch
+                categories={categories}
+                parentId={null}
+                selectedId={value}
+              />
+            </TreeView>
+          </TreeProvider>
+        ) : (
+          <p className="px-2.5 py-3 text-xs text-muted">
+            Create a category from the category manager first.
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function TaskCategoryPickerBranch({
+  categories,
+  level = 0,
+  parentId,
+  parentPath = [],
+  selectedId,
+}: {
+  categories: TaskCategory[];
+  level?: number;
+  parentId: string | null;
+  parentPath?: boolean[];
+  selectedId: string;
+}) {
+  const siblings = categories
+    .filter((category) => category.parentId === parentId)
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return siblings.map((category, index) => {
+    const children = categories.filter(
+      (candidate) => candidate.parentId === category.id,
+    );
+    const isLast = index === siblings.length - 1;
+    const CategoryIcon = taskCategoryIconMap[category.icon];
+
+    return (
+      <TreeNode
+        isLast={isLast}
+        key={category.id}
+        level={level}
+        nodeId={category.id}
+        parentPath={parentPath}
+      >
+        <TreeNodeTrigger className="py-1.5">
+          <TreeExpander hasChildren={children.length > 0} />
+          <TreeIcon
+            hasChildren={children.length > 0}
+            icon={<CategoryIcon className="h-4 w-4 text-accent" />}
+          />
+          <TreeLabel>{category.name}</TreeLabel>
+          {selectedId === category.id ? (
+            <Check className="h-4 w-4 shrink-0 text-accent" />
+          ) : null}
+        </TreeNodeTrigger>
+        <TreeNodeContent hasChildren={children.length > 0}>
+          <TaskCategoryPickerBranch
+            categories={categories}
+            level={level + 1}
+            parentId={category.id}
+            parentPath={[...parentPath, isLast]}
+            selectedId={selectedId}
+          />
+        </TreeNodeContent>
+      </TreeNode>
+    );
+  });
+}
+
+function TaskCategoryManagerModal({
+  addCategory,
+  categories,
+  deleteCategory,
+  onClose,
+  renameCategory,
+}: {
+  addCategory: (
+    name: string,
+    parentId: string | null,
+    icon: TaskCategoryIconName,
+  ) => void;
+  categories: TaskCategory[];
+  deleteCategory: (categoryId: string) => void;
+  onClose: () => void;
+  renameCategory: (
+    categoryId: string,
+    name: string,
+    icon: TaskCategoryIconName,
+  ) => void;
+}) {
+  const [addingParentId, setAddingParentId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  return (
+    <Modal isOpen onOpenChange={(open) => !open && onClose()}>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container placement="center">
+          <Modal.Dialog
+            className={`${panelClass} w-full max-w-xl animate-slide-up p-5`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FolderTree className="h-5 w-5 text-accent" />
+                  <h3 className="text-lg font-semibold">Task categories</h3>
+                </div>
+                <p className="mt-1 text-sm text-muted">
+                  Add nested categories from any branch and give each one a
+                  recognizable icon.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  className={primaryButtonClass}
+                  onClick={() => {
+                    setEditingId(null);
+                    setAddingParentId("root");
+                  }}
+                  type="button"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add category
+                </Button>
+                <Button
+                  className={iconButtonClass}
+                  onClick={onClose}
+                  title="Close"
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-5 max-h-[520px] overflow-y-auto rounded-2xl border border-separator bg-surface-secondary/60 p-2">
+              {addingParentId === "root" ? (
+                <TaskCategoryForm
+                  className="m-2"
+                  label="New top-level category"
+                  onCancel={() => setAddingParentId(null)}
+                  onSave={(name, icon) => {
+                    addCategory(name, null, icon);
+                    setAddingParentId(null);
+                  }}
+                />
+              ) : null}
+              {categories.length > 0 ? (
+                <TreeProvider
+                  defaultExpandedIds={categories.map((category) => category.id)}
+                  indent={22}
+                  selectable={false}
+                  showLines
+                >
+                  <TreeView className="p-1">
+                    <TaskCategoryTreeBranch
+                      addCategory={addCategory}
+                      addingParentId={addingParentId}
+                      categories={categories}
+                      deleteCategory={deleteCategory}
+                      editingId={editingId}
+                      onAddingParentChange={setAddingParentId}
+                      onEditingChange={setEditingId}
+                      parentId={null}
+                      renameCategory={renameCategory}
+                    />
+                  </TreeView>
+                </TreeProvider>
+              ) : (
+                <EmptyState
+                  detail="Use Add category to create the first branch."
+                  icon={FolderTree}
+                  title="Your category tree is empty"
+                />
+              )}
+            </div>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
+function TaskCategoryTreeBranch({
+  addCategory,
+  addingParentId,
+  categories,
+  deleteCategory,
+  editingId,
+  level = 0,
+  onAddingParentChange,
+  onEditingChange,
+  parentId,
+  parentPath = [],
+  renameCategory,
+}: {
+  addCategory: (
+    name: string,
+    parentId: string | null,
+    icon: TaskCategoryIconName,
+  ) => void;
+  addingParentId: string | null;
+  categories: TaskCategory[];
+  deleteCategory: (categoryId: string) => void;
+  editingId: string | null;
+  level?: number;
+  onAddingParentChange: (categoryId: string | null) => void;
+  onEditingChange: (categoryId: string | null) => void;
+  parentId: string | null;
+  parentPath?: boolean[];
+  renameCategory: (
+    categoryId: string,
+    name: string,
+    icon: TaskCategoryIconName,
+  ) => void;
+}) {
+  const { expandedIds, toggleExpanded } = useTree();
+  const siblings = categories
+    .filter((category) => category.parentId === parentId)
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return siblings.map((category, index) => {
+    const children = categories.filter(
+      (candidate) => candidate.parentId === category.id,
+    );
+    const isLast = index === siblings.length - 1;
+    const hasChildren =
+      children.length > 0 || addingParentId === category.id;
+    const CategoryIcon = taskCategoryIconMap[category.icon];
+
+    return (
+      <TreeNode
+        isLast={isLast}
+        key={category.id}
+        level={level}
+        nodeId={category.id}
+        parentPath={parentPath}
+      >
+        <TreeNodeTrigger>
+          <TreeExpander hasChildren={hasChildren} />
+          <TreeIcon
+            hasChildren={hasChildren}
+            icon={<CategoryIcon className="h-4 w-4 text-accent" />}
+          />
+          <TreeLabel>{category.name}</TreeLabel>
+          <span className="flex shrink-0 items-center gap-0.5 opacity-70 transition group-hover:opacity-100">
+            <Button
+              aria-label={`Add subcategory to ${category.name}`}
+              className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-accent-soft hover:text-accent"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEditingChange(null);
+                onAddingParentChange(category.id);
+                if (!expandedIds.has(category.id)) toggleExpanded(category.id);
+              }}
+              title={`Add subcategory to ${category.name}`}
+              type="button"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              aria-label={`Edit ${category.name}`}
+              className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-accent-soft hover:text-accent"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAddingParentChange(null);
+                onEditingChange(category.id);
+              }}
+              title={`Edit ${category.name}`}
+              type="button"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              aria-label={`Delete ${category.name}`}
+              className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-danger-soft hover:text-danger"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (
+                  window.confirm(
+                    `Delete "${category.name}" and its nested categories? Tasks will remain, but their category assignment will be removed.`,
+                  )
+                ) {
+                  deleteCategory(category.id);
+                }
+              }}
+              title={`Delete ${category.name}`}
+              type="button"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </span>
+        </TreeNodeTrigger>
+        {editingId === category.id ? (
+          <TaskCategoryForm
+            className="mb-1"
+            initialIcon={category.icon}
+            initialName={category.name}
+            label={`Edit ${category.name}`}
+            onCancel={() => onEditingChange(null)}
+            onSave={(name, icon) => {
+              renameCategory(category.id, name, icon);
+              onEditingChange(null);
+            }}
+            style={{ marginLeft: `${level * 22 + 36}px` }}
+          />
+        ) : null}
+        <TreeNodeContent hasChildren={hasChildren}>
+          {addingParentId === category.id ? (
+            <TaskCategoryForm
+              className="mb-1"
+              label={`New subcategory in ${category.name}`}
+              onCancel={() => onAddingParentChange(null)}
+              onSave={(name, icon) => {
+                addCategory(name, category.id, icon);
+                onAddingParentChange(null);
+              }}
+              style={{ marginLeft: `${(level + 1) * 22 + 18}px` }}
+            />
+          ) : null}
+          <TaskCategoryTreeBranch
+            addCategory={addCategory}
+            addingParentId={addingParentId}
+            categories={categories}
+            deleteCategory={deleteCategory}
+            editingId={editingId}
+            level={level + 1}
+            onAddingParentChange={onAddingParentChange}
+            onEditingChange={onEditingChange}
+            parentId={category.id}
+            parentPath={[...parentPath, isLast]}
+            renameCategory={renameCategory}
+          />
+        </TreeNodeContent>
+      </TreeNode>
+    );
+  });
+}
+
+function TaskCategoryForm({
+  className,
+  initialIcon = "folder",
+  initialName = "",
+  label,
+  onCancel,
+  onSave,
+  style,
+}: {
+  className?: string;
+  initialIcon?: TaskCategoryIconName;
+  initialName?: string;
+  label: string;
+  onCancel: () => void;
+  onSave: (name: string, icon: TaskCategoryIconName) => void;
+  style?: CSSProperties;
+}) {
+  const [name, setName] = useState(initialName);
+  const [icon, setIcon] = useState<TaskCategoryIconName>(initialIcon);
+  const iconPickerRef = useRef<HTMLDetailsElement>(null);
+  const SelectedIcon = taskCategoryIconMap[icon];
+
+  useDismissableDetails(iconPickerRef);
+
+  return (
+    <div
+      className={`rounded-xl border border-separator bg-surface p-3 shadow-sm ${className ?? ""}`}
+      style={style}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+        {label}
+      </p>
+      <Input
+        aria-label={label}
+        autoFocus
+        className="mt-2 h-9 w-full rounded-lg border border-separator bg-surface-secondary px-2.5 text-sm"
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && name.trim()) {
+            onSave(name.trim(), icon);
+          }
+          if (event.key === "Escape") onCancel();
+        }}
+        placeholder="Category name"
+        value={name}
+      />
+      <details
+        className="task-icon-picker group relative mt-2.5"
+        ref={iconPickerRef}
+      >
+        <summary className="flex h-9 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-separator bg-surface-secondary px-2.5 text-sm outline-none transition hover:border-[var(--accent)] focus-visible:border-[var(--accent)]">
+          <span className="flex items-center gap-2">
+            <SelectedIcon className="h-4 w-4 text-accent" />
+            <span className="capitalize">{icon}</span>
+          </span>
+          <ChevronDown className="h-4 w-4 text-muted transition group-open:rotate-180" />
+        </summary>
+        <div className="task-icon-picker__panel absolute left-0 top-[calc(100%+0.35rem)] z-40 grid w-[17rem] grid-cols-7 gap-1.5 rounded-xl border border-separator bg-overlay p-2.5 shadow-overlay">
+          {Object.entries(taskCategoryIconMap).map(([iconName, Icon]) => (
+            <button
+              aria-label={`Use ${iconName} icon`}
+              aria-pressed={icon === iconName}
+              className="task-category-icon-option"
+              key={iconName}
+              onClick={() => {
+                setIcon(iconName as TaskCategoryIconName);
+                if (iconPickerRef.current) {
+                  iconPickerRef.current.open = false;
+                }
+              }}
+              title={iconName}
+              type="button"
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
+      </details>
+      <div className="mt-3 flex items-center gap-2">
+        <Button
+          className={primaryButtonClass}
+          disabled={!name.trim()}
+          onClick={() => onSave(name.trim(), icon)}
+          type="button"
+        >
+          <Check className="h-3.5 w-3.5" />
+          Save
+        </Button>
+        <Button
+          className={secondaryButtonClass}
+          onClick={onCancel}
+          type="button"
+        >
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function useDismissableDetails(ref: {
+  current: HTMLDetailsElement | null;
+}) {
+  useEffect(() => {
+    function dismissOnOutsidePress(event: MouseEvent) {
+      const details = ref.current;
+      if (
+        details?.open &&
+        event.target instanceof Node &&
+        !details.contains(event.target)
+      ) {
+        details.open = false;
+      }
+    }
+
+    function dismissOnEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape" && ref.current?.open) {
+        ref.current.open = false;
+        ref.current.querySelector<HTMLElement>("summary")?.focus();
+      }
+    }
+
+    document.addEventListener("mousedown", dismissOnOutsidePress);
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", dismissOnOutsidePress);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [ref]);
+}
+
+function useTaskCategories() {
+  const [categories, setCategories] = useState<TaskCategory[]>(
+    readStoredTaskCategories,
+  );
+  const [assignments, setAssignments] = useState<TaskCategoryAssignments>(
+    readStoredTaskCategoryAssignments,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      taskCategoryStorageKey,
+      JSON.stringify(categories),
+    );
+    window.localStorage.setItem(
+      taskCategoryAssignmentStorageKey,
+      JSON.stringify(assignments),
+    );
+  }, [assignments, categories]);
+
+  function addCategory(
+    name: string,
+    parentId: string | null,
+    icon: TaskCategoryIconName,
+  ) {
+    const id = `category-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setCategories((current) => [...current, { icon, id, name, parentId }]);
+  }
+
+  function renameCategory(
+    categoryId: string,
+    name: string,
+    icon: TaskCategoryIconName,
+  ) {
+    setCategories((current) =>
+      current.map((category) =>
+        category.id === categoryId ? { ...category, icon, name } : category,
+      ),
+    );
+  }
+
+  function deleteCategory(categoryId: string) {
+    setCategories((current) => {
+      const removedIds = new Set([
+        categoryId,
+        ...taskCategoryDescendantIds(current, categoryId),
+      ]);
+      setAssignments((currentAssignments) =>
+        Object.fromEntries(
+          Object.entries(currentAssignments).filter(
+            ([, assignedCategoryId]) => !removedIds.has(assignedCategoryId),
+          ),
+        ),
+      );
+      return current.filter((category) => !removedIds.has(category.id));
+    });
+  }
+
+  function setTaskCategory(taskKey: string, categoryId: string | null) {
+    setAssignments((current) => {
+      if (!categoryId) {
+        const next = { ...current };
+        delete next[taskKey];
+        return next;
+      }
+      return { ...current, [taskKey]: categoryId };
+    });
+  }
+
+  return {
+    assignments,
+    categories,
+    addCategory,
+    deleteCategory,
+    renameCategory,
+    setTaskCategory,
+  };
+}
+
+function useTaskArchive() {
+  const [archivedKeys, setArchivedKeys] = useState<string[]>(
+    readStoredTaskArchive,
+  );
+  const archivedTaskKeys = useMemo(
+    () => new Set(archivedKeys),
+    [archivedKeys],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      taskArchiveStorageKey,
+      JSON.stringify(archivedKeys),
+    );
+  }, [archivedKeys]);
+
+  function archiveTask(taskKey: string) {
+    setArchivedKeys((current) =>
+      current.includes(taskKey) ? current : [...current, taskKey],
+    );
+  }
+
+  function unarchiveTask(taskKey: string) {
+    setArchivedKeys((current) => current.filter((key) => key !== taskKey));
+  }
+
+  return {
+    archivedTaskKeys,
+    archiveTask,
+    forgetTaskArchive: unarchiveTask,
+    unarchiveTask,
+  };
+}
+
+function useTaskRichDescriptions() {
+  const [richDescriptions, setRichDescriptions] =
+    useState<TaskRichDescriptions>(readStoredTaskRichDescriptions);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      taskRichDescriptionStorageKey,
+      JSON.stringify(richDescriptions),
+    );
+  }, [richDescriptions]);
+
+  function setRichDescription(taskKey: string, document: TaskRichDocument) {
+    setRichDescriptions((current) => ({
+      ...current,
+      [taskKey]: document,
+    }));
+  }
+
+  function deleteRichDescription(taskKey: string) {
+    setRichDescriptions((current) => {
+      const next = { ...current };
+      delete next[taskKey];
+      return next;
+    });
+  }
+
+  return {
+    deleteRichDescription,
+    richDescriptions,
+    setRichDescription,
+  };
+}
+
+function useTaskRepositoryAssignments() {
+  const [repositoryAssignments, setRepositoryAssignments] =
+    useState<TaskRepositoryAssignments>(
+      readStoredTaskRepositoryAssignments,
+    );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      taskRepositoryAssignmentStorageKey,
+      JSON.stringify(repositoryAssignments),
+    );
+  }, [repositoryAssignments]);
+
+  function setTaskRepository(
+    taskKey: string,
+    repositoryFullName: string | null,
+  ) {
+    setRepositoryAssignments((current) => {
+      const next = { ...current };
+      if (repositoryFullName) next[taskKey] = repositoryFullName;
+      else delete next[taskKey];
+      return next;
+    });
+  }
+
+  return { repositoryAssignments, setTaskRepository };
+}
+
+function readStoredTaskCategories() {
+  if (typeof window === "undefined") return defaultTaskCategories;
+  try {
+    const saved = window.localStorage.getItem(taskCategoryStorageKey);
+    if (!saved) return defaultTaskCategories;
+    const parsed = JSON.parse(saved) as unknown;
+    if (!Array.isArray(parsed)) return defaultTaskCategories;
+    return parsed.flatMap((item): TaskCategory[] => {
+      if (
+        !item ||
+        typeof item !== "object" ||
+        !("id" in item) ||
+        typeof item.id !== "string" ||
+        !("name" in item) ||
+        typeof item.name !== "string" ||
+        !("parentId" in item) ||
+        (item.parentId !== null && typeof item.parentId !== "string")
+      ) {
+        return [];
+      }
+      const icon =
+        "icon" in item && isTaskCategoryIconName(item.icon)
+          ? item.icon
+          : "folder";
+      return [
+        {
+          icon,
+          id: item.id,
+          name: item.name,
+          parentId: item.parentId,
+        },
+      ];
+    });
+  } catch {
+    return defaultTaskCategories;
+  }
+}
+
+function readStoredTaskArchive() {
+  if (typeof window === "undefined") return [];
+  try {
+    const saved = window.localStorage.getItem(taskArchiveStorageKey);
+    const parsed = saved ? (JSON.parse(saved) as unknown) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function readStoredTaskRichDescriptions() {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = window.localStorage.getItem(taskRichDescriptionStorageKey);
+    const parsed = saved ? (JSON.parse(saved) as unknown) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([, value]) =>
+          Boolean(
+            value &&
+              typeof value === "object" &&
+              "type" in value &&
+              value.type === "doc",
+          ),
+      ),
+    ) as TaskRichDescriptions;
+  } catch {
+    return {};
+  }
+}
+
+function readStoredTaskRepositoryAssignments(): TaskRepositoryAssignments {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = window.localStorage.getItem(
+      taskRepositoryAssignmentStorageKey,
+    );
+    const parsed = saved ? (JSON.parse(saved) as unknown) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([taskKey, repositoryFullName]) =>
+          taskKey.length > 0 &&
+          typeof repositoryFullName === "string" &&
+          repositoryFullName.length > 0,
+      ),
+    ) as TaskRepositoryAssignments;
+  } catch {
+    return {};
+  }
+}
+
+function isTaskCategoryIconName(
+  value: unknown,
+): value is TaskCategoryIconName {
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(taskCategoryIconMap, value)
+  );
+}
+
+function readStoredTaskCategoryAssignments() {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = window.localStorage.getItem(
+      taskCategoryAssignmentStorageKey,
+    );
+    if (!saved) return {};
+    const parsed = JSON.parse(saved) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => typeof value === "string"),
+    ) as TaskCategoryAssignments;
+  } catch {
+    return {};
+  }
+}
+
+function readStoredTaskLayout() {
+  if (typeof window === "undefined") return defaultTaskLayout;
+  try {
+    const saved = window.localStorage.getItem(taskLayoutStorageKey);
+    if (!saved) return defaultTaskLayout;
+    const parsed = JSON.parse(saved) as {
+      calendarHeight?: unknown;
+      railWidth?: unknown;
+    };
+    return {
+      calendarHeight:
+        typeof parsed.calendarHeight === "number"
+          ? Math.min(420, Math.max(180, parsed.calendarHeight))
+          : defaultTaskLayout.calendarHeight,
+      railWidth:
+        typeof parsed.railWidth === "number"
+          ? Math.min(480, Math.max(240, parsed.railWidth))
+          : defaultTaskLayout.railWidth,
+    };
+  } catch {
+    return defaultTaskLayout;
+  }
+}
+
+function flattenTaskCategories(
+  categories: TaskCategory[],
+  parentId: string | null = null,
+  depth = 0,
+  visited = new Set<string>(),
+): Array<{ category: TaskCategory; depth: number }> {
+  return categories
+    .filter(
+      (category) =>
+        category.parentId === parentId && !visited.has(category.id),
+    )
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .flatMap((category) => {
+      const nextVisited = new Set(visited).add(category.id);
+      return [
+        { category, depth },
+        ...flattenTaskCategories(
+          categories,
+          category.id,
+          depth + 1,
+          nextVisited,
+        ),
+      ];
+    });
+}
+
+function taskCategoryPath(
+  categories: TaskCategory[],
+  categoryId?: string | null,
+) {
+  if (!categoryId) return [];
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const path: TaskCategory[] = [];
+  const visited = new Set<string>();
+  let currentId: string | null = categoryId;
+
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const category = byId.get(currentId);
+    if (!category) break;
+    path.unshift(category);
+    currentId = category.parentId;
+  }
+
+  return path;
+}
+
+function taskCategoryDescendantIds(
+  categories: TaskCategory[],
+  categoryId: string,
+) {
+  const descendants: string[] = [];
+  const pending = [categoryId];
+
+  while (pending.length > 0) {
+    const parentId = pending.shift();
+    const children = categories.filter(
+      (category) => category.parentId === parentId,
+    );
+    for (const child of children) {
+      descendants.push(child.id);
+      pending.push(child.id);
+    }
+  }
+
+  return descendants;
 }
 
 function TaskDueDatePicker({
@@ -6908,12 +9574,16 @@ function TaskDueDatePicker({
 }
 
 function TaskDetailDatum({
+  actionLabel,
   icon: Icon,
   label,
+  onAction,
   value,
 }: {
+  actionLabel?: string;
   icon: LucideIcon;
   label: string;
+  onAction?: () => void;
   value: string;
 }) {
   return (
@@ -6922,7 +9592,20 @@ function TaskDetailDatum({
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <p className="mt-2 text-sm font-semibold">{value}</p>
+      <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-sm font-semibold">{value}</p>
+        {onAction && actionLabel ? (
+          <Button
+            aria-label={actionLabel}
+            className="h-7 w-7 shrink-0 rounded-lg border border-separator bg-surface p-0 text-muted hover:border-[var(--accent)] hover:bg-accent-soft hover:text-accent"
+            onClick={onAction}
+            title={actionLabel}
+            type="button"
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -6936,23 +9619,13 @@ function taskDateValue(value?: string | null): DateValue | null {
   }
 }
 
-function formatTaskTimestamp(value?: string | null) {
-  if (!value) return "Unknown";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 function GoogleTaskCreationModal({
+  categories,
   onClose,
   onCreate,
   taskLists,
 }: {
+  categories: TaskCategory[];
   onClose: () => void;
   onCreate: (input: GoogleTaskInput) => Promise<void>;
   taskLists: Array<{ id?: string | null; title: string }>;
@@ -6962,6 +9635,7 @@ function GoogleTaskCreationModal({
   const [due, setDue] = useState<DateValue | null>(null);
   const [priority, setPriority] = useState<GoogleTaskPriority>("medium");
   const [taskListId, setTaskListId] = useState(taskLists[0]?.id ?? "@default");
+  const [categoryId, setCategoryId] = useState("none");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -6976,6 +9650,7 @@ function GoogleTaskCreationModal({
         due: due ? new Date(`${due.toString()}T23:59:00`).toISOString() : null,
         priority,
         taskListId: taskListId || "@default",
+        categoryId: categoryId === "none" ? null : categoryId,
       });
       onClose();
     } catch (error) {
@@ -7079,6 +9754,26 @@ function GoogleTaskCreationModal({
                   )}
                 </Select>
               </label>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-muted">
+                  Category
+                </span>
+                <Select
+                  aria-label="Task category"
+                  className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) => setCategoryId(event.target.value)}
+                  value={categoryId}
+                >
+                  <option value="none">No category</option>
+                  {flattenTaskCategories(categories).map(
+                    ({ category, depth }) => (
+                      <option key={category.id} value={category.id}>
+                        {`${"— ".repeat(depth)}${category.name}`}
+                      </option>
+                    ),
+                  )}
+                </Select>
+              </label>
             </div>
 
             {status ? (
@@ -7117,579 +9812,85 @@ function GoogleTaskCreationModal({
 }
 
 function TasksView({
-  addTask,
   briefing,
-  completeTask,
-  openTasks,
+  repositories,
+  repositoryAssignments,
   refreshWorkspace,
-  setContextMenu,
-  taskColumns,
-  tasks,
-}: {
-  addTask: (input: AddTaskInput) => Promise<void>;
-  briefing: Briefing | null;
-  completeTask: (task: RelayTask) => Promise<void>;
-  openTasks: RelayTask[];
-  refreshWorkspace: () => Promise<void>;
-  setContextMenu: (
-    menu: { x: number; y: number; task: RelayTask } | null,
-  ) => void;
-  taskColumns: TaskColumn[];
-  tasks: RelayTask[];
-}) {
-  const [taskModalOpen, setTaskModalOpen] = useState(false);
-  const [newColumnTitle, setNewColumnTitle] = useState("");
-  const [renamingColumn, setRenamingColumn] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const columns =
-    taskColumns.length > 0
-      ? taskColumns
-      : [{ id: "today", title: "Today", order: 0, createdAt: "system" }];
-  const googleTasks =
-    briefing?.googleTasks?.tasks.filter(
-      (task) => task.status !== "completed",
-    ) ?? [];
-  const sortedLocalTasks = sortTasksByUrgency(openTasks);
-
-  async function taskAction(body: Record<string, unknown>) {
-    await fetch("/api/google/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    await refreshWorkspace();
-  }
-
-  async function addColumn() {
-    const title = newColumnTitle.trim();
-    if (!title) return;
-    await taskAction({ action: "add_column", title });
-    setNewColumnTitle("");
-  }
-
-  async function renameColumn(id: string) {
-    const title = renameValue.trim();
-    if (!title) return;
-    await taskAction({ action: "rename_column", id, title });
-    setRenamingColumn(null);
-    setRenameValue("");
-  }
-
-  async function reorderColumn(id: string, direction: -1 | 1) {
-    const index = columns.findIndex((column) => column.id === id);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= columns.length) return;
-
-    const ids = columns.map((column) => column.id);
-    [ids[index], ids[target]] = [ids[target], ids[index]];
-    await taskAction({ action: "reorder_columns", ids });
-  }
-
-  async function completeGoogleTask(task: GoogleTask) {
-    if (!task.id) return;
-    await fetch("/api/google/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "complete",
-        id: task.id,
-        taskListId: task.taskListId,
-      }),
-    });
-    await refreshWorkspace();
-  }
-
-  const useMasterDetailLayout = true;
-  if (useMasterDetailLayout) {
-    return (
-      <TaskMasterDetailView
-        briefing={briefing}
-        refreshWorkspace={refreshWorkspace}
-      />
-    );
-  }
-
-  return (
-    <div className="grid min-h-[calc(100vh-144px)] gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section
-        className={`${panelClass} flex min-h-0 flex-col overflow-hidden p-5`}
-      >
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold">Task board</h2>
-            <p className="mt-1 text-sm text-muted">
-              Editable local Kanban columns with deadline-aware cards.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              className={secondaryButtonClass}
-              onClick={addColumn}
-              type="button"
-            >
-              <Plus className="h-4 w-4" />
-              Add column
-            </Button>
-            <Button
-              className={primaryButtonClass}
-              onClick={() => setTaskModalOpen(true)}
-              type="button"
-            >
-              <Plus className="h-4 w-4" />
-              Add task
-            </Button>
-          </div>
-        </div>
-
-        <div className="mb-4 flex gap-2">
-          <Input
-            className="h-10 min-w-0 flex-1 rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none placeholder:text-muted focus:border-[var(--accent)]"
-            onChange={(event) => setNewColumnTitle(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void addColumn();
-            }}
-            placeholder="New column name..."
-            value={newColumnTitle}
-          />
-          <Button
-            className={secondaryButtonClass + " px-3"}
-            onClick={addColumn}
-            type="button"
-            title="Create column"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-x-auto pb-2">
-          <div
-            className="grid min-w-[920px] gap-4"
-            style={{
-              gridTemplateColumns: `repeat(${columns.length}, minmax(260px, 1fr))`,
-            }}
-          >
-            {columns.map((column, columnIndex) => {
-              const columnTasks = openTasks.filter(
-                (task) => (task.columnId ?? columns[0]?.id) === column.id,
-              );
-              return (
-                <div
-                  className={
-                    softPanelClass + " flex min-h-[560px] flex-col p-3"
-                  }
-                  key={column.id}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const taskId =
-                      event.dataTransfer.getData("text/relay-task-id");
-                    if (taskId)
-                      void taskAction({
-                        action: "move",
-                        id: taskId,
-                        columnId: column.id,
-                      });
-                  }}
-                >
-                  <div className="mb-3 flex items-center gap-2">
-                    {renamingColumn === column.id ? (
-                      <Input
-                        className="h-9 min-w-0 flex-1 rounded-lg border border-separator bg-surface px-2 text-sm font-semibold outline-none focus:border-[var(--accent)]"
-                        onChange={(event) => setRenameValue(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter")
-                            void renameColumn(column.id);
-                          if (event.key === "Escape") setRenamingColumn(null);
-                        }}
-                        value={renameValue}
-                      />
-                    ) : (
-                      <Button
-                        className="min-w-0 flex-1 truncate text-left text-sm font-semibold"
-                        onClick={() => {
-                          setRenamingColumn(column.id);
-                          setRenameValue(column.title);
-                        }}
-                        type="button"
-                      >
-                        {column.title}
-                      </Button>
-                    )}
-                    <span className="rounded-full bg-surface px-2 py-1 text-[11px] font-semibold text-muted">
-                      {columnTasks.length}
-                    </span>
-                    <Button
-                      className={iconButtonClass + " h-8 w-8"}
-                      disabled={columnIndex === 0}
-                      onClick={() => void reorderColumn(column.id, -1)}
-                      type="button"
-                      title="Move column left"
-                    >
-                      <ArrowRight className="h-3.5 w-3.5 rotate-180" />
-                    </Button>
-                    <Button
-                      className={iconButtonClass + " h-8 w-8"}
-                      disabled={columnIndex === columns.length - 1}
-                      onClick={() => void reorderColumn(column.id, 1)}
-                      type="button"
-                      title="Move column right"
-                    >
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      className={iconButtonClass + " h-8 w-8"}
-                      disabled={columns.length <= 1}
-                      onClick={() =>
-                        void taskAction({
-                          action: "delete_column",
-                          id: column.id,
-                        })
-                      }
-                      type="button"
-                      title="Delete column"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <div className="space-y-3">
-                    {columnTasks.map((task) => (
-                      <TaskKanbanCard
-                        completeTask={completeTask}
-                        key={task.id}
-                        setContextMenu={setContextMenu}
-                        task={task}
-                      />
-                    ))}
-                    {columnTasks.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-separator p-5 text-center text-sm text-muted">
-                        Drop tasks here
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section
-        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
-      >
-        <div className="border-b border-separator p-5">
-          <h2 className="text-lg font-semibold">Global task view</h2>
-          <p className="mt-1 text-sm text-muted">
-            Sorted by urgency and deadline proximity.
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="space-y-3">
-            {sortedLocalTasks.map((task) => (
-              <Button
-                className="interactive-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-separator bg-surface-secondary p-3 text-left"
-                key={task.id}
-                onClick={() => void completeTask(task)}
-                type="button"
-              >
-                <PriorityTag priority={task.priority} />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">
-                    {task.title}
-                  </span>
-                  <span className="mt-1 block truncate text-xs text-muted">
-                    {task.due ? formatDueDate(task.due) : "No deadline"} ·{" "}
-                    {task.notes || "No notes"}
-                  </span>
-                </span>
-                <Check className="h-4 w-4 text-success" />
-              </Button>
-            ))}
-            {googleTasks.map((task) => (
-              <Button
-                className="interactive-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-separator bg-surface-secondary p-3 text-left"
-                key={`${task.taskListId}-${task.id ?? task.title}`}
-                onClick={() => void completeGoogleTask(task)}
-                type="button"
-              >
-                <PriorityTag priority={googleTaskPriority(task)} />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">
-                    {task.title}
-                  </span>
-                  <span className="mt-1 block truncate text-xs text-muted">
-                    {task.due
-                      ? formatDueDate(task.due)
-                      : (task.taskListTitle ?? "Google Tasks")}{" "}
-                    · {task.notes || "No notes"}
-                  </span>
-                </span>
-                <CheckCircle2 className="h-4 w-4 text-accent" />
-              </Button>
-            ))}
-            {sortedLocalTasks.length === 0 && googleTasks.length === 0 ? (
-              <EmptyState
-                icon={ListTodo}
-                title={tasks.length > 0 ? "All tasks complete" : "No tasks yet"}
-                detail={
-                  briefing?.googleTasks?.reason ??
-                  "Use Add task or ask chat to create one."
-                }
-              />
-            ) : null}
-          </div>
-        </div>
-      </section>
-
-      {taskModalOpen ? (
-        <TaskCreationModal
-          addTask={addTask}
-          columns={columns}
-          onClose={() => setTaskModalOpen(false)}
-          refreshWorkspace={refreshWorkspace}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function TaskKanbanCard({
-  completeTask,
-  setContextMenu,
-  task,
-}: {
-  completeTask: (task: RelayTask) => Promise<void>;
-  setContextMenu: (
-    menu: { x: number; y: number; task: RelayTask } | null,
-  ) => void;
-  task: RelayTask;
-}) {
-  return (
-    <HoverPreview
-      detail={task.notes || "No notes saved."}
-      meta={task.due ? `Due ${formatDueDate(task.due)}` : "No deadline"}
-      title={task.title}
-    >
-      <article
-        className="interactive-row rounded-xl border border-separator bg-surface p-3 shadow-sm"
-        draggable
-        onContextMenu={(event: MouseEvent<HTMLElement>) => {
-          event.preventDefault();
-          setContextMenu({ x: event.clientX, y: event.clientY, task });
-        }}
-        onDragStart={(event) =>
-          event.dataTransfer.setData("text/relay-task-id", task.id)
-        }
-      >
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <PriorityTag priority={task.priority} />
-          <Button
-            className={iconButtonClass + " h-8 w-8"}
-            onClick={() => completeTask(task)}
-            type="button"
-            title="Complete task"
-          >
-            <Check className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <p className="text-sm font-semibold leading-5">{task.title}</p>
-        <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted">
-          {task.notes || "No notes"}
-        </p>
-        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted">
-          <span>{task.due ? formatDueDate(task.due) : "No due date"}</span>
-          <MoreHorizontal className="h-4 w-4" />
-        </div>
-      </article>
-    </HoverPreview>
-  );
-}
-
-function TaskCreationModal({
-  addTask,
-  columns,
-  onClose,
-  refreshWorkspace,
-}: {
-  addTask: (input: AddTaskInput) => Promise<void>;
-  columns: TaskColumn[];
-  onClose: () => void;
-  refreshWorkspace: () => Promise<void>;
-}) {
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
-  const [due, setDue] = useState("");
-  const [priority, setPriority] = useState<RelayTaskPriority>("medium");
-  const [columnId, setColumnId] = useState(columns[0]?.id ?? "");
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (!title.trim() || saving) return;
-    setSaving(true);
-    await addTask({
-      title,
-      notes,
-      due: due ? new Date(`${due}T23:59:00`).toISOString() : null,
-      priority,
-      columnId,
-    });
-    await refreshWorkspace();
-    setSaving(false);
-    onClose();
-  }
-
-  return (
-    <Modal isOpen onOpenChange={(open) => !open && onClose()}>
-      <Modal.Backdrop variant="blur">
-        <Modal.Container placement="center">
-          <Modal.Dialog
-            className={`${panelClass} w-full max-w-lg animate-slide-up p-5`}
-          >
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold">Add task</h3>
-                <p className="mt-1 text-sm text-muted">
-                  Create a Google Task with real metadata.
-                </p>
-              </div>
-              <Button
-                className={iconButtonClass}
-                onClick={onClose}
-                type="button"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="space-y-3">
-              <label className="space-y-1">
-                <span className="text-xs font-semibold uppercase text-muted">
-                  Title
-                </span>
-                <Input
-                  className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
-                  onChange={(event) => setTitle(event.target.value)}
-                  value={title}
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-xs font-semibold uppercase text-muted">
-                  Notes
-                </span>
-                <TextArea
-                  className="min-h-24 w-full resize-y rounded-lg border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-                  onChange={(event) => setNotes(event.target.value)}
-                  value={notes}
-                />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-muted">
-                    Due
-                  </span>
-                  <Input
-                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
-                    onChange={(event) => setDue(event.target.value)}
-                    type="date"
-                    value={due}
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-muted">
-                    Priority
-                  </span>
-                  <Select
-                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
-                    onChange={(event) =>
-                      setPriority(event.target.value as RelayTaskPriority)
-                    }
-                    value={priority}
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </Select>
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold uppercase text-muted">
-                    Column
-                  </span>
-                  <Select
-                    className="h-10 w-full rounded-lg border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
-                    onChange={(event) => setColumnId(event.target.value)}
-                    value={columnId}
-                  >
-                    {columns.map((column) => (
-                      <option key={column.id} value={column.id}>
-                        {column.title}
-                      </option>
-                    ))}
-                  </Select>
-                </label>
-              </div>
-            </div>
-            <div className="mt-5 flex gap-2">
-              <Button
-                className={primaryButtonClass}
-                disabled={!title.trim() || saving}
-                onClick={() => void save()}
-                type="button"
-              >
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Create task
-              </Button>
-              <Button
-                className={secondaryButtonClass}
-                onClick={onClose}
-                type="button"
-              >
-                Cancel
-              </Button>
-            </div>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
-  );
-}
-
-function FilesView({
-  briefing,
-  runPrompt,
+  setTaskRepository,
 }: {
   briefing: Briefing | null;
-  runPrompt: (prompt: string) => void;
+  repositories: GithubRepository[];
+  repositoryAssignments: TaskRepositoryAssignments;
+  refreshWorkspace: () => Promise<void>;
+  setTaskRepository: (
+    taskKey: string,
+    repositoryFullName: string | null,
+  ) => void;
 }) {
+  return (
+    <TaskMasterDetailView
+      briefing={briefing}
+      repositories={repositories}
+      repositoryAssignments={repositoryAssignments}
+      refreshWorkspace={refreshWorkspace}
+      setTaskRepository={setTaskRepository}
+    />
+  );
+}
+
+function FilesWorkspaceView({
+  briefing,
+}: {
+  briefing: Briefing | null;
+}) {
+  const gmailFiles = useMemo<DriveFile[]>(
+    () =>
+      (briefing?.gmail?.messages ?? []).flatMap((message) =>
+        (message.attachments ?? []).map((attachment, index) => ({
+          appProperties: {
+            attachmentId: attachment.attachmentId ?? "",
+            attachmentMimeType: attachment.mimeType,
+            gmailMessageId: message.id ?? "",
+            gmailSubject: message.subject || "No subject",
+            source: "gmail",
+          },
+          id: `gmail:${message.id ?? message.threadId ?? "message"}:${attachment.attachmentId ?? index}`,
+          mimeType: attachment.mimeType,
+          modifiedTime: message.date,
+          name: attachment.filename,
+          owner: message.from ?? "Unknown sender",
+          size: attachment.size,
+          webViewLink: message.threadId
+            ? `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(message.threadId)}`
+            : null,
+        })),
+      ),
+    [briefing?.gmail?.messages],
+  );
   const initialFiles = useMemo(
-    () => briefing?.drive.files ?? [],
-    [briefing?.drive.files],
+    () => [...(briefing?.drive.files ?? []), ...gmailFiles],
+    [briefing?.drive.files, gmailFiles],
   );
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<DriveFile[] | null>(null);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState<DriveFileCategory>("all");
+  const [typeFilter, setTypeFilter] = useState<DriveFileFilter>("all");
   const [sortBy, setSortBy] = useState<"recent" | "name" | "type">("recent");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const fileFiltersRef = useRef<HTMLDivElement>(null);
   const files = searchResults ?? initialFiles;
   const organizedFiles = useMemo(() => {
     const filtered =
       typeFilter === "all"
         ? files
-        : files.filter(
-            (file) => driveFileCategory(file.mimeType) === typeFilter,
-          );
+        : files.filter((file) => driveFileKind(file) === typeFilter);
 
     return [...filtered].sort((left, right) => {
       if (sortBy === "name") return left.name.localeCompare(right.name);
       if (sortBy === "type") {
-        return driveFileType(left.mimeType).localeCompare(
-          driveFileType(right.mimeType),
-        );
+        return driveFileType(left).localeCompare(driveFileType(right));
       }
 
       return (
@@ -7702,31 +9903,48 @@ function FilesView({
     organizedFiles.find((file) => (file.id ?? file.name) === selectedFileId) ??
     organizedFiles[0] ??
     null;
-  const folderCount = files.filter(
-    (file) => driveFileCategory(file.mimeType) === "folder",
-  ).length;
-  const imageCount = files.filter(
-    (file) => driveFileCategory(file.mimeType) === "image",
-  ).length;
+  const filtersActive = typeFilter !== "all" || sortBy !== "recent";
 
-  async function searchFiles(nextQuery = query) {
+  useEffect(() => {
+    if (!filtersOpen) return;
+
+    function closeFilters(event: MouseEvent) {
+      if (
+        event.target instanceof Node &&
+        !fileFiltersRef.current?.contains(event.target)
+      ) {
+        setFiltersOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeFilters);
+    return () => document.removeEventListener("pointerdown", closeFilters);
+  }, [filtersOpen]);
+
+  async function searchFiles() {
     setLoading(true);
     setStatus(null);
     try {
       const response = await fetch(
-        `/api/google/drive/files${nextQuery ? `?q=${encodeURIComponent(nextQuery)}` : ""}`,
+        `/api/google/drive/files${query ? `?q=${encodeURIComponent(query)}` : ""}`,
       );
       const data = (await response.json()) as {
         ok: boolean;
         reason?: string;
         files: DriveFile[];
       };
-      setSearchResults(data.files ?? []);
-      setSelectedFileId(
-        data.files?.[0] ? (data.files[0].id ?? data.files[0].name) : null,
+      const normalizedQuery = query.trim().toLowerCase();
+      const matchingGmailFiles = gmailFiles.filter((file) =>
+        `${file.name} ${file.owner ?? ""}`.toLowerCase().includes(normalizedQuery),
       );
-      if (!response.ok || !data.ok)
+      const nextFiles = [...(data.files ?? []), ...matchingGmailFiles];
+      setSearchResults(nextFiles);
+      setSelectedFileId(
+        nextFiles[0] ? (nextFiles[0].id ?? nextFiles[0].name) : null,
+      );
+      if (!response.ok || !data.ok) {
         setStatus(data.reason ?? "Drive search failed.");
+      }
     } catch (error) {
       setStatus(
         error instanceof Error ? error.message : "Drive search failed.",
@@ -7737,242 +9955,604 @@ function FilesView({
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-144px)] gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <section
-        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
-      >
-        <div className="border-b border-separator p-5">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">Drive browser</h2>
-              <p className="mt-1 text-sm text-muted">
-                {briefing?.google.connected
-                  ? "Browse and search real Google Drive files."
-                  : "Connect Google Drive to browse files."}
-              </p>
+    <div className="files-page flex h-full min-h-0 flex-col gap-4 animate-fade-in">
+      <section className={`${panelClass} relative z-40 shrink-0 p-4`}>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+          <div className="min-w-0 xl:w-64 xl:shrink-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold">Files</h1>
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  briefing?.google.connected ? "bg-success" : "bg-muted"
+                }`}
+              />
             </div>
-            <Button
-              className={primaryButtonClass}
-              onClick={() => runPrompt("Summarize my recent Drive files")}
-              type="button"
-            >
-              <Wand2 className="h-4 w-4" />
-              Ask AI
-            </Button>
+            <p className="mt-1 truncate text-sm text-muted">
+              {briefing?.google.connected
+                ? `${files.length} recent Workspace items`
+                : "Connect Google to browse files"}
+            </p>
           </div>
-          <div className="grid gap-3">
-            <form
-              className="flex gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void searchFiles();
-              }}
+
+          <form
+            className="file-search-control flex h-11 min-w-0 flex-1 items-center rounded-xl border border-separator bg-surface-secondary transition focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void searchFiles();
+            }}
+          >
+            <input
+              aria-label="Search files"
+              className="h-full min-w-0 flex-1 bg-transparent px-3.5 text-sm text-foreground outline-none placeholder:text-muted"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search files, attachments, or senders"
+              value={query}
+            />
+            {searchResults ? (
+              <button
+                aria-label="Clear file search"
+                className="mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-surface-tertiary hover:text-foreground"
+                onClick={() => {
+                  setQuery("");
+                  setSearchResults(null);
+                  setStatus(null);
+                }}
+                type="button"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            <Button
+              aria-label="Search files"
+              className="mr-1 h-9 w-9 shrink-0 rounded-lg bg-accent p-0 text-accent-foreground hover:bg-accent-hover"
+              disabled={loading}
+              title="Search files"
+              type="submit"
             >
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-separator bg-surface-secondary px-3">
-                <Search className="h-4 w-4 text-muted" />
-                <Input
-                  className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search Drive files and folders..."
-                  value={query}
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+            </Button>
+          </form>
+
+          <div className="relative shrink-0" ref={fileFiltersRef}>
+            <Button
+              aria-expanded={filtersOpen}
+              aria-label={filtersOpen ? "Close file filters" : "Filter files"}
+              className={`task-filter-trigger relative h-10 w-10 p-0 ${
+                filtersOpen ? "is-expanded" : ""
+              }`}
+              onClick={() => setFiltersOpen((current) => !current)}
+              title="Filter files"
+              type="button"
+              variant="secondary"
+            >
+              <Filter className="h-4 w-4" />
+              {filtersActive ? (
+                <span
+                  aria-hidden="true"
+                  className="task-filter-active-dot absolute right-1.5 top-1.5"
                 />
+              ) : null}
+            </Button>
+            {filtersOpen ? (
+              <div className="file-filter-popover task-filter-strip absolute right-0 top-[calc(100%+0.55rem)] z-[100] w-[min(19rem,calc(100vw-2rem))] rounded-2xl border border-separator p-3 shadow-overlay">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                      File filters
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Showing {organizedFiles.length} of {files.length}
+                    </p>
+                  </div>
+                  {filtersActive ? (
+                    <Button
+                      className="h-7 px-2 text-[11px] text-muted"
+                      onClick={() => {
+                        setTypeFilter("all");
+                        setSortBy("recent");
+                      }}
+                      type="button"
+                      variant="ghost"
+                    >
+                      <X className="h-3 w-3" />
+                      Clear
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="grid gap-2">
+                  <Select
+                    aria-label="Filter files by source or type"
+                    className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-xs"
+                    onChange={(event) =>
+                      setTypeFilter(event.target.value as DriveFileFilter)
+                    }
+                    value={typeFilter}
+                  >
+                    <option value="all">All sources and types</option>
+                    {workspaceFileKinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {driveFileKindMeta[kind].label}
+                      </option>
+                    ))}
+                    {storageFileKinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {driveFileKindMeta[kind].label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    aria-label="Sort files"
+                    className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-xs"
+                    onChange={(event) =>
+                      setSortBy(
+                        event.target.value as "recent" | "name" | "type",
+                      )
+                    }
+                    value={sortBy}
+                  >
+                    <option value="recent">Recently modified</option>
+                    <option value="name">Name A–Z</option>
+                    <option value="type">File type</option>
+                  </Select>
+                </div>
               </div>
-              <Button
-                className={secondaryButtonClass}
-                disabled={loading}
-                type="submit"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-                Search
-              </Button>
-            </form>
-            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-              <Select
-                aria-label="Filter Drive files by type"
-                className="h-10 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
-                onChange={(event) =>
-                  setTypeFilter(event.target.value as DriveFileCategory)
-                }
-                value={typeFilter}
-              >
-                <option value="all">All file types</option>
-                <option value="folder">Folders</option>
-                <option value="document">Documents</option>
-                <option value="image">Images</option>
-              </Select>
-              <Select
-                aria-label="Sort Drive files"
-                className="h-10 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
-                onChange={(event) =>
-                  setSortBy(event.target.value as "recent" | "name" | "type")
-                }
-                value={sortBy}
-              >
-                <option value="recent">Recently modified</option>
-                <option value="name">Name A–Z</option>
-                <option value="type">File type</option>
-              </Select>
-              <div className="flex items-center gap-2">
-                <Chip size="sm" variant="secondary">
-                  {files.length} items
-                </Chip>
-                <Chip size="sm" variant="secondary">
-                  {folderCount} folders
-                </Chip>
-                {imageCount > 0 ? (
-                  <Chip size="sm" variant="secondary">
-                    {imageCount} images
-                  </Chip>
-                ) : null}
-              </div>
-            </div>
+            ) : null}
           </div>
         </div>
+      </section>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {status ? (
-            <p className="mb-3 rounded-lg border border-warning bg-warning-soft px-3 py-2 text-sm text-warning">
-              {status}
-            </p>
-          ) : null}
-          {organizedFiles.length > 0 ? (
-            <div className="overflow-hidden rounded-2xl border border-separator">
-              <div className="hidden grid-cols-[44px_minmax(0,1fr)_120px_120px] items-center gap-3 border-b border-separator bg-surface-secondary px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted md:grid">
-                <span />
-                <span>Name</span>
-                <span>Type</span>
-                <span>Modified</span>
-              </div>
-              <div className="divide-y divide-separator">
-                {organizedFiles.map((file) => (
-                  <Button
-                    className={`file-browser-row grid w-full grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 rounded-none px-4 py-3 text-left md:grid-cols-[44px_minmax(0,1fr)_120px_120px] ${
-                      selectedFile === file
-                        ? "is-selected bg-accent-soft"
-                        : "bg-surface"
-                    }`}
-                    key={file.id ?? file.name}
-                    onClick={() => setSelectedFileId(file.id ?? file.name)}
-                    type="button"
-                  >
-                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent">
-                      <DriveFileGlyph
-                        className="h-5 w-5"
-                        mimeType={file.mimeType}
-                      />
-                    </span>
-                    <span className="min-w-0">
+      <div className="relative z-0 grid min-h-0 flex-1 grid-rows-[minmax(0,0.65fr)_minmax(0,1.45fr)_minmax(0,0.9fr)] gap-4 lg:grid-cols-[230px_minmax(0,1fr)_320px] lg:grid-rows-1 2xl:grid-cols-[260px_minmax(0,1fr)_360px]">
+        <section
+          className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-separator px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Browse by source</h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Apps and Drive storage
+              </p>
+            </div>
+            <FolderTree className="h-4 w-4 text-accent" />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            <FileSourceTree
+              files={files}
+              onSelect={setTypeFilter}
+              selected={typeFilter}
+            />
+          </div>
+        </section>
+
+        <section
+          className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+        >
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-separator px-4 py-3">
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold">
+                {typeFilter === "all"
+                  ? "All files"
+                  : driveFileKindMeta[typeFilter].label}
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">
+                {organizedFiles.length}{" "}
+                {organizedFiles.length === 1 ? "item" : "items"}
+              </p>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto">
+            {status ? (
+              <p className="m-3 rounded-lg border border-warning bg-warning-soft px-3 py-2 text-sm text-warning">
+                {status}
+              </p>
+            ) : null}
+            {organizedFiles.length > 0 ? (
+              <table className="w-full min-w-[620px] table-fixed border-collapse">
+                <colgroup>
+                  <col className="w-16" />
+                  <col />
+                  <col className="w-[180px]" />
+                  <col className="w-[126px]" />
+                </colgroup>
+                <thead className="sticky top-0 z-10 bg-surface-secondary">
+                  <tr className="border-b border-separator">
+                    <th aria-label="File icon" className="px-4 py-2" />
+                    <th
+                      className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.13em] text-muted"
+                      scope="col"
+                    >
+                      Name
+                    </th>
+                    <th
+                      className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.13em] text-muted"
+                      scope="col"
+                    >
+                      Source / type
+                    </th>
+                    <th
+                      className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.13em] text-muted"
+                      scope="col"
+                    >
+                      Modified
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {organizedFiles.map((file) => (
+                    <tr
+                      aria-label={`Select ${file.name}`}
+                      aria-selected={selectedFile === file}
+                      className={`file-browser-row cursor-pointer border-b border-separator text-left outline-none transition focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${
+                        selectedFile === file
+                          ? "is-selected bg-accent-soft"
+                          : "bg-surface hover:bg-surface-secondary"
+                      }`}
+                      key={file.id ?? file.name}
+                      onClick={() => setSelectedFileId(file.id ?? file.name)}
+                      onDoubleClick={() => {
+                        const destination = driveFileDestination(file);
+                        if (destination.href) {
+                          window.open(
+                            destination.href,
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedFileId(file.id ?? file.name);
+                        }
+                      }}
+                      tabIndex={0}
+                      title={`Select ${file.name}. Double-click to open.`}
+                    >
+                      <td
+                        className={`border-l-[3px] px-4 py-3 ${
+                          selectedFile === file
+                            ? "border-l-accent"
+                            : "border-l-transparent"
+                        }`}
+                      >
+                        <span
+                          className={`grid h-9 w-9 place-items-center rounded-xl ${driveFileKindMeta[driveFileKind(file)].badgeClass}`}
+                        >
+                          <DriveFileGlyph className="h-4.5 w-4.5" file={file} />
+                        </span>
+                      </td>
+                      <td className="min-w-0 px-3 py-3 align-middle">
                       <span className="block truncate text-sm font-semibold">
                         {file.name}
                       </span>
-                      <span className="mt-1 block truncate text-xs text-muted">
-                        {file.owner ?? "Unknown owner"}
-                      </span>
-                    </span>
-                    <span className="rounded-full bg-surface-secondary px-2 py-1 text-[11px] font-semibold text-muted md:rounded-none md:bg-transparent md:p-0">
-                      {driveFileType(file.mimeType)}
-                    </span>
-                    <span className="hidden text-xs text-muted md:block">
-                      {formatFileTime(file.modifiedTime)}
-                    </span>
-                  </Button>
-                ))}
+                        <span className="mt-0.5 block truncate text-xs font-normal text-muted">
+                          {file.owner ?? "Unknown owner"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 align-middle">
+                        <FileTypeBadge file={file} />
+                      </td>
+                      <td className="px-3 py-3 align-middle text-xs font-normal text-muted">
+                          {formatFileTime(file.modifiedTime)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-5">
+                <EmptyState
+                  detail={
+                    files.length > 0
+                      ? "Choose another branch in the file tree."
+                      : (status ??
+                        briefing?.drive.reason ??
+                        "Search Drive or connect Google.")
+                  }
+                  icon={FolderOpen}
+                  title={
+                    files.length > 0
+                      ? "No files in this source"
+                      : briefing?.google.connected
+                        ? "No Drive files found"
+                        : "Drive not connected"
+                  }
+                />
               </div>
-            </div>
-          ) : null}
-          {organizedFiles.length === 0 ? (
-            <EmptyState
-              icon={FolderOpen}
-              title={
-                files.length > 0
-                  ? "No files match this filter"
-                  : briefing?.google.connected
-                    ? "No Drive files found"
-                    : "Drive not connected"
-              }
-              detail={
-                files.length > 0
-                  ? "Choose another file type to see more Drive items."
-                  : (status ??
-                    briefing?.drive.reason ??
-                    "Search Drive or connect Google.")
-              }
-            />
-          ) : null}
-        </div>
-      </section>
+            )}
+          </div>
+        </section>
 
-      <section
-        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
-      >
-        <div className="border-b border-separator p-5">
-          <h2 className="text-lg font-semibold">Quick preview</h2>
-          <p className="mt-1 text-sm text-muted">
-            Open, download, or ask AI about the selected file.
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {selectedFile ? (
-            <FilePreviewCard file={selectedFile} runPrompt={runPrompt} />
-          ) : (
-            <EmptyState
-              icon={FileText}
-              title="No file selected"
-              detail="Select a Drive file to preview actions."
-            />
-          )}
-        </div>
-      </section>
+        <section
+          className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
+        >
+          <div className="shrink-0 border-b border-separator px-4 py-3">
+            <h2 className="text-sm font-semibold">File details</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              Source, route, and file context
+            </p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {selectedFile ? (
+              <FilesWorkspacePreview file={selectedFile} />
+            ) : (
+              <EmptyState
+                detail="Select a file to see its actions."
+                icon={FileText}
+                title="No file selected"
+              />
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
 
-function FilePreviewCard({
-  file,
-  runPrompt,
+const workspaceFileKinds: DriveFileKind[] = [
+  "sheets",
+  "docs",
+  "slides",
+  "aistudio",
+  "gmail",
+];
+
+const storageFileKinds: DriveFileKind[] = [
+  "folder",
+  "pdf",
+  "image",
+  "drive",
+];
+
+function FileSourceTree({
+  files,
+  onSelect,
+  selected,
 }: {
-  file: DriveFile;
-  runPrompt: (prompt: string) => void;
+  files: DriveFile[];
+  onSelect: (filter: DriveFileFilter) => void;
+  selected: DriveFileFilter;
 }) {
-  const downloadUrl = file.id
-    ? `https://drive.google.com/uc?id=${encodeURIComponent(file.id)}&export=download`
-    : null;
+  function countFor(kind: DriveFileKind) {
+    return files.filter((file) => driveFileKind(file) === kind).length;
+  }
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="rounded-2xl border border-separator bg-surface-secondary p-5">
-        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent">
-          <DriveFileGlyph className="h-6 w-6" mimeType={file.mimeType} />
+    <TreeProvider
+      defaultExpandedIds={["workspace-apps", "drive-storage"]}
+      indent={20}
+      onSelectionChange={(selectedIds) => {
+        const next = selectedIds[0];
+        if (
+          next === "all" ||
+          workspaceFileKinds.includes(next as DriveFileKind) ||
+          storageFileKinds.includes(next as DriveFileKind)
+        ) {
+          onSelect(next as DriveFileFilter);
+        }
+      }}
+      selectedIds={[selected]}
+      showLines
+    >
+      <TreeView className="p-0">
+        <TreeNode isLast={false} nodeId="all">
+          <TreeNodeTrigger className="py-2">
+            <TreeExpander hasChildren={false} />
+            <TreeIcon
+              hasChildren={false}
+              icon={<FolderOpen className="h-4 w-4 text-accent" />}
+            />
+            <TreeLabel>All files</TreeLabel>
+            <span className="rounded-full bg-surface-tertiary px-2 py-0.5 text-[10px] font-semibold text-muted">
+              {files.length}
+            </span>
+          </TreeNodeTrigger>
+        </TreeNode>
+
+        <TreeNode isLast={false} nodeId="workspace-apps">
+          <TreeNodeTrigger className="py-2">
+            <TreeExpander hasChildren />
+            <TreeIcon
+              hasChildren
+              icon={<Sparkles className="h-4 w-4 text-violet-500" />}
+            />
+            <TreeLabel>Workspace apps</TreeLabel>
+          </TreeNodeTrigger>
+          <TreeNodeContent hasChildren>
+            {workspaceFileKinds.map((kind, index) => (
+              <FileSourceTreeLeaf
+                count={countFor(kind)}
+                isLast={index === workspaceFileKinds.length - 1}
+                key={kind}
+                kind={kind}
+              />
+            ))}
+          </TreeNodeContent>
+        </TreeNode>
+
+        <TreeNode isLast nodeId="drive-storage">
+          <TreeNodeTrigger className="py-2">
+            <TreeExpander hasChildren />
+            <TreeIcon
+              hasChildren
+              icon={<Cloud className="h-4 w-4 text-sky-500" />}
+            />
+            <TreeLabel>Drive storage</TreeLabel>
+          </TreeNodeTrigger>
+          <TreeNodeContent hasChildren>
+            {storageFileKinds.map((kind, index) => (
+              <FileSourceTreeLeaf
+                count={countFor(kind)}
+                isLast={index === storageFileKinds.length - 1}
+                key={kind}
+                kind={kind}
+              />
+            ))}
+          </TreeNodeContent>
+        </TreeNode>
+      </TreeView>
+    </TreeProvider>
+  );
+}
+
+function FileSourceTreeLeaf({
+  count,
+  isLast,
+  kind,
+}: {
+  count: number;
+  isLast: boolean;
+  kind: DriveFileKind;
+}) {
+  const meta = driveFileKindMeta[kind];
+  const Glyph = meta.icon;
+
+  return (
+    <TreeNode isLast={isLast} level={1} nodeId={kind}>
+      <TreeNodeTrigger className="py-1.5">
+        <TreeExpander hasChildren={false} />
+        <TreeIcon
+          hasChildren={false}
+          icon={<Glyph className="h-4 w-4" />}
+        />
+        <TreeLabel>{meta.label}</TreeLabel>
+        <span className="text-[10px] font-semibold tabular-nums text-muted">
+          {count}
         </span>
-        <h3 className="mt-4 text-lg font-semibold leading-6">{file.name}</h3>
-        <div className="mt-4 space-y-2">
-          <MiniControl label="Type" value={driveFileType(file.mimeType)} />
-          <MiniControl label="Owner" value={file.owner ?? "Unknown owner"} />
-          <MiniControl
-            label="Modified"
-            value={formatFileTime(file.modifiedTime)}
-          />
+      </TreeNodeTrigger>
+    </TreeNode>
+  );
+}
+
+function FilesWorkspacePreview({ file }: { file: DriveFile }) {
+  const kind = driveFileKind(file);
+  const meta = driveFileKindMeta[kind];
+  const destination = driveFileDestination(file);
+  const openBehavior = driveFileOpenBehavior(file);
+  const sourceContext =
+    kind === "gmail" && file.appProperties?.gmailSubject
+      ? `Attached to "${file.appProperties.gmailSubject}"`
+      : kind === "folder"
+        ? "A folder in your Drive workspace"
+        : `Stored in ${meta.label}`;
+  const downloadUrl =
+    file.id &&
+    !file.mimeType.includes("application/vnd.google-apps") &&
+    kind !== "aistudio" &&
+    kind !== "folder" &&
+    kind !== "gmail"
+      ? `https://drive.google.com/uc?id=${encodeURIComponent(file.id)}&export=download`
+      : null;
+
+  return (
+    <div className="space-y-3 animate-fade-in">
+      <div className="rounded-2xl border border-separator bg-surface-secondary p-4">
+        <div className="flex items-start gap-3">
+          <span
+            className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${meta.badgeClass}`}
+          >
+            <DriveFileGlyph className="h-5 w-5" file={file} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <FileTypeBadge file={file} />
+            <h3 className="mt-2 break-words text-base font-semibold leading-6">
+              {file.name}
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              {sourceContext}
+            </p>
+          </div>
         </div>
       </div>
-      <div className="grid gap-2">
-        {file.webViewLink ? (
+
+      <div className="rounded-2xl border border-separator bg-surface-secondary p-3">
+        <div className="flex items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-accent/30 bg-accent-soft text-accent">
+            <ExternalLink className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-muted">
+              Opens with
+            </p>
+            <p className="mt-1 text-sm font-semibold">{openBehavior.title}</p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              {openBehavior.detail}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <FileDetailMetric
+          label={kind === "gmail" ? "From" : "Owner"}
+          value={file.owner ?? "Unknown"}
+        />
+        <FileDetailMetric label="Format" value={driveFileFormat(file)} />
+        <FileDetailMetric
+          label="Modified"
+          value={formatFileTime(file.modifiedTime)}
+        />
+        <FileDetailMetric label="Size" value={formatFileSize(file.size)} />
+      </div>
+
+      <div
+        className={`grid gap-2 ${
+          downloadUrl
+            ? "grid-cols-3"
+            : destination.href
+              ? "grid-cols-2"
+              : "grid-cols-1"
+        }`}
+      >
+        {destination.href ? (
           <Link
-            className={primaryButtonClass}
-            href={file.webViewLink}
+            aria-label={destination.label}
+            className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-2 text-xs font-semibold text-accent-foreground shadow-sm transition hover:bg-accent-hover"
+            href={destination.href}
             rel="noreferrer"
             target="_blank"
           >
             <ExternalLink className="h-4 w-4" />
-            Open in Drive
+            Open
           </Link>
+        ) : (
+          <Button
+            className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-2 text-xs font-semibold text-accent-foreground"
+            isDisabled
+            type="button"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Open
+          </Button>
+        )}
+        {destination.href ? (
+          <Button
+            className="interactive-control inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-separator bg-surface-secondary px-2 text-xs font-semibold text-foreground transition hover:border-border-secondary hover:bg-surface-tertiary"
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(destination.href ?? "")
+                .then(() =>
+                  toast.success("Link copied", { description: file.name }),
+                )
+                .catch(() =>
+                  toast.warning("Link could not be copied", {
+                    description: "Open the file and copy its URL instead.",
+                  }),
+                );
+            }}
+            type="button"
+          >
+            <Copy className="h-4 w-4" />
+            Copy link
+          </Button>
         ) : null}
         {downloadUrl ? (
           <Link
-            className={secondaryButtonClass}
+            className="interactive-control inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl border border-separator bg-surface-secondary px-2 text-xs font-semibold text-foreground transition hover:border-border-secondary hover:bg-surface-tertiary"
             href={downloadUrl}
             rel="noreferrer"
             target="_blank"
@@ -7981,288 +10561,26 @@ function FilePreviewCard({
             Download
           </Link>
         ) : null}
-        <Button
-          className={secondaryButtonClass}
-          onClick={() => runPrompt(`Summarize Drive file ${file.name}`)}
-          type="button"
-        >
-          <Sparkles className="h-4 w-4" />
-          Ask AI about file
-        </Button>
       </div>
     </div>
   );
 }
 
-function GithubView({
-  briefing,
-  runPrompt,
-  signedInToGithub,
+function FileDetailMetric({
+  label,
+  value,
 }: {
-  briefing: Briefing | null;
-  runPrompt: (prompt: string) => void;
-  signedInToGithub: boolean;
+  label: string;
+  value: string;
 }) {
-  const repositories = useMemo(
-    () => briefing?.githubRepositories?.repositories ?? [],
-    [briefing?.githubRepositories?.repositories],
-  );
-  const [selectedRepoName, setSelectedRepoName] = useState(
-    repositories[0]?.fullName ?? "",
-  );
-  const selectedRepo =
-    repositories.find((repo) => repo.fullName === selectedRepoName) ??
-    repositories[0] ??
-    null;
-  const selectedRepoFullName = selectedRepo?.fullName ?? "";
-  const [repoIssues, setRepoIssues] = useState<GithubIssue[]>([]);
-  const [repoPulls, setRepoPulls] = useState<GithubPullRequest[]>([]);
-  const [loadingRepo, setLoadingRepo] = useState(false);
-  const [question, setQuestion] = useState("");
-  const [githubStatus, setGithubStatus] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedRepoFullName) return;
-    let active = true;
-    const [owner, name] = selectedRepoFullName.split("/");
-
-    async function loadRepoContext() {
-      setLoadingRepo(true);
-      setGithubStatus(null);
-      try {
-        const [issuesResponse, pullsResponse] = await Promise.all([
-          fetch(
-            `/api/github/issues?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(name)}&maxResults=20`,
-          ),
-          fetch(
-            `/api/github/pulls?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(name)}&maxResults=10`,
-          ),
-        ]);
-        const issuesData = (await issuesResponse.json()) as {
-          ok: boolean;
-          reason?: string;
-          issues: GithubIssue[];
-        };
-        const pullsData = (await pullsResponse.json()) as {
-          ok: boolean;
-          reason?: string;
-          pullRequests: GithubPullRequest[];
-        };
-
-        if (!active) return;
-        setRepoIssues(issuesData.issues ?? []);
-        setRepoPulls(pullsData.pullRequests ?? []);
-        if (!issuesResponse.ok || !issuesData.ok)
-          setGithubStatus(
-            issuesData.reason ?? "Unable to load repository issues.",
-          );
-        if (!pullsResponse.ok || !pullsData.ok)
-          setGithubStatus(
-            pullsData.reason ?? "Unable to load repository pull requests.",
-          );
-      } catch (error) {
-        if (active)
-          setGithubStatus(
-            error instanceof Error
-              ? error.message
-              : "Unable to load repository context.",
-          );
-      } finally {
-        if (active) setLoadingRepo(false);
-      }
-    }
-
-    void loadRepoContext();
-    return () => {
-      active = false;
-    };
-  }, [selectedRepoFullName]);
-
-  function askRepo(prompt: string) {
-    if (!selectedRepo) return;
-    runPrompt(`${prompt} Repository: ${selectedRepo.fullName}.`);
-  }
-
   return (
-    <div className="grid min-h-[calc(100vh-144px)] gap-5 xl:grid-cols-[300px_minmax(0,1fr)_360px]">
-      <section
-        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
-      >
-        <div className="border-b border-separator p-5">
-          <h2 className="text-lg font-semibold">Repositories</h2>
-          <p className="mt-1 text-sm text-muted">
-            {signedInToGithub
-              ? `${repositories.length} recent repos`
-              : "Connect GitHub to browse repositories."}
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {repositories.map((repo) => (
-            <Button
-              className={`relay-content-card mb-2 w-full rounded-xl border p-3 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
-                selectedRepo?.id === repo.id
-                  ? "border-[var(--accent)] bg-accent-soft"
-                  : "border-separator bg-surface-secondary"
-              }`}
-              key={repo.id}
-              onClick={() => setSelectedRepoName(repo.fullName)}
-              type="button"
-            >
-              <span className="block truncate text-sm font-semibold">
-                {repo.fullName}
-              </span>
-              <span className="mt-1 block truncate text-xs text-muted">
-                {repo.language ?? "No language"} · {repo.openIssues} open
-              </span>
-            </Button>
-          ))}
-          {repositories.length === 0 ? (
-            <EmptyState
-              icon={GitBranch}
-              title={
-                signedInToGithub
-                  ? "No repositories loaded"
-                  : "GitHub not connected"
-              }
-              detail={
-                briefing?.githubRepositories?.reason ??
-                "Connect GitHub from Integrations."
-              }
-            />
-          ) : null}
-        </div>
-      </section>
-
-      <section
-        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
-      >
-        <div className="border-b border-separator p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="truncate text-xl font-semibold">
-                {selectedRepo?.fullName ?? "Repository workspace"}
-              </h2>
-              <p className="mt-1 text-sm text-muted">
-                {selectedRepo?.description ??
-                  "Select a repository to inspect its issues and pull requests."}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {selectedRepo?.htmlUrl ? (
-                <Link
-                  className={secondaryButtonClass}
-                  href={selectedRepo.htmlUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open repo
-                </Link>
-              ) : null}
-              <Button
-                className={primaryButtonClass}
-                disabled={!selectedRepo}
-                onClick={() => askRepo("What should I fix first in this repo?")}
-                type="button"
-              >
-                <Sparkles className="h-4 w-4" />
-                Ask AI
-              </Button>
-            </div>
-          </div>
-          {selectedRepo ? (
-            <div className="mt-4 grid gap-3 sm:grid-cols-4">
-              <MiniControl
-                label="Issues"
-                value={`${selectedRepo.openIssues}`}
-              />
-              <MiniControl label="Stars" value={`${selectedRepo.stars}`} />
-              <MiniControl label="Forks" value={`${selectedRepo.forks}`} />
-              <MiniControl
-                label="Updated"
-                value={formatFileTime(selectedRepo.updatedAt)}
-              />
-            </div>
-          ) : null}
-          {githubStatus ? (
-            <p className="mt-3 rounded-lg border border-warning bg-warning-soft px-3 py-2 text-sm text-warning">
-              {githubStatus}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {loadingRepo ? (
-            <div className="space-y-3">
-              <div className="skeleton h-20 rounded-2xl" />
-              <div className="skeleton h-20 rounded-2xl" />
-              <div className="skeleton h-20 rounded-2xl" />
-            </div>
-          ) : (
-            <div className="grid gap-5 xl:grid-cols-2">
-              <GithubIssueList
-                issues={repoIssues}
-                runPrompt={runPrompt}
-                title="Open issues"
-              />
-              <GithubPullList pullRequests={repoPulls} runPrompt={runPrompt} />
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section
-        className={`${panelClass} flex min-h-0 flex-col overflow-hidden`}
-      >
-        <div className="border-b border-separator p-5">
-          <h2 className="text-lg font-semibold">Repo Q&A</h2>
-          <p className="mt-1 text-sm text-muted">
-            Ask the assistant with repository context attached.
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
-          {[
-            "Summarize open issues",
-            "What should I fix first?",
-            "What changed recently?",
-          ].map((prompt) => (
-            <Button
-              className="interactive-row w-full rounded-xl border border-separator bg-surface-secondary p-3 text-left text-sm font-semibold"
-              key={prompt}
-              onClick={() => askRepo(prompt)}
-              type="button"
-            >
-              {prompt}
-            </Button>
-          ))}
-        </div>
-        <form
-          className="border-t border-separator p-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!question.trim()) return;
-            askRepo(question);
-            setQuestion("");
-          }}
-        >
-          <div className="flex gap-2 rounded-xl border border-separator bg-surface-secondary p-2">
-            <Input
-              className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted"
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ask about this repo..."
-              value={question}
-            />
-            <Button
-              className={primaryButtonClass + " h-10 w-10 px-0"}
-              disabled={!selectedRepo}
-              type="submit"
-              title="Ask"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </form>
-      </section>
+    <div className="min-w-0 rounded-xl border border-separator bg-surface-secondary px-3 py-2.5">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-muted">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-xs font-semibold text-foreground">
+        {value}
+      </p>
     </div>
   );
 }
@@ -8337,77 +10655,6 @@ function GithubIssueList({
             icon={GitBranch}
             title="No issues loaded"
             detail="This repository has no open issues in the loaded view."
-          />
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function GithubPullList({
-  pullRequests,
-  runPrompt,
-}: {
-  pullRequests: GithubPullRequest[];
-  runPrompt: (prompt: string) => void;
-}) {
-  return (
-    <section>
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Pull requests</h3>
-        <StatusBadge ready label={`${pullRequests.length}`} />
-      </div>
-      <div className="space-y-3">
-        {pullRequests.map((pullRequest) => (
-          <div
-            className="rounded-xl border border-separator bg-surface-secondary p-3"
-            key={pullRequest.id}
-          >
-            <div className="mb-2 flex items-start justify-between gap-3">
-              <Button
-                className="relay-content-row min-w-0 text-left"
-                onClick={() =>
-                  runPrompt(
-                    `Summarize GitHub pull request ${pullRequest.repositoryFullName} #${pullRequest.number}`,
-                  )
-                }
-                type="button"
-              >
-                <span className="block line-clamp-3 text-sm font-semibold leading-5">
-                  {pullRequest.title}
-                </span>
-                <span className="mt-1 block text-xs text-muted">
-                  #{pullRequest.number} ·{" "}
-                  {formatFileTime(pullRequest.updatedAt)}
-                </span>
-              </Button>
-              <Link
-                aria-label="Open pull request"
-                className={iconButtonClass + " h-8 w-8"}
-                href={pullRequest.htmlUrl}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent">
-                {pullRequest.state}
-              </span>
-              {pullRequest.draft ? (
-                <span className="rounded-full bg-warning-soft px-2 py-1 text-[11px] font-semibold text-warning">
-                  draft
-                </span>
-              ) : null}
-            </div>
-          </div>
-        ))}
-        {pullRequests.length === 0 ? (
-          <EmptyState
-            icon={GitBranch}
-            title="No pull requests loaded"
-            detail="Open pull requests will appear here."
           />
         ) : null}
       </div>
@@ -9105,6 +11352,7 @@ function ProfileConnectionRow({
 }
 
 function SettingsView({
+  addMemory,
   aiStatus,
   connectGithub,
   connectGoogle,
@@ -9112,10 +11360,14 @@ function SettingsView({
   disconnectGoogle,
   githubConfigured,
   googleConfigured,
+  notes,
   oauthStatus,
+  setTheme,
   signedInToGithub,
   signedInToGoogle,
+  theme,
 }: {
+  addMemory: (body: string) => Promise<void>;
   aiStatus: AiStatus | null;
   connectGithub: () => void;
   connectGoogle: () => void;
@@ -9123,9 +11375,12 @@ function SettingsView({
   disconnectGoogle: () => void;
   githubConfigured: boolean;
   googleConfigured: boolean;
+  notes: RelayNote[];
   oauthStatus: OAuthStatus | null;
+  setTheme: (theme: ThemeMode) => void;
   signedInToGithub: boolean;
   signedInToGoogle: boolean;
+  theme: ThemeMode;
 }) {
   const [providerHealth, setProviderHealth] = useState<{
     ok: boolean;
@@ -9173,6 +11428,40 @@ function SettingsView({
           one place.
         </p>
       </div>
+
+      <section
+        aria-labelledby="appearance-settings-title"
+        className={`${panelClass} flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between`}
+      >
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+            <Palette className="h-5 w-5" />
+          </span>
+          <div>
+            <h2
+              className="text-lg font-semibold"
+              id="appearance-settings-title"
+            >
+              Appearance
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              {theme === "dark" ? "Dark theme" : "Light theme"} is active.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-separator bg-surface-secondary px-3 py-2 sm:justify-start">
+          <span className="text-sm font-semibold text-foreground">
+            {theme === "dark" ? "Switch to light" : "Switch to dark"}
+          </span>
+          <AnimatedThemeToggler
+            className="border border-separator bg-surface text-muted shadow-surface hover:text-foreground"
+            duration={500}
+            onThemeChange={setTheme}
+            theme={theme}
+            variant="circle"
+          />
+        </div>
+      </section>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <section className={`${panelClass} p-5`}>
@@ -9310,6 +11599,19 @@ function SettingsView({
           signedInToGithub={signedInToGithub}
           signedInToGoogle={signedInToGoogle}
         />
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+            Personalization
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">Memory</h2>
+          <p className="mt-2 text-sm text-muted">
+            Review and add the context Relay may remember across conversations.
+          </p>
+        </div>
+        <MemoryView addMemory={addMemory} notes={notes} />
       </section>
     </div>
   );
@@ -9492,13 +11794,13 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
                 <span className="grid h-10 w-10 place-items-center rounded-md bg-accent-soft text-accent">
                   <DriveFileGlyph
                     className="h-5 w-5"
-                    mimeType={file.mimeType}
+                    file={file}
                   />
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{file.name}</p>
                   <p className="mt-1 text-xs text-muted">
-                    {driveFileType(file.mimeType)} by{" "}
+                    {driveFileType(file)} by{" "}
                     {file.owner ?? "Unknown owner"}
                   </p>
                 </div>
@@ -9543,126 +11845,6 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
         />
       )}
     </section>
-  );
-}
-
-function CommandPalette({
-  actions,
-  open,
-  setOpen,
-}: {
-  actions: Array<{ label: string; icon: LucideIcon; run: () => void }>;
-  open: boolean;
-  setOpen: (open: boolean) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const filtered = actions.filter((action) =>
-    action.label.toLowerCase().includes(query.toLowerCase()),
-  );
-
-  function run(action: { run: () => void }) {
-    action.run();
-    setOpen(false);
-    setQuery("");
-  }
-
-  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter" && filtered[0]) {
-      run(filtered[0]);
-    }
-  }
-
-  if (!open) return null;
-
-  return (
-    <Modal isOpen onOpenChange={setOpen}>
-      <Modal.Backdrop variant="blur">
-        <Modal.Container placement="top">
-          <Modal.Dialog
-            className={`${panelClass} mt-20 w-full max-w-xl overflow-hidden p-0`}
-          >
-            <div className="flex items-center gap-3 border-b border-separator px-4 py-3">
-              <Search className="h-4 w-4 text-muted" />
-              <Input
-                autoFocus
-                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="Search commands..."
-                value={query}
-              />
-              <Button
-                className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-surface-secondary"
-                onClick={() => setOpen(false)}
-                type="button"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="max-h-96 overflow-y-auto p-2">
-              {filtered.map((action) => {
-                const Icon = action.icon;
-                return (
-                  <Button
-                    className="flex h-12 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold hover:bg-surface-secondary"
-                    key={action.label}
-                    onClick={() => run(action)}
-                    type="button"
-                  >
-                    <Icon className="h-4 w-4 text-accent" />
-                    {action.label}
-                  </Button>
-                );
-              })}
-              {filtered.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted">
-                  No matching commands.
-                </div>
-              ) : null}
-            </div>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
-  );
-}
-
-function TaskContextMenu({
-  contextMenu,
-  onClose,
-  onComplete,
-}: {
-  contextMenu: { x: number; y: number; task: RelayTask };
-  onClose: () => void;
-  onComplete: () => void;
-}) {
-  return (
-    <div
-      className={`${panelClass} fixed z-50 w-52 p-2`}
-      style={{ left: contextMenu.x, top: contextMenu.y }}
-      onClick={(event) => event.stopPropagation()}
-    >
-      <Button
-        className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold hover:bg-surface-secondary"
-        onClick={() => {
-          onComplete();
-          onClose();
-        }}
-        type="button"
-      >
-        <Check className="h-4 w-4 text-success" />
-        Complete
-      </Button>
-      <Button
-        className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm font-semibold hover:bg-surface-secondary"
-        onClick={onClose}
-        type="button"
-      >
-        <X className="h-4 w-4 text-muted" />
-        Close menu
-      </Button>
-    </div>
   );
 }
 
@@ -9899,7 +12081,7 @@ function priorityColor(
 function PriorityTag({ priority }: { priority?: RelayTaskPriority }) {
   return (
     <Chip
-      className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-[11px] font-semibold"
+      className="inline-flex h-6 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold"
       color={priorityColor(priority)}
       size="sm"
       variant="soft"
@@ -9907,19 +12089,6 @@ function PriorityTag({ priority }: { priority?: RelayTaskPriority }) {
       {priorityLabel(priority)}
     </Chip>
   );
-}
-
-function PriorityDot({ priority }: { priority?: RelayTaskPriority }) {
-  const color =
-    priority === "urgent"
-      ? "bg-[var(--danger)]"
-      : priority === "high"
-        ? "bg-[var(--warning)]"
-        : priority === "low"
-          ? "bg-[var(--success)]"
-          : "bg-accent";
-
-  return <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} />;
 }
 
 function formatDueDate(value?: string | null) {
@@ -9932,6 +12101,43 @@ function formatDueDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatRemainingDueDays(value?: string | null) {
+  if (!value) return "∞";
+
+  const dateOnly = value.slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly);
+  const now = new Date();
+  const today = Date.UTC(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+  const due = match
+    ? Date.UTC(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+      )
+    : (() => {
+        const parsed = parseEventDate(value);
+        return parsed
+          ? Date.UTC(
+              parsed.getFullYear(),
+              parsed.getMonth(),
+              parsed.getDate(),
+            )
+          : Number.NaN;
+      })();
+
+  if (Number.isNaN(due)) return "∞";
+  const remainingDays = Math.round((due - today) / 86_400_000);
+  if (remainingDays === 0) return "Today";
+  if (remainingDays === 1) return "1 day left";
+  if (remainingDays > 1) return `${remainingDays} days left`;
+  if (remainingDays === -1) return "1 day overdue";
+  return `${Math.abs(remainingDays)} days overdue`;
 }
 
 function formatDateShort(value?: string | null) {
@@ -10031,116 +12237,13 @@ function githubUrgencyClass(issue: GithubIssue) {
   return "bg-accent-soft text-accent";
 }
 
-function buildPlannerActions(
-  briefing: Briefing | null,
-  openTasks: RelayTask[],
-  runPrompt: (prompt: string) => void,
-  setActiveView: (view: ViewId) => void,
-) {
-  const now = new Date();
-  const sortedTasks = sortTasksByUrgency(openTasks);
-  const overdueTask = sortedTasks.find((task) => isOverdue(task.due));
-  const nextEvent = briefing?.calendar.events
-    .map((event) => ({ event, start: parseEventDate(event.start) }))
-    .filter((item): item is { event: CalendarEvent; start: Date } =>
-      Boolean(item.start),
-    )
-    .filter((item) => item.start.getTime() >= now.getTime())
-    .sort(
-      (left, right) => left.start.getTime() - right.start.getTime(),
-    )[0]?.event;
-  const urgentIssue = briefing?.githubIssues?.issues.find(
-    (issue) => githubUrgency(issue) === "Urgent",
-  );
-  const inboxMessage = briefing?.gmail?.messages[0];
-  const recentFile = briefing?.drive.files[0];
-  const actions: Array<{
-    detail: string;
-    icon: LucideIcon;
-    onClick: () => void;
-    title: string;
-  }> = [];
-
-  if (overdueTask) {
-    actions.push({
-      icon: ListTodo,
-      title: `Clear overdue task`,
-      detail: `${overdueTask.title} was due ${formatDueDate(overdueTask.due)}.`,
-      onClick: () => {
-        setActiveView("tasks");
-        runPrompt(`Help me finish overdue task: ${overdueTask.title}`);
-      },
-    });
-  }
-
-  if (nextEvent) {
-    actions.push({
-      icon: CalendarDays,
-      title: "Prepare next meeting",
-      detail: `${nextEvent.title} starts ${formatEventTime(nextEvent.start)}.`,
-      onClick: () => runPrompt("Prepare me for my next meeting"),
-    });
-  }
-
-  if (urgentIssue) {
-    actions.push({
-      icon: GitBranch,
-      title: "Review GitHub blocker",
-      detail: `${urgentIssue.repositoryFullName ?? "GitHub"} #${urgentIssue.number}: ${urgentIssue.title}`,
-      onClick: () => {
-        setActiveView("github");
-        runPrompt(
-          `What should I do about GitHub issue ${urgentIssue.repositoryFullName ?? ""} #${urgentIssue.number}?`,
-        );
-      },
-    });
-  }
-
-  if (inboxMessage) {
-    actions.push({
-      icon: Mail,
-      title: "Triage latest email",
-      detail: `${inboxMessage.from ?? "Gmail"}: ${inboxMessage.subject}`,
-      onClick: () =>
-        runPrompt(
-          `Summarize this email and suggest a response: ${inboxMessage.subject}`,
-        ),
-    });
-  }
-
-  if (recentFile) {
-    actions.push({
-      icon: FolderOpen,
-      title: "Review recent file",
-      detail: `${recentFile.name} changed ${formatFileTime(recentFile.modifiedTime)}.`,
-      onClick: () => {
-        setActiveView("files");
-        runPrompt(`Summarize recent Drive file ${recentFile.name}`);
-      },
-    });
-  }
-
-  if (sortedTasks[0] && !overdueTask) {
-    actions.push({
-      icon: CheckCircle2,
-      title: "Advance priority task",
-      detail: `${sortedTasks[0].title} is the highest-ranked open Google Task.`,
-      onClick: () => {
-        setActiveView("tasks");
-        runPrompt(`Plan the next step for ${sortedTasks[0].title}`);
-      },
-    });
-  }
-
-  return actions.slice(0, 3);
-}
-
 function inferExecutionTrace(messages: Message[]) {
-  const latest =
-    [...messages]
-      .reverse()
-      .find((message) => message.role === "user")
-      ?.content.toLowerCase() ?? "";
+  const latestMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "user");
+  const latest = latestMessage
+    ? relayMessageText(latestMessage).toLowerCase()
+    : "";
 
   if (/(github|repo|repository|issue|pull request|pr )/.test(latest)) {
     return [
@@ -10188,26 +12291,6 @@ function inferExecutionTrace(messages: Message[]) {
   }
 
   return ["Understanding intent", "Selecting tools", "Preparing workspace"];
-}
-
-function AvatarIcon({ role }: { role: Message["role"] }) {
-  return (
-    <Avatar
-      aria-label={role === "user" ? "You" : "Relay assistant"}
-      className="shrink-0"
-      color="accent"
-      size="sm"
-      variant={role === "user" ? "default" : "soft"}
-    >
-      <Avatar.Fallback>
-        {role === "user" ? (
-          <User className="h-4 w-4" />
-        ) : (
-          <Bot className="h-4 w-4" />
-        )}
-      </Avatar.Fallback>
-    </Avatar>
-  );
 }
 
 function authActionLabel(mode: AuthMode) {
@@ -10436,78 +12519,6 @@ function inferGeneratedSurface(
     return { surface: "email" };
   }
   return undefined;
-}
-
-function inferContextWorkspaceMode(messages: Message[]): ContextWorkspaceMode {
-  const latest =
-    [...messages].reverse().find((message) => message.role === "user")
-      ?.content ?? "";
-  const text = latest.toLowerCase();
-
-  if (
-    text.includes("schedule") ||
-    text.includes("meeting") ||
-    text.includes("calendar") ||
-    text.includes("availability") ||
-    text.includes("birthday") ||
-    text.includes("birthdays")
-  ) {
-    return text.includes("birthday") || text.includes("birthdays")
-      ? "contacts"
-      : "calendar";
-  }
-  if (
-    text.includes("task") ||
-    text.includes("todo") ||
-    text.includes("deadline") ||
-    text.includes("remind me")
-  ) {
-    return "tasks";
-  }
-  if (
-    text.includes("drive") ||
-    text.includes("file") ||
-    text.includes("document") ||
-    text.includes("pdf")
-  ) {
-    return "files";
-  }
-  if (
-    text.includes("github") ||
-    text.includes("repo") ||
-    text.includes("repository") ||
-    text.includes("issue") ||
-    text.includes("pull request") ||
-    text.includes("pr ")
-  ) {
-    return "github";
-  }
-  if (
-    text.includes("remember") ||
-    text.includes("memory") ||
-    text.includes("preference")
-  ) {
-    return "memory";
-  }
-  if (
-    text.includes("contact") ||
-    text.includes("contacts") ||
-    text.includes("person") ||
-    text.includes("people") ||
-    text.includes("phone")
-  ) {
-    return "contacts";
-  }
-  if (
-    text.includes("email") ||
-    text.includes("gmail") ||
-    text.includes("draft") ||
-    text.includes("inbox")
-  ) {
-    return "email";
-  }
-
-  return "focus";
 }
 
 function contextWorkspaceMeta(mode: ContextWorkspaceMode) {
