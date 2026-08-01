@@ -76,6 +76,36 @@ type GithubTreeResponse = {
   url: string;
 };
 
+type GithubCommitResponse = {
+  sha: string;
+  html_url: string;
+  commit: {
+    author?: {
+      name?: string | null;
+      email?: string | null;
+      date?: string | null;
+    } | null;
+    message: string;
+  };
+  author?: {
+    login?: string;
+    avatar_url?: string | null;
+  } | null;
+  files?: Array<{
+    filename: string;
+    status: string;
+    additions?: number;
+    deletions?: number;
+    changes?: number;
+    blob_url?: string;
+  }>;
+  stats?: {
+    additions?: number;
+    deletions?: number;
+    total?: number;
+  };
+};
+
 export type GithubRepository = {
   id: number;
   name: string;
@@ -137,6 +167,31 @@ export type GithubTreeEntry = {
   type: "blob" | "tree" | "commit";
 };
 
+export type GithubCommit = {
+  sha: string;
+  shortSha: string;
+  htmlUrl: string;
+  message: string;
+  authoredAt?: string | null;
+  author: {
+    login?: string | null;
+    name: string;
+    email?: string | null;
+    avatarUrl?: string | null;
+  };
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  files: Array<{
+    path: string;
+    status: string;
+    additions: number;
+    deletions: number;
+    changes: number;
+    htmlUrl?: string | null;
+  }>;
+};
+
 function toRepository(repo: GithubRepoResponse): GithubRepository {
   return {
     id: repo.id,
@@ -181,7 +236,7 @@ function toIssue(issue: GithubIssueResponse): GithubIssue {
     avatarUrl: issue.user?.avatar_url ?? null,
     labels:
       issue.labels?.map((label) =>
-        typeof label === "string" ? label : label.name ?? "label",
+        typeof label === "string" ? label : (label.name ?? "label"),
       ) ?? [],
   };
 }
@@ -254,10 +309,84 @@ export async function listGithubRepositoryTree(
   };
 }
 
+export async function listGithubRepositoryCommits(
+  tokens: DirectGithubTokens,
+  owner: string,
+  repo: string,
+  ref: string,
+  maxResults = 10,
+) {
+  const commits = await githubApi<GithubCommitResponse[]>(
+    tokens,
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?${new URLSearchParams(
+      {
+        sha: ref,
+        per_page: String(Math.min(Math.max(maxResults, 1), 20)),
+      },
+    )}`,
+  );
+
+  const detailedCommits = await Promise.all(
+    commits.map(async (commit) => {
+      const detail = await githubApi<GithubCommitResponse>(
+        tokens,
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(commit.sha)}`,
+      ).catch(() => commit);
+      const authorName =
+        detail.author?.login ??
+        detail.commit.author?.name ??
+        detail.commit.author?.email ??
+        "Unknown contributor";
+
+      return {
+        sha: detail.sha,
+        shortSha: detail.sha.slice(0, 7),
+        htmlUrl: detail.html_url,
+        message: detail.commit.message,
+        authoredAt: detail.commit.author?.date ?? null,
+        author: {
+          login: detail.author?.login ?? null,
+          name: authorName,
+          email: detail.commit.author?.email ?? null,
+          avatarUrl: detail.author?.avatar_url ?? null,
+        },
+        additions:
+          detail.stats?.additions ??
+          detail.files?.reduce((sum, file) => sum + (file.additions ?? 0), 0) ??
+          0,
+        deletions:
+          detail.stats?.deletions ??
+          detail.files?.reduce((sum, file) => sum + (file.deletions ?? 0), 0) ??
+          0,
+        changedFiles: detail.files?.length ?? 0,
+        files:
+          detail.files?.map((file) => ({
+            path: file.filename,
+            status: file.status,
+            additions: file.additions ?? 0,
+            deletions: file.deletions ?? 0,
+            changes: file.changes ?? 0,
+            htmlUrl: file.blob_url ?? null,
+          })) ?? [],
+      } satisfies GithubCommit;
+    }),
+  );
+
+  return {
+    ok: true,
+    commits: detailedCommits,
+  };
+}
+
 export async function listGithubIssuesForUser(
   tokens: DirectGithubTokens,
   maxResults = 12,
-  filter: "assigned" | "created" | "mentioned" | "subscribed" | "all" = "assigned",
+  filter:
+    | "assigned"
+    | "created"
+    | "mentioned"
+    | "subscribed"
+    | "all" = "assigned",
 ) {
   const issues = await githubApi<GithubIssueResponse[]>(
     tokens,
@@ -272,9 +401,7 @@ export async function listGithubIssuesForUser(
 
   return {
     ok: true,
-    issues: issues
-      .filter((issue) => !issue.pull_request)
-      .map(toIssue),
+    issues: issues.filter((issue) => !issue.pull_request).map(toIssue),
   };
 }
 
@@ -287,12 +414,14 @@ export async function listGithubIssuesForRepository(
 ) {
   const issues = await githubApi<GithubIssueResponse[]>(
     tokens,
-    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?${new URLSearchParams({
-      state,
-      sort: "updated",
-      direction: "desc",
-      per_page: String(Math.min(Math.max(maxResults, 1), 50)),
-    })}`,
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?${new URLSearchParams(
+      {
+        state,
+        sort: "updated",
+        direction: "desc",
+        per_page: String(Math.min(Math.max(maxResults, 1), 50)),
+      },
+    )}`,
   );
 
   return {
@@ -315,12 +444,14 @@ export async function listGithubPullRequestsForRepository(
 ) {
   const pulls = await githubApi<GithubPullResponse[]>(
     tokens,
-    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?${new URLSearchParams({
-      state,
-      sort: "updated",
-      direction: "desc",
-      per_page: String(Math.min(Math.max(maxResults, 1), 50)),
-    })}`,
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?${new URLSearchParams(
+      {
+        state,
+        sort: "updated",
+        direction: "desc",
+        per_page: String(Math.min(Math.max(maxResults, 1), 50)),
+      },
+    )}`,
   );
 
   return {
@@ -433,7 +564,11 @@ export async function commentOnGithubIssue(
     body: string;
   },
 ) {
-  const comment = await githubApi<{ id: number; html_url: string; body?: string }>(
+  const comment = await githubApi<{
+    id: number;
+    html_url: string;
+    body?: string;
+  }>(
     tokens,
     `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}/issues/${input.issueNumber}/comments`,
     {

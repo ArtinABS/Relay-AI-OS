@@ -2270,6 +2270,123 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   outline-offset: -2px;
 }
 
+.relay-product-shell
+  .github-tabs-list-container
+  .tabs__list-container__scroller {
+  scrollbar-width: none;
+}
+
+.relay-product-shell
+  .github-tabs-list-container
+  .tabs__list-container__scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.relay-product-shell .github-tab-count {
+  align-items: center;
+  background: color-mix(in oklab, var(--muted) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--muted) 18%, transparent);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.56rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  height: 1rem;
+  justify-content: center;
+  line-height: 1;
+  margin-left: 0.2rem;
+  min-width: 1rem;
+  padding-inline: 0.25rem;
+  transform: translateY(-0.28rem);
+}
+
+.relay-product-shell
+  .github-tabs-list-container
+  .tabs__tab[aria-selected="true"]
+  .github-tab-count {
+  background: color-mix(in oklab, var(--accent-foreground) 18%, transparent);
+  border-color: color-mix(in oklab, var(--accent-foreground) 24%, transparent);
+  color: var(--accent-foreground);
+}
+
+.relay-product-shell .github-contributor-filter {
+  background: var(--surface-secondary);
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  color: var(--muted);
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.45rem 0.65rem;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.relay-product-shell .github-contributor-filter:hover {
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+.relay-product-shell .github-contributor-filter[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--separator));
+  color: var(--accent);
+}
+
+.relay-product-shell .github-contributor-filter:focus-visible,
+.relay-product-shell .github-commit-trigger:focus-visible,
+.relay-product-shell .github-pull-request-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.relay-product-shell .github-commit-trigger,
+.relay-product-shell .github-pull-request-card {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.relay-product-shell .github-commit-trigger:hover,
+.relay-product-shell .github-pull-request-card:hover {
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface));
+  border-color: color-mix(in oklab, var(--accent) 28%, var(--separator));
+}
+
+.relay-product-shell .github-file-status {
+  align-items: center;
+  background: var(--accent-soft);
+  border-radius: 0.3rem;
+  color: var(--accent);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.58rem;
+  font-weight: 800;
+  height: 1.1rem;
+  justify-content: center;
+  width: 1.1rem;
+}
+
+.relay-product-shell .github-file-status[data-status="added"] {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.relay-product-shell .github-file-status[data-status="removed"] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.relay-product-shell .github-file-status[data-status="renamed"] {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .relay-product-shell .relay-dashboard .dashboard-task-row.is-completing {
   background: color-mix(in oklab, var(--success) 7%, var(--surface));
 }
