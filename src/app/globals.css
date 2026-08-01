@@ -138,6 +138,9 @@ select {
   --surface-secondary-foreground: var(--foreground);
   --surface-tertiary: #e2e9ed;
   --surface-tertiary-foreground: var(--foreground);
+  --theme-toggle-background: #edf2f6;
+  --theme-toggle-background-hover: #e2e9ed;
+  --theme-toggle-thumb: #ffffff;
   --overlay: #ffffff;
   --overlay-foreground: var(--foreground);
   --backdrop: rgba(6, 47, 60, 0.46);
@@ -179,11 +182,7 @@ select {
   --link: var(--accent);
   --app-bg: var(--background);
   --sidebar: color-mix(in oklab, var(--surface) 82%, var(--background));
-  --chat-rail: color-mix(
-    in oklab,
-    var(--sidebar) 48%,
-    var(--background)
-  );
+  --chat-rail: color-mix(in oklab, var(--sidebar) 48%, var(--background));
   --surface-soft: var(--surface-secondary);
   --surface-glass: color-mix(in oklab, var(--surface) 86%, transparent);
   --text: var(--foreground);
@@ -233,6 +232,9 @@ select {
   --surface-secondary-foreground: var(--foreground);
   --surface-tertiary: #172c36;
   --surface-tertiary-foreground: var(--foreground);
+  --theme-toggle-background: #0f2029;
+  --theme-toggle-background-hover: #172c36;
+  --theme-toggle-thumb: #0a151d;
   --overlay: #0c1a23;
   --overlay-foreground: var(--foreground);
   --backdrop: rgba(1, 7, 11, 0.78);
@@ -274,11 +276,7 @@ select {
   --link: var(--accent);
   --app-bg: var(--background);
   --sidebar: color-mix(in oklab, var(--surface) 88%, var(--background));
-  --chat-rail: color-mix(
-    in oklab,
-    var(--sidebar) 48%,
-    var(--background)
-  );
+  --chat-rail: color-mix(in oklab, var(--sidebar) 48%, var(--background));
   --surface-soft: var(--surface-secondary);
   --surface-glass: color-mix(in oklab, var(--surface) 84%, transparent);
   --text: var(--foreground);
@@ -1226,6 +1224,153 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   overflow: hidden;
 }
 
+.relay-product-shell .relay-page--projects {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The project spine is a quiet visual map: a live route through categories. */
+.relay-product-shell .project-spine::after {
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in oklab, var(--accent) 46%, transparent) 18%,
+    color-mix(in oklab, var(--accent) 16%, transparent) 68%,
+    transparent
+  );
+  content: "";
+  inset-block: 4rem 5.5rem;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 2px;
+}
+
+.relay-product-shell .project-modal {
+  animation: surface-pop 180ms ease-out both;
+}
+
+.relay-product-shell .project-list-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.relay-product-shell
+  .project-category-icon-picker
+  > summary::-webkit-details-marker {
+  display: none;
+}
+
+.relay-product-shell .project-category-icon-option {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.7rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.56rem;
+  font-weight: 700;
+  gap: 0.3rem;
+  justify-content: center;
+  min-height: 3.2rem;
+  min-width: 0;
+  padding: 0.35rem 0.2rem;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.relay-product-shell .project-category-icon-option span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relay-product-shell .project-category-icon-option:hover {
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+  border-color: color-mix(in oklab, var(--accent) 20%, var(--separator));
+  color: var(--foreground);
+  transform: translateY(-1px);
+}
+
+.relay-product-shell .project-category-icon-option[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: color-mix(in oklab, var(--accent) 44%, var(--separator));
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.relay-product-shell
+  .project-tabs-list-container
+  .tabs__list-container__scroller {
+  scrollbar-width: none;
+}
+
+.relay-product-shell
+  .project-tabs-list-container
+  .tabs__list-container__scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.relay-product-shell .project-tab-badge {
+  align-items: center;
+  background: color-mix(in oklab, var(--muted) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--muted) 18%, transparent);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.56rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  height: 1rem;
+  justify-content: center;
+  line-height: 1;
+  margin-left: 0.28rem;
+  min-width: 1rem;
+  padding-inline: 0.25rem;
+  transform: translateY(-0.3rem);
+}
+
+.relay-product-shell
+  .project-tabs-list-container
+  .tabs__tab[aria-selected="true"]
+  .project-tab-badge {
+  background: color-mix(in oklab, var(--accent-foreground) 18%, transparent);
+  border-color: color-mix(in oklab, var(--accent-foreground) 24%, transparent);
+  color: var(--accent-foreground);
+}
+
+@media (min-width: 48rem) {
+  .relay-product-shell .project-resizable-layout {
+    grid-template-columns:
+      clamp(170px, min(var(--project-category-width, 210px), 24%), 320px)
+      0.75rem
+      clamp(220px, min(var(--project-rail-width, 270px), 30%), 420px)
+      0.75rem
+      minmax(320px, 1fr);
+  }
+
+  .relay-product-shell .project-detail-stack {
+    grid-template-rows:
+      minmax(280px, 1fr) 0.75rem
+      clamp(170px, var(--project-calendar-height, 210px), calc(100% - 296px));
+  }
+
+  .relay-product-shell .project-detail-stack[data-calendar-collapsed="true"] {
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+.relay-product-shell .project-resizable-layout .relay-panel:hover {
+  transform: none;
+}
+
 .relay-product-shell .calendar-page,
 .relay-product-shell .calendar-workspace {
   height: 100%;
@@ -1237,12 +1382,11 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 }
 
 .relay-product-shell .relay-chat-composer {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--surface-secondary) 96%, white 4%),
-      var(--surface-secondary)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--surface-secondary) 96%, white 4%),
+    var(--surface-secondary)
+  );
   box-shadow:
     0 10px 35px color-mix(in oklab, var(--foreground) 7%, transparent),
     inset 0 1px 0 color-mix(in oklab, white 5%, transparent);
@@ -1256,15 +1400,11 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   overflow-y: auto;
 }
 
-.relay-product-shell
-  .relay-chat-composer
-  [data-slot="textarea"]:focus-visible {
+.relay-product-shell .relay-chat-composer [data-slot="textarea"]:focus-visible {
   outline: none;
 }
 
-.relay-product-shell
-  .relay-chat-composer
-  [data-slot="textarea"]::placeholder {
+.relay-product-shell .relay-chat-composer [data-slot="textarea"]::placeholder {
   color: var(--muted);
 }
 
@@ -1314,11 +1454,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 @media (min-width: 64rem) {
   .relay-product-shell .task-resizable-layout {
     grid-template-columns:
-      clamp(
-        240px,
-        var(--task-rail-width, 288px),
-        calc(100% - 436px)
-      )
+      clamp(240px, var(--task-rail-width, 288px), calc(100% - 436px))
       1rem
       minmax(0, 1fr);
   }
@@ -1326,11 +1462,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   .relay-product-shell .task-resizable-stack {
     grid-template-rows:
       minmax(280px, 1fr) 1rem
-      clamp(
-        180px,
-        var(--task-calendar-height, 240px),
-        calc(100% - 296px)
-      );
+      clamp(180px, var(--task-calendar-height, 240px), calc(100% - 296px));
   }
 }
 
@@ -1492,8 +1624,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   transform: translateY(-1px);
 }
 
-.relay-product-shell
-  .task-rich-text__toolbar-button[aria-pressed="true"] {
+.relay-product-shell .task-rich-text__toolbar-button[aria-pressed="true"] {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -1553,12 +1684,18 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   font-size: 1rem;
 }
 
-.relay-product-shell .task-rich-text .ProseMirror ul:not([data-type="taskList"]),
+.relay-product-shell
+  .task-rich-text
+  .ProseMirror
+  ul:not([data-type="taskList"]),
 .relay-product-shell .task-rich-text .ProseMirror ol {
   padding-left: 1.25rem;
 }
 
-.relay-product-shell .task-rich-text .ProseMirror ul:not([data-type="taskList"]) {
+.relay-product-shell
+  .task-rich-text
+  .ProseMirror
+  ul:not([data-type="taskList"]) {
   list-style: disc;
 }
 
@@ -1706,12 +1843,8 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   min-width: 0;
 }
 
-.relay-product-shell
-  .sidebar-shell[data-collapsed="true"]
-  .sidebar-header,
-.relay-product-shell
-  .sidebar-shell[data-collapsed="true"]
-  .sidebar-brand {
+.relay-product-shell .sidebar-shell[data-collapsed="true"] .sidebar-header,
+.relay-product-shell .sidebar-shell[data-collapsed="true"] .sidebar-brand {
   justify-content: center;
 }
 
@@ -1763,8 +1896,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
     transparent,
     color-mix(in oklab, var(--surface) 24%, transparent)
   );
-  border-top: 1px solid
-    color-mix(in oklab, var(--separator) 78%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--separator) 78%, transparent);
   padding: 0.75rem var(--sidebar-gutter) 0.9rem;
 }
 
@@ -1859,6 +1991,82 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
     background-color 160ms ease,
     color 160ms ease;
   width: 100%;
+}
+
+.relay-product-shell .sidebar-theme-switch {
+  align-items: center;
+  background: var(--theme-toggle-background);
+  border: 1px solid var(--separator);
+  border-radius: 0.9rem;
+  color: var(--foreground);
+  display: flex;
+  font-size: 0.82rem;
+  font-weight: 700;
+  height: 3rem;
+  overflow: hidden;
+  padding-inline: 0.8rem;
+  position: relative;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+  width: 100%;
+}
+
+.relay-product-shell .sidebar-theme-switch:hover {
+  background: var(--theme-toggle-background-hover);
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--border));
+}
+
+.relay-product-shell .sidebar-theme-switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.relay-product-shell .sidebar-theme-switch__label {
+  display: block;
+  text-align: right;
+  transition:
+    padding 240ms ease,
+    text-align 240ms ease;
+  width: 100%;
+  padding-left: 2.7rem;
+}
+
+.relay-product-shell
+  .sidebar-theme-switch[data-theme="dark"]
+  .sidebar-theme-switch__label {
+  padding-left: 0;
+  padding-right: 2.7rem;
+  text-align: left;
+}
+
+.relay-product-shell .sidebar-theme-switch__thumb {
+  align-items: center;
+  background: var(--theme-toggle-thumb);
+  border: 1px solid var(--separator);
+  border-radius: 0.72rem;
+  color: var(--muted);
+  display: flex;
+  height: 2.2rem;
+  justify-content: center;
+  left: 0.35rem;
+  position: absolute;
+  top: 0.35rem;
+  transition:
+    left 260ms cubic-bezier(0.32, 0.72, 0, 1),
+    color 160ms ease,
+    background-color 160ms ease;
+  width: 2.2rem;
+}
+
+.relay-product-shell
+  .sidebar-theme-switch[data-theme="dark"]
+  .sidebar-theme-switch__thumb {
+  left: calc(100% - 2.55rem);
+}
+
+.relay-product-shell .sidebar-theme-switch:hover .sidebar-theme-switch__thumb {
+  color: var(--accent);
 }
 
 .relay-product-shell .sidebar-profile-menu-separator {
@@ -2049,6 +2257,19 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   background: color-mix(in oklab, var(--accent) 6%, var(--surface));
 }
 
+.relay-product-shell .relay-dashboard .dashboard-project-row {
+  transition: background-color 170ms ease;
+}
+
+.relay-product-shell .relay-dashboard .dashboard-project-row:hover {
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+}
+
+.relay-product-shell .relay-dashboard .dashboard-project-row:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
 .relay-product-shell .relay-dashboard .dashboard-task-row.is-completing {
   background: color-mix(in oklab, var(--success) 7%, var(--surface));
 }
@@ -2179,7 +2400,8 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 }
 
 .relay-product-shell .task-calendar-day.is-today {
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 38%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--accent) 38%, transparent);
 }
 
 .relay-product-shell .task-calendar-day.is-selected-task {
@@ -2281,9 +2503,18 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   }
 
   .relay-product-shell
-    :is(.relay-page--chat, .relay-page--calendar, .relay-page--files) {
+    :is(
+      .relay-page--chat,
+      .relay-page--calendar,
+      .relay-page--files,
+      .relay-page--projects
+    ) {
     height: 100%;
     min-height: 0;
+  }
+
+  .relay-product-shell .relay-page--projects {
+    overflow-y: auto;
   }
 }
 

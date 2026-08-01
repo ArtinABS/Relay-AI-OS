@@ -30,18 +30,12 @@ import {
   toast,
 } from "@heroui/react";
 import { parseDate, type DateValue } from "@internationalized/date";
-import {
-  useAui,
-  useAuiState,
-  type ThreadMessage,
-} from "@assistant-ui/react";
-import {
-  convertFileListToFileUIParts,
-  type FileUIPart,
-} from "ai";
+import { useAui, useAuiState, type ThreadMessage } from "@assistant-ui/react";
+import { convertFileListToFileUIParts, type FileUIPart } from "ai";
 import { RelayAssistantRuntimeProvider } from "@/components/assistant-ui/relay-runtime";
 import { RelayThread } from "@/components/assistant-ui/relay-thread";
 import { GithubRepositoryExplorer } from "@/components/github/github-repository-explorer";
+import { ProjectsWorkspace } from "@/components/projects/projects-workspace";
 import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import {
@@ -55,11 +49,7 @@ import {
   AttachmentTitle,
   AttachmentTrigger,
 } from "@/components/ui/attachment";
-import {
-  Marker,
-  MarkerContent,
-  MarkerIcon,
-} from "@/components/ui/marker";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import {
   TaskRichTextEditor,
   type TaskRichDocument,
@@ -128,6 +118,7 @@ import {
   MessageSquare,
   Mic,
   MoreHorizontal,
+  Moon,
   Paperclip,
   Palette,
   Pencil,
@@ -140,6 +131,7 @@ import {
   ShoppingBag,
   Sparkles,
   Square,
+  Sun,
   Trash2,
   UploadCloud,
   User,
@@ -164,6 +156,7 @@ type ViewId =
   | "chat"
   | "calendar"
   | "tasks"
+  | "projects"
   | "files"
   | "github"
   | "profile"
@@ -545,6 +538,7 @@ const primaryNavItems: NavItem[] = [
   { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "tasks", label: "Tasks", icon: ListTodo },
+  { id: "projects", label: "Projects", icon: FolderTree },
   { id: "files", label: "Files", icon: FolderOpen },
   { id: "github", label: "GitHub", icon: GitBranch },
 ];
@@ -870,13 +864,15 @@ function driveFileOpenBehavior(file: DriveFile) {
   }
   if (kind === "aistudio") {
     return {
-      detail: "Opens the saved prompt in AI Studio when its direct link is available.",
+      detail:
+        "Opens the saved prompt in AI Studio when its direct link is available.",
       title: "Google AI Studio",
     };
   }
 
   return {
-    detail: "Opens the Drive preview where you can inspect, share, or download it.",
+    detail:
+      "Opens the Drive preview where you can inspect, share, or download it.",
     title: "Google Drive preview",
   };
 }
@@ -1107,10 +1103,10 @@ function AssistantOSContent({
     setAiStatus(aiData);
   }
 
-  async function addTask(input: AddTaskInput) {
+  async function createTask(input: AddTaskInput): Promise<RelayTask> {
     const parsed = typeof input === "string" ? { title: input } : input;
     const trimmed = parsed.title.trim();
-    if (!trimmed) return;
+    if (!trimmed) throw new Error("A task title is required.");
 
     const response = await fetch("/api/google/tasks", {
       method: "POST",
@@ -1125,14 +1121,35 @@ function AssistantOSContent({
         taskListId: parsed.columnId,
       }),
     });
-    if (!response.ok) {
-      const data = (await response.json()) as { reason?: string };
+    const data = (await response.json()) as {
+      reason?: string;
+      task?: GoogleTask;
+    };
+    if (!response.ok || !data.task?.id) {
       throw new Error(
         data.reason ?? "Google Tasks could not create this task.",
       );
     }
     await refreshWorkspace();
     addToast("Google Task created", trimmed, "success");
+    return {
+      id: data.task.id,
+      title: data.task.title,
+      completed: data.task.status === "completed",
+      createdAt: data.task.updated ?? new Date().toISOString(),
+      completedAt: data.task.completed ?? undefined,
+      updatedAt: data.task.updated ?? undefined,
+      notes: googleTaskNotes(data.task.notes),
+      due: data.task.due,
+      priority: googleTaskPriority(data.task),
+      columnId: data.task.taskListId,
+      taskListId: data.task.taskListId,
+      taskListTitle: data.task.taskListTitle,
+    };
+  }
+
+  async function addTask(input: AddTaskInput) {
+    await createTask(input);
   }
 
   async function completeTask(task: RelayTask) {
@@ -1372,6 +1389,7 @@ function AssistantOSContent({
           aiStatus={aiStatus}
           briefing={briefing}
           completeTask={completeTask}
+          createTaskForProject={createTask}
           connectGithub={connectGithub}
           connectGoogle={connectGoogle}
           disconnectGithub={disconnectGithub}
@@ -1396,7 +1414,6 @@ function AssistantOSContent({
           theme={theme}
         />
       ) : null}
-
     </div>
   );
 }
@@ -2026,6 +2043,7 @@ function WorkspaceExperience({
   aiStatus,
   briefing,
   completeTask,
+  createTaskForProject,
   connectGithub,
   connectGoogle,
   disconnectGithub,
@@ -2055,6 +2073,7 @@ function WorkspaceExperience({
   aiStatus: AiStatus | null;
   briefing: Briefing | null;
   completeTask: (task: RelayTask) => Promise<void>;
+  createTaskForProject: (input: AddTaskInput) => Promise<RelayTask>;
   connectGithub: () => void;
   connectGoogle: () => void;
   disconnectGithub: () => void;
@@ -2080,10 +2099,12 @@ function WorkspaceExperience({
 }) {
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(296);
-  const {
-    repositoryAssignments,
-    setTaskRepository,
-  } = useTaskRepositoryAssignments();
+  const [requestedTaskKey, setRequestedTaskKey] = useState<string | null>(null);
+  const [requestedProjectId, setRequestedProjectId] = useState<string | null>(
+    null,
+  );
+  const { repositoryAssignments, setTaskRepository } =
+    useTaskRepositoryAssignments();
   const repositoryLinkedTasks = useMemo(
     () =>
       (briefing?.googleTasks?.tasks ?? []).map((task) => {
@@ -2102,6 +2123,7 @@ function WorkspaceExperience({
   const workspaceContentClass =
     activeView === "chat" ||
     activeView === "calendar" ||
+    activeView === "projects" ||
     activeView === "files"
       ? "overflow-hidden"
       : "overflow-y-auto overscroll-contain";
@@ -2120,14 +2142,14 @@ function WorkspaceExperience({
         collapsed={navCollapsed}
         mobileOpen={sidebarOpen}
         oauthStatus={oauthStatus}
-        onToggleCollapsed={() =>
-          setNavCollapsed((current) => !current)
-        }
+        onToggleCollapsed={() => setNavCollapsed((current) => !current)}
         onSignOut={onSignOut}
         passwordAuth={passwordAuth}
         setActiveView={setActiveView}
         setDesktopWidth={setSidebarWidth}
         setMobileOpen={setSidebarOpen}
+        setTheme={setTheme}
+        theme={theme}
         width={sidebarWidth}
       />
 
@@ -2141,103 +2163,129 @@ function WorkspaceExperience({
                 ? "relay-page relay-page--chat h-full min-h-0 p-0"
                 : activeView === "calendar"
                   ? "relay-page relay-page--calendar p-3 sm:p-4 xl:p-5"
-                  : activeView === "files"
-                    ? "relay-page relay-page--files p-3 sm:p-4 xl:p-5"
-                    : "relay-page min-h-full p-4 sm:p-6 xl:p-8"
+                  : activeView === "projects"
+                    ? "relay-page relay-page--projects p-3 sm:p-4 xl:p-5"
+                    : activeView === "files"
+                      ? "relay-page relay-page--files p-3 sm:p-4 xl:p-5"
+                      : "relay-page min-h-full p-4 sm:p-6 xl:p-8"
             }
           >
-          {activeView === "dashboard" ? (
-            <DashboardView
-              briefing={briefing}
-              completeTask={completeTask}
-              notes={notes}
-              openTasks={openTasks}
-              runPrompt={runPrompt}
-              tasks={tasks}
-            />
-          ) : null}
+            {activeView === "dashboard" ? (
+              <DashboardView
+                briefing={briefing}
+                completeTask={completeTask}
+                notes={notes}
+                onOpenProject={(projectId) => {
+                  setRequestedProjectId(projectId);
+                  setActiveView("projects");
+                }}
+                openTasks={openTasks}
+                runPrompt={runPrompt}
+                tasks={tasks}
+              />
+            ) : null}
 
-          {activeView === "chat" ? (
-            <ChatView
-              addMemory={addMemory}
-              addTask={addTask}
-              briefing={briefing}
-              completeTask={completeTask}
-              notes={notes}
-              openTasks={openTasks}
-              refreshWorkspace={refreshWorkspace}
-              runPrompt={runPrompt}
-              signedInToGoogle={signedInToGoogle}
-              taskColumns={taskColumns}
-              tasks={tasks}
-            />
-          ) : null}
+            {activeView === "chat" ? (
+              <ChatView
+                addMemory={addMemory}
+                addTask={addTask}
+                briefing={briefing}
+                completeTask={completeTask}
+                notes={notes}
+                openTasks={openTasks}
+                refreshWorkspace={refreshWorkspace}
+                runPrompt={runPrompt}
+                signedInToGoogle={signedInToGoogle}
+                taskColumns={taskColumns}
+                tasks={tasks}
+              />
+            ) : null}
 
-          {activeView === "calendar" ? (
-            <CalendarView
-              briefing={briefing}
-              refreshWorkspace={refreshWorkspace}
-            />
-          ) : null}
+            {activeView === "calendar" ? (
+              <CalendarView
+                briefing={briefing}
+                refreshWorkspace={refreshWorkspace}
+              />
+            ) : null}
 
-          {activeView === "tasks" ? (
-            <TasksView
-              briefing={briefing}
-              repositories={briefing?.githubRepositories?.repositories ?? []}
-              repositoryAssignments={repositoryAssignments}
-              refreshWorkspace={refreshWorkspace}
-              setTaskRepository={setTaskRepository}
-            />
-          ) : null}
+            {activeView === "tasks" ? (
+              <TasksView
+                briefing={briefing}
+                initialTaskKey={requestedTaskKey}
+                key={requestedTaskKey ?? "tasks"}
+                repositories={briefing?.githubRepositories?.repositories ?? []}
+                repositoryAssignments={repositoryAssignments}
+                refreshWorkspace={refreshWorkspace}
+                setTaskRepository={setTaskRepository}
+              />
+            ) : null}
 
-          {activeView === "files" ? (
-            <FilesWorkspaceView briefing={briefing} />
-          ) : null}
+            {activeView === "projects" ? (
+              <ProjectsWorkspace
+                initialProjectId={requestedProjectId}
+                key={requestedProjectId ?? "projects"}
+                onCompleteTask={completeTask}
+                onCreateTask={createTaskForProject}
+                onOpenTask={(task) => {
+                  setRequestedTaskKey(
+                    `${task.taskListId ?? "@default"}:${task.id}`,
+                  );
+                  setActiveView("tasks");
+                }}
+                repositories={briefing?.githubRepositories?.repositories ?? []}
+                taskLists={taskColumns}
+                tasks={tasks}
+              />
+            ) : null}
 
-          {activeView === "github" ? (
-            <GithubRepositoryExplorer
-              repositories={briefing?.githubRepositories?.repositories ?? []}
-              repositoryError={briefing?.githubRepositories?.reason}
-              signedIn={signedInToGithub}
-              tasks={repositoryLinkedTasks}
-            />
-          ) : null}
+            {activeView === "files" ? (
+              <FilesWorkspaceView briefing={briefing} />
+            ) : null}
 
-          {activeView === "profile" ? (
-            <ProfileView
-              connectGithub={connectGithub}
-              connectGoogle={connectGoogle}
-              disconnectGithub={disconnectGithub}
-              disconnectGoogle={disconnectGoogle}
-              googleConfigured={googleConfigured}
-              githubConfigured={githubConfigured}
-              oauthStatus={oauthStatus}
-              onSignOut={onSignOut}
-              passwordAuth={passwordAuth}
-              refreshWorkspace={refreshWorkspace}
-              signedInToGithub={signedInToGithub}
-              signedInToGoogle={signedInToGoogle}
-            />
-          ) : null}
+            {activeView === "github" ? (
+              <GithubRepositoryExplorer
+                repositories={briefing?.githubRepositories?.repositories ?? []}
+                repositoryError={briefing?.githubRepositories?.reason}
+                signedIn={signedInToGithub}
+                tasks={repositoryLinkedTasks}
+              />
+            ) : null}
 
-          {activeView === "settings" ? (
-            <SettingsView
-              addMemory={addMemory}
-              aiStatus={aiStatus}
-              connectGithub={connectGithub}
-              connectGoogle={connectGoogle}
-              disconnectGithub={disconnectGithub}
-              disconnectGoogle={disconnectGoogle}
-              githubConfigured={githubConfigured}
-              googleConfigured={googleConfigured}
-              notes={notes}
-              oauthStatus={oauthStatus}
-              setTheme={setTheme}
-              signedInToGithub={signedInToGithub}
-              signedInToGoogle={signedInToGoogle}
-              theme={theme}
-            />
-          ) : null}
+            {activeView === "profile" ? (
+              <ProfileView
+                connectGithub={connectGithub}
+                connectGoogle={connectGoogle}
+                disconnectGithub={disconnectGithub}
+                disconnectGoogle={disconnectGoogle}
+                googleConfigured={googleConfigured}
+                githubConfigured={githubConfigured}
+                oauthStatus={oauthStatus}
+                onSignOut={onSignOut}
+                passwordAuth={passwordAuth}
+                refreshWorkspace={refreshWorkspace}
+                signedInToGithub={signedInToGithub}
+                signedInToGoogle={signedInToGoogle}
+              />
+            ) : null}
+
+            {activeView === "settings" ? (
+              <SettingsView
+                addMemory={addMemory}
+                aiStatus={aiStatus}
+                connectGithub={connectGithub}
+                connectGoogle={connectGoogle}
+                disconnectGithub={disconnectGithub}
+                disconnectGoogle={disconnectGoogle}
+                githubConfigured={githubConfigured}
+                googleConfigured={googleConfigured}
+                notes={notes}
+                oauthStatus={oauthStatus}
+                setTheme={setTheme}
+                signedInToGithub={signedInToGithub}
+                signedInToGoogle={signedInToGoogle}
+                theme={theme}
+              />
+            ) : null}
           </div>
         </div>
       </main>
@@ -2266,6 +2314,8 @@ function Sidebar({
   setActiveView,
   setDesktopWidth,
   setMobileOpen,
+  setTheme,
+  theme,
   width,
 }: {
   activeView: ViewId;
@@ -2278,6 +2328,8 @@ function Sidebar({
   setActiveView: (view: ViewId) => void;
   setDesktopWidth: (width: number) => void;
   setMobileOpen: (open: boolean) => void;
+  setTheme: (theme: ThemeMode) => void;
+  theme: ThemeMode;
   width: number;
 }) {
   const effectiveCollapsed = collapsed && !mobileOpen;
@@ -2420,10 +2472,7 @@ function Sidebar({
       </div>
 
       <footer className="sidebar-footer shrink-0">
-        <div
-          className="sidebar-profile-control relative"
-          ref={profileMenuRef}
-        >
+        <div className="sidebar-profile-control relative" ref={profileMenuRef}>
           {profileMenuOpen ? (
             <div
               className="sidebar-profile-menu"
@@ -2445,7 +2494,11 @@ function Sidebar({
               <div className="sidebar-profile-menu-actions">
                 {[
                   { id: "profile" as const, label: "Profile", icon: User },
-                  { id: "settings" as const, label: "Settings", icon: Settings },
+                  {
+                    id: "settings" as const,
+                    label: "Settings",
+                    icon: Settings,
+                  },
                 ].map((item) => {
                   const Icon = item.icon;
                   const active = activeView === item.id;
@@ -2472,6 +2525,31 @@ function Sidebar({
                     </Button>
                   );
                 })}
+
+                <button
+                  aria-label={
+                    theme === "dark" ? "Switch to light" : "Switch to dark"
+                  }
+                  className="sidebar-theme-switch"
+                  data-theme={theme}
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  role="menuitem"
+                  type="button"
+                >
+                  <span className="sidebar-theme-switch__label">
+                    {theme === "dark" ? "Switch to light" : "Switch to dark"}
+                  </span>
+                  <span
+                    className="sidebar-theme-switch__thumb"
+                    aria-hidden="true"
+                  >
+                    {theme === "dark" ? (
+                      <Sun className="h-4 w-4" />
+                    ) : (
+                      <Moon className="h-4 w-4" />
+                    )}
+                  </span>
+                </button>
 
                 <div className="sidebar-profile-menu-separator" />
                 <Button
@@ -2563,9 +2641,7 @@ function Sidebar({
           <BrandSymbol compact />
         </Button>
       ) : null}
-      <div className="relative hidden h-screen lg:block">
-        {content}
-      </div>
+      <div className="relative hidden h-screen lg:block">{content}</div>
       {mobileOpen ? (
         <div className="mobile-sidebar-backdrop fixed inset-0 z-40 lg:hidden">
           <Button
@@ -2619,9 +2695,7 @@ function SidebarNavGroup({
                   ? "is-active bg-surface text-foreground shadow-surface"
                   : "text-muted hover:bg-surface-secondary hover:text-foreground"
               } ${
-                collapsed
-                  ? "justify-center px-0"
-                  : "justify-start text-left"
+                collapsed ? "justify-center px-0" : "justify-start text-left"
               }`}
               key={item.id}
               onClick={() => onNavigate(item.id)}
@@ -2640,10 +2714,77 @@ function SidebarNavGroup({
   );
 }
 
+type DashboardProject = {
+  archived: boolean;
+  categoryId: string | null;
+  color: string;
+  dueDate: string | null;
+  id: string;
+  name: string;
+  status: "planning" | "active" | "on-hold" | "completed";
+  updatedAt: string;
+};
+
+type DashboardProjectCategory = {
+  id: string;
+  name: string;
+  parentId: string | null;
+};
+
+type DashboardProjectData = {
+  categories: DashboardProjectCategory[];
+  projects: DashboardProject[];
+};
+
+const emptyDashboardProjectData: DashboardProjectData = {
+  categories: [],
+  projects: [],
+};
+
+function safeDashboardProjectData(value: unknown): DashboardProjectData {
+  if (!value || typeof value !== "object") return emptyDashboardProjectData;
+  const store = value as {
+    categories?: unknown;
+    projects?: unknown;
+  };
+  const projects = Array.isArray(store.projects)
+    ? store.projects.filter((project): project is DashboardProject => {
+        if (!project || typeof project !== "object") return false;
+        const candidate = project as Partial<DashboardProject>;
+        return (
+          typeof candidate.id === "string" &&
+          typeof candidate.name === "string" &&
+          typeof candidate.color === "string" &&
+          typeof candidate.archived === "boolean" &&
+          typeof candidate.updatedAt === "string" &&
+          ["planning", "active", "on-hold", "completed"].includes(
+            candidate.status ?? "",
+          )
+        );
+      })
+    : [];
+  const categories = Array.isArray(store.categories)
+    ? store.categories.filter(
+        (category): category is DashboardProjectCategory => {
+          if (!category || typeof category !== "object") return false;
+          const candidate = category as Partial<DashboardProjectCategory>;
+          return (
+            typeof candidate.id === "string" &&
+            typeof candidate.name === "string" &&
+            (candidate.parentId === null ||
+              typeof candidate.parentId === "string")
+          );
+        },
+      )
+    : [];
+  return { categories, projects };
+}
+
 function DashboardView({
   briefing,
   completeTask,
   notes,
+  onOpenProject,
   openTasks,
   runPrompt,
   tasks,
@@ -2651,10 +2792,46 @@ function DashboardView({
   briefing: Briefing | null;
   completeTask: (task: RelayTask) => Promise<void>;
   notes: RelayNote[];
+  onOpenProject: (projectId: string | null) => void;
   openTasks: RelayTask[];
   runPrompt: (prompt: string) => void;
   tasks: RelayTask[];
 }) {
+  const [projectData, setProjectData] = useState<DashboardProjectData>(
+    emptyDashboardProjectData,
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/projects", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const data = (await response.json()) as {
+          account?: unknown;
+          record?: { store?: unknown } | null;
+        };
+        if (!response.ok) return;
+        if (data.record?.store) {
+          setProjectData(safeDashboardProjectData(data.record.store));
+          return;
+        }
+        if (!data.account) {
+          try {
+            const local = window.localStorage.getItem("relay.projects.v1");
+            if (local)
+              setProjectData(safeDashboardProjectData(JSON.parse(local)));
+          } catch {
+            // An invalid local cache should render as an empty project panel.
+          }
+        }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  const activeProjects = projectData.projects.filter(
+    (project) => !project.archived && project.status === "active",
+  );
+
   return (
     <div className="relay-dashboard space-y-7 animate-fade-in">
       <WeeklyCommandCalendar
@@ -2675,7 +2852,11 @@ function DashboardView({
           runPrompt={runPrompt}
           tasks={tasks}
         />
-        <GithubActivityPanel briefing={briefing} runPrompt={runPrompt} />
+        <DashboardProjectsPanel
+          categories={projectData.categories}
+          onOpenProject={onOpenProject}
+          projects={activeProjects}
+        />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -2702,14 +2883,10 @@ function DashboardView({
           detail="recent messages"
         />
         <ControlMetric
-          icon={GitBranch}
-          label="GitHub"
-          value={
-            briefing?.github?.connected
-              ? `${briefing.githubRepositories?.repositories.length ?? 0}`
-              : "Off"
-          }
-          detail="recent repos"
+          icon={FolderTree}
+          label="Projects"
+          value={`${activeProjects.length}`}
+          detail="active projects"
         />
       </section>
     </div>
@@ -3086,7 +3263,7 @@ function TaskSnapshot({
   const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const sortedTasks = sortTasksByUrgency(openTasks).slice(0, 6);
+  const sortedTasks = sortTasksByUrgency(openTasks).slice(0, 5);
   const overdueCount = openTasks.filter((task) => isOverdue(task.due)).length;
 
   async function markTaskDone(task: RelayTask) {
@@ -3177,85 +3354,87 @@ function TaskSnapshot({
   );
 }
 
-function GithubActivityPanel({
-  briefing,
-  runPrompt,
-}: {
-  briefing: Briefing | null;
-  runPrompt: (prompt: string) => void;
-}) {
-  const issues = briefing?.githubIssues?.issues ?? [];
+function dashboardProjectCategoryPath(
+  categoryId: string | null,
+  categories: DashboardProjectCategory[],
+) {
+  if (!categoryId) return "Uncategorized";
+  const names: string[] = [];
+  const visited = new Set<string>();
+  let current = categories.find((category) => category.id === categoryId);
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    names.unshift(current.name);
+    current = current.parentId
+      ? categories.find((category) => category.id === current?.parentId)
+      : undefined;
+  }
+  return names.join(" / ") || "Uncategorized";
+}
 
+function DashboardProjectsPanel({
+  categories,
+  onOpenProject,
+  projects,
+}: {
+  categories: DashboardProjectCategory[];
+  onOpenProject: (projectId: string | null) => void;
+  projects: DashboardProject[];
+}) {
   return (
     <section className={`${panelClass} overflow-hidden`}>
       <div className="flex items-start justify-between gap-3 border-b border-separator p-4">
         <div>
-          <h2 className="text-lg font-semibold">GitHub activity</h2>
+          <h2 className="text-lg font-semibold">Active projects</h2>
           <p className="mt-1 text-sm text-muted">
-            {briefing?.github?.connected
-              ? `${issues.length} assigned issue${issues.length === 1 ? "" : "s"}`
-              : "GitHub not connected"}
+            {projects.length} project{projects.length === 1 ? "" : "s"} moving
+            now
           </p>
         </div>
         <Button
           className={secondaryButtonClass + " h-9 px-3"}
-          onClick={() => runPrompt("What should I fix first on GitHub?")}
+          onClick={() => onOpenProject(null)}
           type="button"
         >
-          Ask AI
+          View all
         </Button>
       </div>
       <div className="divide-y divide-separator">
-        {issues.slice(0, 5).map((issue) => (
-          <div key={issue.id}>
-            <div className="grid grid-cols-[1fr_auto] gap-3 p-4">
-              <Button
-                className="relay-content-row min-w-0 text-left"
-                onClick={() =>
-                  runPrompt(
-                    `Summarize GitHub issue ${issue.repositoryFullName ?? ""} #${issue.number}`,
-                  )
-                }
-                type="button"
-              >
-                <span className="block truncate text-sm font-semibold">
-                  {issue.title}
-                </span>
-                <span className="mt-1 block truncate text-xs text-muted">
-                  {issue.repositoryFullName ?? "Repository"} #{issue.number}
-                </span>
-              </Button>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`rounded-full px-2 py-1 text-[11px] font-semibold ${githubUrgencyClass(issue)}`}
-                >
-                  {githubUrgency(issue)}
-                </span>
-                <Link
-                  aria-label="Open issue"
-                  className={iconButtonClass + " h-8 w-8"}
-                  href={issue.htmlUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </div>
-          </div>
+        {projects.slice(0, 5).map((project) => (
+          <button
+            className="dashboard-project-row group relative flex w-full items-center gap-3 overflow-hidden px-4 py-3.5 text-left"
+            key={project.id}
+            onClick={() => onOpenProject(project.id)}
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-2 left-0 w-0.5 rounded-full"
+              style={{ backgroundColor: project.color }}
+            />
+            <span
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-separator bg-surface-secondary"
+              style={{ color: project.color }}
+            >
+              <FolderTree className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">
+                {project.name}
+              </span>
+              <span className="mt-1 block truncate text-xs text-muted">
+                {dashboardProjectCategoryPath(project.categoryId, categories)}
+                {project.dueDate ? ` · ${formatDueDate(project.dueDate)}` : ""}
+              </span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
+          </button>
         ))}
-        {issues.length === 0 ? (
+        {projects.length === 0 ? (
           <EmptyState
-            icon={GitBranch}
-            title={
-              briefing?.github?.connected
-                ? "No assigned issues loaded"
-                : "GitHub not connected"
-            }
-            detail={
-              briefing?.githubIssues?.reason ??
-              "Connect GitHub to see repository work."
-            }
+            detail="Create or activate a project to keep it within reach here."
+            icon={FolderTree}
+            title="No active projects"
           />
         ) : null}
       </div>
@@ -3646,11 +3825,7 @@ function RelayAssistantExtras({
       {surfaceCompletion ? (
         surfaceCompletion.link ? (
           <Marker asChild className="mt-3">
-            <a
-              href={surfaceCompletion.link}
-              rel="noreferrer"
-              target="_blank"
-            >
+            <a href={surfaceCompletion.link} rel="noreferrer" target="_blank">
               <MarkerIcon>
                 <Check />
               </MarkerIcon>
@@ -3703,7 +3878,9 @@ function RelayAssistantExtras({
 function threadMessageText(message: ThreadMessage) {
   return message.content
     .filter(
-      (part): part is Extract<(typeof message.content)[number], { type: "text" }> =>
+      (
+        part,
+      ): part is Extract<(typeof message.content)[number], { type: "text" }> =>
         part.type === "text",
     )
     .map((part) => part.text)
@@ -3888,8 +4065,7 @@ function LegacyAgentConsole({
     composer.style.height = `${Math.min(composer.scrollHeight, 160)}px`;
   }, [input]);
 
-  const showThinking =
-    loading && messages.at(-1)?.role !== "assistant";
+  const showThinking = loading && messages.at(-1)?.role !== "assistant";
   const showSuggestions = messages.length === 0 && !loading;
 
   return (
@@ -3979,9 +4155,7 @@ function LegacyAgentConsole({
                       key={`${file.filename ?? file.mediaType}-${index}`}
                       onRemove={() =>
                         setPendingFiles((current) =>
-                          current.filter(
-                            (_, fileIndex) => fileIndex !== index,
-                          ),
+                          current.filter((_, fileIndex) => fileIndex !== index),
                         )
                       }
                       size="sm"
@@ -4199,8 +4373,7 @@ function ChatMessage({
       part.type !== "source-document",
   );
   const sourceParts = message.parts.filter(
-    (part) =>
-      part.type === "source-url" || part.type === "source-document",
+    (part) => part.type === "source-url" || part.type === "source-document",
   );
   const metadata = message.metadata;
 
@@ -4343,11 +4516,7 @@ function ChatMessage({
   );
 }
 
-function ChatActivity({
-  parts,
-}: {
-  parts: Message["parts"];
-}) {
+function ChatActivity({ parts }: { parts: Message["parts"] }) {
   const visibleParts = parts.filter((part) => part.type !== "step-start");
   const running = visibleParts.some(isChatPartRunning);
   const failed = visibleParts.some(isChatPartFailed);
@@ -4423,9 +4592,7 @@ function isChatPartRunning(part: Message["parts"][number]) {
   if (part.type === "reasoning") return part.state === "streaming";
   if (part.type === "data-activity") return part.data.state === "running";
   if (part.type === "tool-routeRequest" || part.type === "dynamic-tool") {
-    return (
-      part.state === "input-streaming" || part.state === "input-available"
-    );
+    return part.state === "input-streaming" || part.state === "input-available";
   }
   return false;
 }
@@ -4438,11 +4605,7 @@ function isChatPartFailed(part: Message["parts"][number]) {
   return false;
 }
 
-function ChatPartMarker({
-  part,
-}: {
-  part: Message["parts"][number];
-}) {
+function ChatPartMarker({ part }: { part: Message["parts"][number] }) {
   if (part.type === "step-start") {
     return (
       <Marker variant="separator">
@@ -4510,7 +4673,9 @@ function ChatPartMarker({
         </MarkerIcon>
         <MarkerContent className={running ? "shimmer" : undefined}>
           {part.title ?? "Relay request router"}
-          {mode ? ` · ${mode === "provider" ? "AI provider" : "local mode"}` : ""}
+          {mode
+            ? ` · ${mode === "provider" ? "AI provider" : "local mode"}`
+            : ""}
         </MarkerContent>
       </Marker>
     );
@@ -4568,7 +4733,9 @@ function ChatPartMarker({
         <MarkerIcon>
           <FileText />
         </MarkerIcon>
-        <MarkerContent>Attached reasoning file · {part.mediaType}</MarkerContent>
+        <MarkerContent>
+          Attached reasoning file · {part.mediaType}
+        </MarkerContent>
       </Marker>
     );
   }
@@ -4603,13 +4770,7 @@ function ChatAttachment({
     <Attachment className="max-w-64" size={size} state="done">
       <AttachmentMedia variant={image ? "image" : "icon"}>
         {image ? (
-          <Image
-            alt=""
-            height={80}
-            src={file.url}
-            unoptimized
-            width={80}
-          />
+          <Image alt="" height={80} src={file.url} unoptimized width={80} />
         ) : (
           <FileText />
         )}
@@ -5198,10 +5359,7 @@ function FocusWorkspace({
                 : "Not connected"
             }
           />
-          <MiniControl
-            label="Tasks"
-            value={`${openTasks.length} open`}
-          />
+          <MiniControl label="Tasks" value={`${openTasks.length} open`} />
           <MiniControl
             label="Files"
             value={
@@ -5586,9 +5744,7 @@ function WeekCalendar({
   const now = new Date();
   const showNow = weekDays.some((day) => sameCalendarDay(day, now));
   const nowTopPercent =
-    ((now.getHours() * 60 +
-      now.getMinutes() -
-      calendarStartHour * 60) /
+    ((now.getHours() * 60 + now.getMinutes() - calendarStartHour * 60) /
       calendarMinutes) *
     100;
 
@@ -5720,8 +5876,7 @@ function CalendarEventBlock({
   const calendarMinutes = (calendarEndHour - calendarStartHour) * 60;
   const topPercent =
     ((startMinutes - calendarStartHour * 60) / calendarMinutes) * 100;
-  const heightPercent =
-    ((endMinutes - startMinutes) / calendarMinutes) * 100;
+  const heightPercent = ((endMinutes - startMinutes) / calendarMinutes) * 100;
 
   return (
     <div
@@ -6854,15 +7009,11 @@ function FileGeneratedSurface() {
           {result.files.map((file) => {
             const row = (
               <>
-                <DriveFileGlyph
-                  className="h-4 w-4 text-accent"
-                  file={file}
-                />
+                <DriveFileGlyph className="h-4 w-4 text-accent" file={file} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{file.name}</p>
                   <p className="text-xs text-muted">
-                    {driveFileType(file)} by{" "}
-                    {file.owner ?? "Unknown owner"}
+                    {driveFileType(file)} by {file.owner ?? "Unknown owner"}
                   </p>
                 </div>
                 <ExternalLink className="h-4 w-4 text-muted" />
@@ -7107,12 +7258,14 @@ function CalendarView({
 
 function TaskMasterDetailView({
   briefing,
+  initialTaskKey,
   repositories,
   repositoryAssignments,
   refreshWorkspace,
   setTaskRepository,
 }: {
   briefing: Briefing | null;
+  initialTaskKey: string | null;
   repositories: GithubRepository[];
   repositoryAssignments: TaskRepositoryAssignments;
   refreshWorkspace: () => Promise<void>;
@@ -7138,20 +7291,17 @@ function TaskMasterDetailView({
     forgetTaskArchive,
     unarchiveTask: unarchiveTaskLocally,
   } = useTaskArchive();
-  const {
-    deleteRichDescription,
-    richDescriptions,
-    setRichDescription,
-  } = useTaskRichDescriptions();
+  const { deleteRichDescription, richDescriptions, setRichDescription } =
+    useTaskRichDescriptions();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
-    googleTaskKey(tasks[0] ?? null),
+    initialTaskKey ?? googleTaskKey(tasks[0] ?? null),
   );
   const [calendarFocusRequest, setCalendarFocusRequest] = useState(0);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [layoutSizes, setLayoutSizes] = useState(readStoredTaskLayout);
-  const [activeResize, setActiveResize] = useState<
-    "rail" | "calendar" | null
-  >(null);
+  const [activeResize, setActiveResize] = useState<"rail" | "calendar" | null>(
+    null,
+  );
   const taskLayoutRef = useRef<HTMLDivElement>(null);
   const resizeStateRef = useRef<{
     axis: "rail" | "calendar";
@@ -7166,7 +7316,7 @@ function TaskMasterDetailView({
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     "all" | "pending" | "done" | "archived"
-  >("all");
+  >("pending");
   const [priorityFilter, setPriorityFilter] = useState<
     "all" | GoogleTaskPriority
   >("all");
@@ -7292,10 +7442,7 @@ function TaskMasterDetailView({
         180,
         Math.min(420, (rect?.height ?? 720) - 280),
       ),
-      maxRailWidth: Math.max(
-        240,
-        Math.min(480, (rect?.width ?? 1000) - 420),
-      ),
+      maxRailWidth: Math.max(240, Math.min(480, (rect?.width ?? 1000) - 420)),
     };
   }
 
@@ -7311,10 +7458,7 @@ function TaskMasterDetailView({
     const { maxCalendarHeight } = taskLayoutBounds();
     setLayoutSizes((current) => ({
       ...current,
-      calendarHeight: Math.min(
-        maxCalendarHeight,
-        Math.max(180, nextHeight),
-      ),
+      calendarHeight: Math.min(maxCalendarHeight, Math.max(180, nextHeight)),
     }));
   }
 
@@ -7333,8 +7477,7 @@ function TaskMasterDetailView({
       startY: event.clientY,
     };
     setActiveResize(axis);
-    document.body.style.cursor =
-      axis === "rail" ? "col-resize" : "row-resize";
+    document.body.style.cursor = axis === "rail" ? "col-resize" : "row-resize";
     document.body.style.userSelect = "none";
   }
 
@@ -7395,10 +7538,7 @@ function TaskMasterDetailView({
     const createdTaskKey = googleTaskKey(createdTask);
     if (createdTaskKey) {
       setTaskCategory(createdTaskKey, input.categoryId);
-      setTaskRepository(
-        createdTaskKey,
-        input.repositoryFullName ?? null,
-      );
+      setTaskRepository(createdTaskKey, input.repositoryFullName ?? null);
       setSelectedTaskId(createdTaskKey);
     }
   }
@@ -7745,9 +7885,8 @@ function TaskMasterDetailView({
           repositories={repositories}
           repositoryFullName={
             selectedTask
-              ? (repositoryAssignments[
-                  googleTaskKey(selectedTask) ?? ""
-                ] ?? null)
+              ? (repositoryAssignments[googleTaskKey(selectedTask) ?? ""] ??
+                null)
               : null
           }
           richDescription={
@@ -7964,8 +8103,7 @@ function TaskListCard({
 
 function TaskCategoryBadge({ categories }: { categories: TaskCategory[] }) {
   const label = categories.map((category) => category.name).join(" / ");
-  const CategoryIcon =
-    taskCategoryIconMap[categories.at(-1)?.icon ?? "folder"];
+  const CategoryIcon = taskCategoryIconMap[categories.at(-1)?.icon ?? "folder"];
 
   return (
     <span
@@ -8119,9 +8257,7 @@ function TaskDetailPanel({
         taskListId: activeTask.taskListId ?? null,
         categoryId: draftCategoryId === "none" ? null : draftCategoryId,
         repositoryFullName:
-          draftRepositoryFullName === "none"
-            ? null
-            : draftRepositoryFullName,
+          draftRepositoryFullName === "none" ? null : draftRepositoryFullName,
       });
       if (draftRichDescription) {
         setRichDescription(draftRichDescription);
@@ -8293,18 +8429,14 @@ function TaskDetailPanel({
                   <option value="none">No repository</option>
                   {repositoryFullName &&
                   !repositories.some(
-                    (repository) =>
-                      repository.fullName === repositoryFullName,
+                    (repository) => repository.fullName === repositoryFullName,
                   ) ? (
                     <option value={repositoryFullName}>
                       {repositoryFullName} (unavailable)
                     </option>
                   ) : null}
                   {repositories.map((repository) => (
-                    <option
-                      key={repository.id}
-                      value={repository.fullName}
-                    >
+                    <option key={repository.id} value={repository.fullName}>
                       {repository.fullName}
                     </option>
                   ))}
@@ -8395,9 +8527,7 @@ function TaskDetailPanel({
                   }
                   icon={CalendarDays}
                   label="Due date"
-                  onAction={
-                    task.due ? () => onShowDueDate(task) : undefined
-                  }
+                  onAction={task.due ? () => onShowDueDate(task) : undefined}
                   value={task.due ? formatDueDate(task.due) : "No due date"}
                 />
                 <TaskDetailDatum
@@ -8454,8 +8584,9 @@ function TaskMiniCalendar({
     const gridStart = addDays(firstDay, -firstDay.getDay());
     return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
   }, [visibleMonth]);
-  const dueTaskCount = tasks.filter((task) => Boolean(parseEventDate(task.due)))
-    .length;
+  const dueTaskCount = tasks.filter((task) =>
+    Boolean(parseEventDate(task.due)),
+  ).length;
 
   return (
     <section
@@ -8474,7 +8605,10 @@ function TaskMiniCalendar({
               })}
             </h3>
           </div>
-          <p aria-live="polite" className="mt-0.5 truncate text-[10px] text-muted">
+          <p
+            aria-live="polite"
+            className="mt-0.5 truncate text-[10px] text-muted"
+          >
             {selectedTask
               ? selectedDueDate
                 ? `Selected · ${selectedDueDate.toLocaleDateString(undefined, {
@@ -8592,9 +8726,7 @@ function TaskCategoryTreePicker({
   value: string;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  const selectedCategory = categories.find(
-    (category) => category.id === value,
-  );
+  const selectedCategory = categories.find((category) => category.id === value);
   const selectedPath = selectedCategory
     ? taskCategoryPath(categories, selectedCategory.id)
     : [];
@@ -8884,8 +9016,7 @@ function TaskCategoryTreeBranch({
       (candidate) => candidate.parentId === category.id,
     );
     const isLast = index === siblings.length - 1;
-    const hasChildren =
-      children.length > 0 || addingParentId === category.id;
+    const hasChildren = children.length > 0 || addingParentId === category.id;
     const CategoryIcon = taskCategoryIconMap[category.icon];
 
     return (
@@ -9097,9 +9228,7 @@ function TaskCategoryForm({
   );
 }
 
-function useDismissableDetails(ref: {
-  current: HTMLDetailsElement | null;
-}) {
+function useDismissableDetails(ref: { current: HTMLDetailsElement | null }) {
   useEffect(() => {
     function dismissOnOutsidePress(event: MouseEvent) {
       const details = ref.current;
@@ -9211,10 +9340,7 @@ function useTaskArchive() {
   const [archivedKeys, setArchivedKeys] = useState<string[]>(
     readStoredTaskArchive,
   );
-  const archivedTaskKeys = useMemo(
-    () => new Set(archivedKeys),
-    [archivedKeys],
-  );
+  const archivedTaskKeys = useMemo(() => new Set(archivedKeys), [archivedKeys]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -9278,9 +9404,7 @@ function useTaskRichDescriptions() {
 
 function useTaskRepositoryAssignments() {
   const [repositoryAssignments, setRepositoryAssignments] =
-    useState<TaskRepositoryAssignments>(
-      readStoredTaskRepositoryAssignments,
-    );
+    useState<TaskRepositoryAssignments>(readStoredTaskRepositoryAssignments);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -9365,14 +9489,13 @@ function readStoredTaskRichDescriptions() {
       return {};
     }
     return Object.fromEntries(
-      Object.entries(parsed).filter(
-        ([, value]) =>
-          Boolean(
-            value &&
-              typeof value === "object" &&
-              "type" in value &&
-              value.type === "doc",
-          ),
+      Object.entries(parsed).filter(([, value]) =>
+        Boolean(
+          value &&
+          typeof value === "object" &&
+          "type" in value &&
+          value.type === "doc",
+        ),
       ),
     ) as TaskRichDescriptions;
   } catch {
@@ -9403,9 +9526,7 @@ function readStoredTaskRepositoryAssignments(): TaskRepositoryAssignments {
   }
 }
 
-function isTaskCategoryIconName(
-  value: unknown,
-): value is TaskCategoryIconName {
+function isTaskCategoryIconName(value: unknown): value is TaskCategoryIconName {
   return (
     typeof value === "string" &&
     Object.prototype.hasOwnProperty.call(taskCategoryIconMap, value)
@@ -9415,9 +9536,7 @@ function isTaskCategoryIconName(
 function readStoredTaskCategoryAssignments() {
   if (typeof window === "undefined") return {};
   try {
-    const saved = window.localStorage.getItem(
-      taskCategoryAssignmentStorageKey,
-    );
+    const saved = window.localStorage.getItem(taskCategoryAssignmentStorageKey);
     if (!saved) return {};
     const parsed = JSON.parse(saved) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -9463,8 +9582,7 @@ function flattenTaskCategories(
 ): Array<{ category: TaskCategory; depth: number }> {
   return categories
     .filter(
-      (category) =>
-        category.parentId === parentId && !visited.has(category.id),
+      (category) => category.parentId === parentId && !visited.has(category.id),
     )
     .sort((left, right) => left.name.localeCompare(right.name))
     .flatMap((category) => {
@@ -9813,12 +9931,14 @@ function GoogleTaskCreationModal({
 
 function TasksView({
   briefing,
+  initialTaskKey,
   repositories,
   repositoryAssignments,
   refreshWorkspace,
   setTaskRepository,
 }: {
   briefing: Briefing | null;
+  initialTaskKey: string | null;
   repositories: GithubRepository[];
   repositoryAssignments: TaskRepositoryAssignments;
   refreshWorkspace: () => Promise<void>;
@@ -9830,6 +9950,7 @@ function TasksView({
   return (
     <TaskMasterDetailView
       briefing={briefing}
+      initialTaskKey={initialTaskKey}
       repositories={repositories}
       repositoryAssignments={repositoryAssignments}
       refreshWorkspace={refreshWorkspace}
@@ -9838,11 +9959,7 @@ function TasksView({
   );
 }
 
-function FilesWorkspaceView({
-  briefing,
-}: {
-  briefing: Briefing | null;
-}) {
+function FilesWorkspaceView({ briefing }: { briefing: Briefing | null }) {
   const gmailFiles = useMemo<DriveFile[]>(
     () =>
       (briefing?.gmail?.messages ?? []).flatMap((message) =>
@@ -9935,7 +10052,9 @@ function FilesWorkspaceView({
       };
       const normalizedQuery = query.trim().toLowerCase();
       const matchingGmailFiles = gmailFiles.filter((file) =>
-        `${file.name} ${file.owner ?? ""}`.toLowerCase().includes(normalizedQuery),
+        `${file.name} ${file.owner ?? ""}`
+          .toLowerCase()
+          .includes(normalizedQuery),
       );
       const nextFiles = [...(data.files ?? []), ...matchingGmailFiles];
       setSearchResults(nextFiles);
@@ -10226,9 +10345,9 @@ function FilesWorkspaceView({
                         </span>
                       </td>
                       <td className="min-w-0 px-3 py-3 align-middle">
-                      <span className="block truncate text-sm font-semibold">
-                        {file.name}
-                      </span>
+                        <span className="block truncate text-sm font-semibold">
+                          {file.name}
+                        </span>
                         <span className="mt-0.5 block truncate text-xs font-normal text-muted">
                           {file.owner ?? "Unknown owner"}
                         </span>
@@ -10237,7 +10356,7 @@ function FilesWorkspaceView({
                         <FileTypeBadge file={file} />
                       </td>
                       <td className="px-3 py-3 align-middle text-xs font-normal text-muted">
-                          {formatFileTime(file.modifiedTime)}
+                        {formatFileTime(file.modifiedTime)}
                       </td>
                     </tr>
                   ))}
@@ -10301,12 +10420,7 @@ const workspaceFileKinds: DriveFileKind[] = [
   "gmail",
 ];
 
-const storageFileKinds: DriveFileKind[] = [
-  "folder",
-  "pdf",
-  "image",
-  "drive",
-];
+const storageFileKinds: DriveFileKind[] = ["folder", "pdf", "image", "drive"];
 
 function FileSourceTree({
   files,
@@ -10415,10 +10529,7 @@ function FileSourceTreeLeaf({
     <TreeNode isLast={isLast} level={1} nodeId={kind}>
       <TreeNodeTrigger className="py-1.5">
         <TreeExpander hasChildren={false} />
-        <TreeIcon
-          hasChildren={false}
-          icon={<Glyph className="h-4 w-4" />}
-        />
+        <TreeIcon hasChildren={false} icon={<Glyph className="h-4 w-4" />} />
         <TreeLabel>{meta.label}</TreeLabel>
         <span className="text-[10px] font-semibold tabular-nums text-muted">
           {count}
@@ -10462,9 +10573,7 @@ function FilesWorkspacePreview({ file }: { file: DriveFile }) {
             <h3 className="mt-2 break-words text-base font-semibold leading-6">
               {file.name}
             </h3>
-            <p className="mt-1 text-xs leading-5 text-muted">
-              {sourceContext}
-            </p>
+            <p className="mt-1 text-xs leading-5 text-muted">{sourceContext}</p>
           </div>
         </div>
       </div>
@@ -10566,13 +10675,7 @@ function FilesWorkspacePreview({ file }: { file: DriveFile }) {
   );
 }
 
-function FileDetailMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function FileDetailMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-separator bg-surface-secondary px-3 py-2.5">
       <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-muted">
@@ -11792,16 +11895,12 @@ function RecentFilesPanel({ briefing }: { briefing: Briefing | null }) {
             const content = (
               <>
                 <span className="grid h-10 w-10 place-items-center rounded-md bg-accent-soft text-accent">
-                  <DriveFileGlyph
-                    className="h-5 w-5"
-                    file={file}
-                  />
+                  <DriveFileGlyph className="h-5 w-5" file={file} />
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{file.name}</p>
                   <p className="mt-1 text-xs text-muted">
-                    {driveFileType(file)} by{" "}
-                    {file.owner ?? "Unknown owner"}
+                    {driveFileType(file)} by {file.owner ?? "Unknown owner"}
                   </p>
                 </div>
                 <span className="text-xs text-muted">
@@ -12109,25 +12208,13 @@ function formatRemainingDueDays(value?: string | null) {
   const dateOnly = value.slice(0, 10);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly);
   const now = new Date();
-  const today = Date.UTC(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  );
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const due = match
-    ? Date.UTC(
-        Number(match[1]),
-        Number(match[2]) - 1,
-        Number(match[3]),
-      )
+    ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
     : (() => {
         const parsed = parseEventDate(value);
         return parsed
-          ? Date.UTC(
-              parsed.getFullYear(),
-              parsed.getMonth(),
-              parsed.getDate(),
-            )
+          ? Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate())
           : Number.NaN;
       })();
 
