@@ -19,11 +19,7 @@ import {
 import { CharacterCount } from "@tiptap/extension-character-count";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Placeholder } from "@tiptap/extension-placeholder";
-import {
-  EditorContent,
-  type JSONContent,
-  useEditor,
-} from "@tiptap/react";
+import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 import { cn } from "@/lib/utils";
@@ -39,30 +35,32 @@ type TaskRichTextEditorProps = {
   readOnly?: boolean;
 };
 
-const taskEditorExtensions = [
-  StarterKit.configure({
-    heading: { levels: [2, 3] },
-    link: {
-      HTMLAttributes: {
-        rel: "noopener noreferrer",
-        target: "_blank",
+function createTaskEditorExtensions(maxLength: number) {
+  return [
+    StarterKit.configure({
+      heading: { levels: [2, 3] },
+      link: {
+        HTMLAttributes: {
+          rel: "noopener noreferrer",
+          target: "_blank",
+        },
+        openOnClick: false,
       },
-      openOnClick: false,
-    },
-  }),
-  TaskList,
-  TaskItem.configure({
-    a11y: {
-      checkboxLabel: (node, checked) =>
-        `${checked ? "Uncheck" : "Check"} ${node.textContent || "task item"}`,
-    },
-    nested: true,
-  }),
-  Placeholder.configure({
-    placeholder: "Add context, links, decisions, or a checklist...",
-  }),
-  CharacterCount.configure({ limit: 5000 }),
-];
+    }),
+    TaskList,
+    TaskItem.configure({
+      a11y: {
+        checkboxLabel: (node, checked) =>
+          `${checked ? "Uncheck" : "Check"} ${node.textContent || "task item"}`,
+      },
+      nested: true,
+    }),
+    Placeholder.configure({
+      placeholder: "Add context, links, decisions, or a checklist...",
+    }),
+    CharacterCount.configure({ limit: maxLength }),
+  ];
+}
 
 export function TaskRichTextEditor({
   className,
@@ -75,7 +73,7 @@ export function TaskRichTextEditor({
   const editor = useEditor({
     content: defaultValue ?? richDocumentFromText(fallbackText),
     editable: !readOnly,
-    extensions: taskEditorExtensions,
+    extensions: createTaskEditorExtensions(maxLength),
     immediatelyRender: false,
     onUpdate: ({ editor: activeEditor }) => {
       onChange?.(

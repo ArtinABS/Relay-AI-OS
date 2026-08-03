@@ -207,6 +207,7 @@ type GoogleTaskInput = {
   taskListId: string | null;
   categoryId: string | null;
   repositoryFullName?: string | null;
+  richDescription?: TaskRichDocument | null;
 };
 
 type TaskCategoryIconName =
@@ -934,6 +935,7 @@ function AssistantOSRuntimeContent({
         aui.thread.append(prompt);
       }}
       setStage={setStage}
+      startNewChat={() => aui.threads.switchToNewThread()}
       stage={stage}
     />
   );
@@ -942,15 +944,18 @@ function AssistantOSRuntimeContent({
 function AssistantOSContent({
   appendPrompt,
   setStage,
+  startNewChat,
   stage,
 }: {
   appendPrompt?: (prompt: string) => void;
   setStage: (stage: AppStage) => void;
+  startNewChat?: () => void;
   stage: AppStage;
 }) {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authResolved, setAuthResolved] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>("dark");
-  const [activeView, setActiveView] = useState<ViewId>("chat");
+  const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [tasks, setTasks] = useState<RelayTask[]>([]);
   const [taskColumns, setTaskColumns] = useState<TaskColumn[]>([]);
   const [notes, setNotes] = useState<RelayNote[]>([]);
@@ -981,6 +986,35 @@ function AssistantOSContent({
   const openTasks = tasks.filter((task) => !task.completed);
 
   useEffect(() => {
+    const identityController = new AbortController();
+    void Promise.all([
+      fetch("/api/auth/password/status", {
+        cache: "no-store",
+        signal: identityController.signal,
+      }),
+      fetch("/api/oauth/status", {
+        cache: "no-store",
+        signal: identityController.signal,
+      }),
+    ])
+      .then(async ([passwordResponse, oauthResponse]) => {
+        const [passwordStatus, oauthStatus] = await Promise.all([
+          passwordResponse.ok
+            ? (passwordResponse.json() as Promise<PasswordAuthStatus>)
+            : null,
+          oauthResponse.ok
+            ? (oauthResponse.json() as Promise<OAuthStatus>)
+            : null,
+        ]);
+        if (identityController.signal.aborted) return;
+        if (passwordStatus) setPasswordAuth(passwordStatus);
+        if (oauthStatus) setOauthStatus(oauthStatus);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!identityController.signal.aborted) setAuthResolved(true);
+      });
+
     refreshWorkspace().catch(() => undefined);
 
     const params = new URLSearchParams(window.location.search);
@@ -1019,6 +1053,8 @@ function AssistantOSContent({
       }, 0);
       window.history.replaceState({}, "", window.location.pathname);
     }
+
+    return () => identityController.abort();
   }, [setStage]);
 
   function addToast(
@@ -1272,8 +1308,14 @@ function AssistantOSContent({
     const message = prompt.trim();
     if (!message || !appendPrompt) return;
 
+    startNewChat?.();
     setActiveView("chat");
     appendPrompt(message);
+  }
+
+  function navigateToView(view: ViewId) {
+    if (view === "chat") startNewChat?.();
+    setActiveView(view);
   }
 
   function enterAfterAuth() {
@@ -1370,6 +1412,7 @@ function AssistantOSContent({
         <AuthExperience
           {...shared}
           authMode={authMode}
+          authResolving={!authResolved}
           onPasswordSignOut={handleSignOut}
           setAuthMode={setAuthMode}
         />
@@ -1405,7 +1448,7 @@ function AssistantOSContent({
           passwordAuth={passwordAuth}
           refreshWorkspace={refreshWorkspace}
           runPrompt={runPrompt}
-          setActiveView={setActiveView}
+          setActiveView={navigateToView}
           setSidebarOpen={setSidebarOpen}
           setTheme={setTheme}
           sidebarOpen={sidebarOpen}
@@ -1422,6 +1465,7 @@ function AssistantOSContent({
 
 function AuthExperience({
   authMode,
+  authResolving,
   setAuthMode,
   setTheme,
   theme,
@@ -1435,6 +1479,7 @@ function AuthExperience({
   onPasswordSignOut,
 }: {
   authMode: AuthMode;
+  authResolving: boolean;
   setAuthMode: (mode: AuthMode) => void;
   setTheme: (theme: ThemeMode) => void;
   theme: ThemeMode;
@@ -1631,16 +1676,18 @@ function AuthExperience({
   }
 
   const isPrimaryMode = authMode === "login" || authMode === "signup";
-  const heading =
-    authMode === "signup"
+  const heading = authResolving
+    ? "Opening Relay"
+    : authMode === "signup"
       ? "Create your account"
       : authMode === "forgot"
         ? "Reset your password"
         : authMode === "verify"
           ? "Verify your email"
           : "Welcome back";
-  const description =
-    authMode === "signup"
+  const description = authResolving
+    ? "Checking this device for a secure session."
+    : authMode === "signup"
       ? "Set up your Relay workspace in a moment."
       : authMode === "forgot"
         ? "Request a code, then enter it with your new password."
@@ -1868,7 +1915,32 @@ function AuthExperience({
 
         <Card className="auth-card w-full overflow-hidden border border-[var(--line)] bg-[var(--surface-glass)] p-0 backdrop-blur-2xl">
           <Card.Content className="px-5 py-5 sm:px-6 sm:py-6">
-            {isPrimaryMode ? (
+            {authResolving ? (
+              <div
+                aria-label="Checking your Relay session"
+                aria-live="polite"
+                className="auth-session-loader"
+                role="status"
+              >
+                <span className="auth-session-loader__orbit" aria-hidden="true">
+                  <span className="auth-session-loader__core">
+                    <KeyRound className="h-5 w-5" />
+                  </span>
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">
+                    Recognizing this device
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    Verifying your existing session before showing sign-in
+                    options.
+                  </p>
+                </div>
+                <div className="auth-session-loader__track" aria-hidden="true">
+                  <span />
+                </div>
+              </div>
+            ) : isPrimaryMode ? (
               <Tabs
                 className="auth-mode-tabs"
                 onSelectionChange={(key) => {
@@ -2221,16 +2293,17 @@ function WorkspaceExperience({
           className={`workspace-main-content min-h-0 flex-1 pt-[4.75rem] lg:pt-0 ${workspaceContentClass}`}
         >
           <div
+            key={activeView}
             className={
               activeView === "chat"
-                ? "relay-page relay-page--chat h-full min-h-0 p-0"
+                ? "relay-page workspace-view-transition relay-page--chat h-full min-h-0 p-0"
                 : activeView === "calendar"
-                  ? "relay-page relay-page--calendar p-3 sm:p-4 xl:p-5"
+                  ? "relay-page workspace-view-transition relay-page--calendar p-3 sm:p-4 xl:p-5"
                   : activeView === "projects"
-                    ? "relay-page relay-page--projects p-3 sm:p-4 xl:p-5"
+                    ? "relay-page workspace-view-transition relay-page--projects p-3 sm:p-4 xl:p-5"
                     : activeView === "files"
-                      ? "relay-page relay-page--files p-3 sm:p-4 xl:p-5"
-                      : "relay-page min-h-full p-4 sm:p-6 xl:p-8"
+                      ? "relay-page workspace-view-transition relay-page--files p-3 sm:p-4 xl:p-5"
+                      : "relay-page workspace-view-transition min-h-full p-4 sm:p-6 xl:p-8"
             }
           >
             {activeView === "dashboard" ? (
@@ -3119,7 +3192,7 @@ function WeeklyCommandCalendar({
   );
 
   return (
-    <section className={`${panelClass} overflow-hidden p-5 sm:p-6`}>
+    <section className="overflow-visible">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-separator bg-surface-secondary px-3 py-1 text-xs font-semibold uppercase text-muted">
@@ -3628,45 +3701,19 @@ function InboxHighlights({
   briefing: Briefing | null;
   runPrompt: (prompt: string) => void;
 }) {
-  const messages = briefing?.gmail?.messages ?? [];
-  const drafts = briefing?.gmailDrafts?.drafts ?? [];
-  const scheduledDrafts =
-    briefing?.scheduledEmails?.map((email) => ({
-      id: email.id,
-      subject: email.email.subject,
-      to: email.email.to,
-      date: email.sendAt,
-      snippet: `Scheduled for ${formatEventTime(email.sendAt)}`,
-    })) ?? [];
-  const items = [
-    ...messages.slice(0, 5).map((message) => ({
-      id: message.id ?? message.subject,
-      kind: "Inbox",
-      title: message.subject,
-      person: message.from ?? "Unknown sender",
-      time: message.date,
-      snippet: message.snippet ?? "No preview text",
-      prompt: `Summarize this email: ${message.subject}`,
-    })),
-    ...drafts.slice(0, 3).map((draft) => ({
-      id: `draft-${draft.id ?? draft.subject}`,
-      kind: "Draft",
-      title: draft.subject,
-      person: draft.to ?? "No recipient",
-      time: draft.date,
-      snippet: draft.snippet ?? "Draft saved in Gmail.",
-      prompt: `Review my Gmail draft: ${draft.subject}`,
-    })),
-    ...scheduledDrafts.slice(0, 2).map((draft) => ({
-      id: `scheduled-${draft.id}`,
-      kind: "Scheduled",
-      title: draft.subject,
-      person: draft.to,
-      time: draft.date,
-      snippet: draft.snippet,
-      prompt: `Review my scheduled email draft: ${draft.subject}`,
-    })),
-  ];
+  const messages = [...(briefing?.gmail?.messages ?? [])].sort(
+    (left, right) =>
+      new Date(right.date ?? 0).getTime() - new Date(left.date ?? 0).getTime(),
+  );
+  const items = messages.slice(0, 5).map((message) => ({
+    id: message.id ?? message.subject,
+    kind: "Inbox",
+    title: message.subject,
+    person: message.from ?? "Unknown sender",
+    time: message.date,
+    snippet: message.snippet ?? "No preview text",
+    prompt: `Summarize this email: ${message.subject}`,
+  }));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
     items.find((item) => item.id === selectedId) ?? items[0] ?? null;
@@ -5612,6 +5659,9 @@ function CalendarWorkspace({
   const [calendarAction, setCalendarAction] = useState<CalendarAction | null>(
     null,
   );
+  const [inspectedMonthDate, setInspectedMonthDate] = useState<Date | null>(
+    null,
+  );
   const [savingEvent, setSavingEvent] = useState(false);
 
   useEffect(() => {
@@ -5742,7 +5792,19 @@ function CalendarWorkspace({
   }
 
   return (
-    <div className="calendar-workspace flex min-h-0 flex-col gap-3 animate-fade-in">
+    <div
+      className="calendar-workspace relative flex min-h-0 flex-col gap-3 animate-fade-in"
+      data-loading={loadingProjectData || undefined}
+    >
+      {loadingProjectData ? (
+        <div
+          aria-label="Refreshing calendar metadata"
+          className="calendar-sync-progress"
+          role="status"
+        >
+          <span />
+        </div>
+      ) : null}
       <section
         aria-label="Calendar controls"
         className={
@@ -5841,9 +5903,9 @@ function CalendarWorkspace({
 
       <CalendarDeadlineLegend deadlines={deadlines} />
 
-      {view !== "month" ? (
+      {view === "day" ? (
         <CalendarDeadlineRail
-          days={view === "day" ? [selectedDate] : weekDays}
+          days={[selectedDate]}
           deadlines={deadlines}
           onOpenProject={onOpenProject}
           onOpenTask={onOpenTask}
@@ -5861,9 +5923,12 @@ function CalendarWorkspace({
 
       {view === "week" ? (
         <WeekCalendar
+          deadlines={deadlines}
           events={events}
           onEventClick={openEvent}
           onEventDrop={moveEvent}
+          onOpenProject={onOpenProject}
+          onOpenTask={onOpenTask}
           onSelectDate={setSelectedDate}
           onSlotClick={openSlot}
           selectedDate={selectedDate}
@@ -5878,8 +5943,31 @@ function CalendarWorkspace({
           monthDays={monthDays}
           onOpenProject={onOpenProject}
           onOpenTask={onOpenTask}
-          onSelectDate={setSelectedDate}
+          onEventClick={openEvent}
+          onSelectDate={(date) => {
+            setSelectedDate(date);
+            setInspectedMonthDate(date);
+          }}
           selectedDate={selectedDate}
+        />
+      ) : null}
+
+      {inspectedMonthDate ? (
+        <MonthDayInspector
+          date={inspectedMonthDate}
+          deadlines={deadlines.filter((deadline) =>
+            sameCalendarDay(deadline.date, inspectedMonthDate),
+          )}
+          events={events.filter((event) =>
+            sameCalendarDay(parseEventDate(event.start), inspectedMonthDate),
+          )}
+          onClose={() => setInspectedMonthDate(null)}
+          onEventClick={(event) => {
+            setInspectedMonthDate(null);
+            openEvent(event);
+          }}
+          onOpenProject={onOpenProject}
+          onOpenTask={onOpenTask}
         />
       ) : null}
 
@@ -6039,6 +6127,7 @@ function MonthDeadlineCalendar({
   deadlines,
   events,
   monthDays,
+  onEventClick,
   onOpenProject,
   onOpenTask,
   onSelectDate,
@@ -6047,6 +6136,7 @@ function MonthDeadlineCalendar({
   deadlines: CalendarDeadline[];
   events: CalendarEvent[];
   monthDays: Date[];
+  onEventClick: (event: CalendarEvent) => void;
   onOpenProject?: (projectId: string) => void;
   onOpenTask?: (task: RelayTask) => void;
   onSelectDate: (date: Date) => void;
@@ -6111,6 +6201,12 @@ function MonthDeadlineCalendar({
                 </div>
               ) : null}
               <button
+                aria-label={`Open ${day.toLocaleDateString()} details`}
+                className="absolute inset-0 z-10 cursor-pointer rounded-md border-0 bg-transparent focus-visible:outline-2 focus-visible:outline-accent"
+                onClick={() => onSelectDate(day)}
+                type="button"
+              />
+              <button
                 className="relative z-30 flex w-full shrink-0 items-center justify-between gap-1 rounded-md text-left focus-visible:outline-2 focus-visible:outline-accent"
                 onClick={() => onSelectDate(day)}
                 type="button"
@@ -6155,6 +6251,23 @@ function MonthDeadlineCalendar({
               </button>
 
               <div className="relative z-30 mt-1.5 min-h-0 flex-1 space-y-1 overflow-y-auto">
+                {dayEvents.map((event) => (
+                  <button
+                    className="calendar-month-event flex w-full min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left"
+                    key={event.id ?? `${event.title}-${event.start}`}
+                    onClick={() => onEventClick(event)}
+                    title={`Event: ${event.title} · ${formatEventTime(event.start)}`}
+                    type="button"
+                  >
+                    <Clock className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate text-[9px] font-semibold">
+                      {event.title}
+                    </span>
+                    <span className="ml-auto shrink-0 text-[8px] opacity-75">
+                      {formatEventTime(event.start)}
+                    </span>
+                  </button>
+                ))}
                 {dayDeadlines.map((deadline) => (
                   <button
                     className="calendar-deadline-item flex w-full min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left"
@@ -6191,18 +6304,164 @@ function MonthDeadlineCalendar({
   );
 }
 
+function MonthDayInspector({
+  date,
+  deadlines,
+  events,
+  onClose,
+  onEventClick,
+  onOpenProject,
+  onOpenTask,
+}: {
+  date: Date;
+  deadlines: CalendarDeadline[];
+  events: CalendarEvent[];
+  onClose: () => void;
+  onEventClick: (event: CalendarEvent) => void;
+  onOpenProject?: (projectId: string) => void;
+  onOpenTask?: (task: RelayTask) => void;
+}) {
+  return (
+    <Modal isOpen onOpenChange={(open) => !open && onClose()}>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container placement="center" scroll="inside" size="lg">
+          <Modal.Dialog
+            className={`${panelClass} max-h-[min(760px,calc(100vh-2rem))] w-full overflow-y-auto p-5`}
+          >
+            <Modal.CloseTrigger />
+            <div className="pr-8">
+              <div className="mb-5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
+                  Day overview
+                </p>
+                <h3 className="mt-1 text-xl font-semibold">
+                  {date.toLocaleDateString(undefined, {
+                    day: "numeric",
+                    month: "long",
+                    weekday: "long",
+                    year: "numeric",
+                  })}
+                </h3>
+                <p className="mt-1 text-sm text-muted">
+                  {events.length} event{events.length === 1 ? "" : "s"} ·{" "}
+                  {deadlines.length} deadline
+                  {deadlines.length === 1 ? "" : "s"}
+                </p>
+              </div>
+
+              <section>
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-muted">
+                  <CalendarDays className="h-3.5 w-3.5 text-accent" /> Events
+                </div>
+                <div className="space-y-2">
+                  {events.map((event) => (
+                    <button
+                      className="calendar-inspector-event flex w-full items-center gap-3 rounded-xl border border-separator bg-surface-secondary p-3 text-left transition hover:border-accent"
+                      key={event.id ?? `${event.title}-${event.start}`}
+                      onClick={() => onEventClick(event)}
+                      type="button"
+                    >
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-warning-soft text-warning">
+                        <Clock className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">
+                          {event.title}
+                        </span>
+                        <span className="mt-1 block text-xs text-muted">
+                          {formatEventTime(event.start)} –{" "}
+                          {formatEventTime(event.end)}
+                        </span>
+                      </span>
+                      <Pencil className="h-3.5 w-3.5 text-muted" />
+                    </button>
+                  ))}
+                  {events.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-separator p-4 text-center text-xs text-muted">
+                      No calendar events on this day.
+                    </p>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="mt-5">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-muted">
+                  <ListTodo className="h-3.5 w-3.5 text-accent" /> Tasks and
+                  project dates
+                </div>
+                <div className="space-y-2">
+                  {deadlines.map((deadline) => (
+                    <button
+                      className="calendar-deadline-item flex w-full items-center gap-2 rounded-xl border border-separator bg-surface-secondary p-3 text-left"
+                      data-completed={deadline.completed || undefined}
+                      key={deadline.id}
+                      onClick={() => {
+                        onClose();
+                        openCalendarDeadline(
+                          deadline,
+                          onOpenProject,
+                          onOpenTask,
+                        );
+                      }}
+                      style={
+                        { "--deadline-color": deadline.color } as CSSProperties
+                      }
+                      type="button"
+                    >
+                      <span className="calendar-deadline-item__signal" />
+                      {deadline.kind === "project" ? (
+                        <Flag className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <ListTodo className="h-4 w-4 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">
+                          {deadline.title}
+                        </span>
+                        <span className="mt-1 block truncate text-xs text-muted">
+                          {deadline.kind === "project"
+                            ? "Project due"
+                            : deadline.projectName
+                              ? `Task · ${deadline.projectName}`
+                              : "Task due"}
+                        </span>
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 text-muted" />
+                    </button>
+                  ))}
+                  {deadlines.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-separator p-4 text-center text-xs text-muted">
+                      No tasks or project due dates on this day.
+                    </p>
+                  ) : null}
+                </div>
+              </section>
+            </div>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
 function WeekCalendar({
+  deadlines,
   events,
   onEventClick,
   onEventDrop,
+  onOpenProject,
+  onOpenTask,
   onSelectDate,
   onSlotClick,
   selectedDate,
   weekDays,
 }: {
+  deadlines: CalendarDeadline[];
   events: CalendarEvent[];
   onEventClick: (event: CalendarEvent) => void;
   onEventDrop: (event: CalendarEvent, targetDate: Date, hour: number) => void;
+  onOpenProject?: (projectId: string) => void;
+  onOpenTask?: (task: RelayTask) => void;
   onSelectDate: (date: Date) => void;
   onSlotClick: (date: Date, hour: number) => void;
   selectedDate: Date;
@@ -6231,32 +6490,66 @@ function WeekCalendar({
         {weekDays.map((day) => {
           const isSelected = sameCalendarDay(day, selectedDate);
           const isToday = sameCalendarDay(day, now);
+          const dayDeadlines = deadlines.filter((deadline) =>
+            sameCalendarDay(deadline.date, day),
+          );
 
           return (
-            <Button
-              className={`relay-content-card rounded-lg px-1 py-2 text-left transition hover:bg-accent-soft sm:px-2 ${
+            <div
+              className={`week-calendar-day-heading relay-content-card min-w-0 rounded-lg px-1 py-2 transition sm:px-2 ${
                 isSelected ? "bg-accent-soft text-accent" : ""
               }`}
               key={day.toISOString()}
-              onClick={() => onSelectDate(day)}
-              type="button"
             >
-              <span className="flex items-center justify-between gap-1 text-[9px] font-semibold uppercase text-muted sm:text-[10px]">
-                {day.toLocaleDateString(undefined, { weekday: "short" })}
-                {isToday ? (
-                  <span className="hidden text-[9px] text-accent md:inline">
-                    Today
-                  </span>
-                ) : null}
-              </span>
-              <span
-                className={`mt-1 grid h-7 w-7 place-items-center rounded-full text-base font-semibold sm:h-8 sm:w-8 sm:text-lg ${
-                  isToday ? "bg-accent text-accent-foreground shadow-sm" : ""
-                }`}
+              <button
+                className="w-full rounded-md text-left focus-visible:outline-2 focus-visible:outline-accent"
+                onClick={() => onSelectDate(day)}
+                type="button"
               >
-                {day.getDate()}
-              </span>
-            </Button>
+                <span className="flex items-center justify-between gap-1 text-[9px] font-semibold uppercase text-muted sm:text-[10px]">
+                  {day.toLocaleDateString(undefined, { weekday: "short" })}
+                  {isToday ? (
+                    <span className="hidden text-[9px] text-accent md:inline">
+                      Today
+                    </span>
+                  ) : null}
+                </span>
+                <span
+                  className={`mt-1 grid h-7 w-7 place-items-center rounded-full text-base font-semibold sm:h-8 sm:w-8 sm:text-lg ${
+                    isToday ? "bg-accent text-accent-foreground shadow-sm" : ""
+                  }`}
+                >
+                  {day.getDate()}
+                </span>
+              </button>
+              <div className="mt-1 max-h-20 space-y-1 overflow-y-auto">
+                {dayDeadlines.map((deadline) => (
+                  <button
+                    className="calendar-deadline-item flex w-full min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left"
+                    data-completed={deadline.completed || undefined}
+                    key={deadline.id}
+                    onClick={() =>
+                      openCalendarDeadline(deadline, onOpenProject, onOpenTask)
+                    }
+                    style={
+                      { "--deadline-color": deadline.color } as CSSProperties
+                    }
+                    title={deadline.title}
+                    type="button"
+                  >
+                    <span className="calendar-deadline-item__signal" />
+                    {deadline.kind === "project" ? (
+                      <Flag className="h-2.5 w-2.5 shrink-0" />
+                    ) : (
+                      <ListTodo className="h-2.5 w-2.5 shrink-0" />
+                    )}
+                    <span className="truncate text-[9px] font-semibold">
+                      {deadline.title}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           );
         })}
       </div>
@@ -8020,6 +8313,9 @@ function TaskMasterDetailView({
     if (createdTaskKey) {
       setTaskCategory(createdTaskKey, input.categoryId);
       setTaskRepository(createdTaskKey, input.repositoryFullName ?? null);
+      if (input.richDescription) {
+        setRichDescription(createdTaskKey, input.richDescription);
+      }
       setSelectedTaskId(createdTaskKey);
     }
   }
@@ -10231,6 +10527,8 @@ function GoogleTaskCreationModal({
 }) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [richDescription, setRichDescription] =
+    useState<TaskRichDocument | null>(null);
   const [due, setDue] = useState<DateValue | null>(null);
   const [priority, setPriority] = useState<GoogleTaskPriority>("medium");
   const [taskListId, setTaskListId] = useState(taskLists[0]?.id ?? "@default");
@@ -10250,6 +10548,7 @@ function GoogleTaskCreationModal({
         priority,
         taskListId: taskListId || "@default",
         categoryId: categoryId === "none" ? null : categoryId,
+        richDescription,
       });
       onClose();
     } catch (error) {
@@ -10299,16 +10598,18 @@ function GoogleTaskCreationModal({
                 />
               </label>
 
-              <label className="grid gap-1.5">
+              <div className="grid gap-1.5">
                 <span className="text-xs font-semibold uppercase text-muted">
-                  Notes
+                  Description
                 </span>
-                <TextArea
-                  className="min-h-28 w-full resize-y rounded-xl border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-                  onChange={(event) => setNotes(event.target.value)}
-                  value={notes}
+                <TaskRichTextEditor
+                  fallbackText={notes}
+                  onChange={(document, plainText) => {
+                    setRichDescription(document);
+                    setNotes(plainText);
+                  }}
                 />
-              </label>
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <TaskDueDatePicker onChange={setDue} value={due} />

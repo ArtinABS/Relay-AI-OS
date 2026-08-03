@@ -67,6 +67,16 @@ const localProjectTaskSchema = z.object({
   projectId: z.string().min(1),
   title: z.string().min(1),
 });
+const projectMilestoneSchema = z.object({
+  createdAt: z.string(),
+  description: z.string().max(500),
+  id: z.string().min(1),
+  projectId: z.string().min(1),
+  status: z.enum(["planned", "in-progress", "completed"]),
+  targetDate: z.string().nullable(),
+  title: z.string().min(1).max(120),
+  updatedAt: z.string(),
+});
 
 const projectRecordSchema = z.object({
   store: z.object({
@@ -79,6 +89,7 @@ const projectRecordSchema = z.object({
       .record(z.string(), z.array(z.string()))
       .optional()
       .default({}),
+    milestones: z.array(projectMilestoneSchema).optional().default([]),
   }),
   layout: z.object({
     calendarExpanded: z.boolean().optional().default(true),

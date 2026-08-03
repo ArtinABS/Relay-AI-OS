@@ -38,6 +38,7 @@ import {
   Lightbulb,
   Link2,
   Loader2,
+  Milestone,
   MoreHorizontal,
   Palette,
   Pencil,
@@ -162,6 +163,19 @@ type LocalProjectTask = {
   createdAt: string;
 };
 
+type ProjectMilestoneStatus = "planned" | "in-progress" | "completed";
+
+type ProjectMilestone = {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  targetDate: string | null;
+  status: ProjectMilestoneStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type ProjectStore = {
   projects: Project[];
   categories: ProjectCategory[];
@@ -169,6 +183,7 @@ type ProjectStore = {
   localTasks: LocalProjectTask[];
   taskAssignments: Record<string, string>;
   repositoryAssignments: Record<string, string[]>;
+  milestones: ProjectMilestone[];
 };
 
 type ProjectDraft = Pick<
@@ -182,7 +197,7 @@ type ProjectDraft = Pick<
   | "color"
 >;
 
-type ProjectTab = "overview" | "tasks" | "notes" | "repositories";
+type ProjectTab = "overview" | "roadmap" | "tasks" | "notes" | "repositories";
 
 const projectStorageKey = "relay.projects.v1";
 const projectLayoutStorageKey = "relay.project-layout.v1";
@@ -196,11 +211,21 @@ const defaultProjectLayout = {
 };
 const projectColors = [
   "#20c8e8",
+  "#14b8a6",
+  "#22c55e",
+  "#84cc16",
+  "#eab308",
   "#7c9cff",
+  "#6366f1",
   "#b18cff",
+  "#d946ef",
+  "#ec4899",
   "#4fd1a1",
   "#f0a45d",
+  "#f97316",
   "#ee7183",
+  "#ef4444",
+  "#64748b",
 ];
 const defaultCategories: ProjectCategory[] = [
   { id: "work", icon: "briefcase", name: "Work", parentId: null },
@@ -214,6 +239,7 @@ const emptyStore: ProjectStore = {
   localTasks: [],
   taskAssignments: {},
   repositoryAssignments: {},
+  milestones: [],
 };
 
 const statusMeta: Record<ProjectStatus, { label: string; className: string }> =
@@ -339,6 +365,25 @@ function safeProjectStore(value: unknown): ProjectStore {
       typeof candidate.repositoryAssignments === "object"
         ? candidate.repositoryAssignments
         : {},
+    milestones: Array.isArray(candidate.milestones)
+      ? candidate.milestones.filter(
+          (milestone): milestone is ProjectMilestone =>
+            Boolean(
+              milestone &&
+              typeof milestone.id === "string" &&
+              typeof milestone.projectId === "string" &&
+              typeof milestone.title === "string" &&
+              typeof milestone.description === "string" &&
+              (milestone.targetDate === null ||
+                typeof milestone.targetDate === "string") &&
+              ["planned", "in-progress", "completed"].includes(
+                milestone.status,
+              ) &&
+              typeof milestone.createdAt === "string" &&
+              typeof milestone.updatedAt === "string",
+            ),
+        )
+      : [],
   };
 }
 
@@ -2223,6 +2268,259 @@ function NotesPanel({
   );
 }
 
+function ProjectRoadmapPanel({
+  onStoreChange,
+  project,
+  store,
+}: {
+  onStoreChange: (update: (current: ProjectStore) => ProjectStore) => void;
+  project: Project;
+  store: ProjectStore;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [targetDate, setTargetDate] = useState("");
+  const milestones = store.milestones
+    .filter((milestone) => milestone.projectId === project.id)
+    .sort((left, right) => {
+      if (left.targetDate && right.targetDate) {
+        const dateDifference = left.targetDate.localeCompare(right.targetDate);
+        if (dateDifference) return dateDifference;
+      }
+      if (left.targetDate) return -1;
+      if (right.targetDate) return 1;
+      return left.createdAt.localeCompare(right.createdAt);
+    });
+  const completedCount = milestones.filter(
+    (milestone) => milestone.status === "completed",
+  ).length;
+  const roadmapPercent =
+    milestones.length > 0
+      ? Math.round((completedCount / milestones.length) * 100)
+      : 0;
+
+  function addMilestone(event: FormEvent) {
+    event.preventDefault();
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return;
+    const now = new Date().toISOString();
+    onStoreChange((current) => ({
+      ...current,
+      milestones: [
+        ...current.milestones,
+        {
+          createdAt: now,
+          description: description.trim(),
+          id: makeId("milestone"),
+          projectId: project.id,
+          status: "planned",
+          targetDate: targetDate || null,
+          title: trimmedTitle,
+          updatedAt: now,
+        },
+      ],
+    }));
+    setTitle("");
+    setDescription("");
+    setTargetDate("");
+    setAdding(false);
+  }
+
+  function advanceMilestone(milestone: ProjectMilestone) {
+    const status: ProjectMilestoneStatus =
+      milestone.status === "planned"
+        ? "in-progress"
+        : milestone.status === "in-progress"
+          ? "completed"
+          : "planned";
+    onStoreChange((current) => ({
+      ...current,
+      milestones: current.milestones.map((item) =>
+        item.id === milestone.id
+          ? { ...item, status, updatedAt: new Date().toISOString() }
+          : item,
+      ),
+    }));
+  }
+
+  return (
+    <div className="project-roadmap">
+      <div className="project-roadmap__header">
+        <div>
+          <div className="flex items-center gap-2">
+            <Milestone className="h-4 w-4 text-accent" />
+            <h3 className="text-sm font-semibold">Project roadmap</h3>
+          </div>
+          <p className="mt-1 text-xs text-muted">
+            Define the levels that move {project.name} forward.
+          </p>
+        </div>
+        <button
+          className="inline-flex h-9 items-center gap-2 rounded-xl bg-accent px-3 text-xs font-semibold text-accent-foreground transition hover:bg-accent-hover"
+          onClick={() => setAdding((current) => !current)}
+          type="button"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add milestone
+        </button>
+      </div>
+
+      <div className="project-roadmap__progress">
+        <div className="flex items-center justify-between text-[11px] font-semibold">
+          <span>{completedCount} levels completed</span>
+          <span className="text-accent">{roadmapPercent}%</span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-default">
+          <div
+            className="h-full rounded-full transition-[width] duration-300"
+            style={{
+              backgroundColor: project.color,
+              width: `${roadmapPercent}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      {adding ? (
+        <form className="project-roadmap__composer" onSubmit={addMilestone}>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px]">
+            <label className="grid gap-1.5 text-xs font-semibold text-muted">
+              Milestone
+              <input
+                autoFocus
+                className="h-10 rounded-xl border border-separator bg-field-background px-3 text-sm text-foreground outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft"
+                maxLength={120}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="e.g. Private beta"
+                required
+                value={title}
+              />
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold text-muted">
+              Target date
+              <input
+                className="h-10 rounded-xl border border-separator bg-field-background px-3 text-sm text-foreground outline-none focus:border-accent"
+                onChange={(event) => setTargetDate(event.target.value)}
+                type="date"
+                value={targetDate}
+              />
+            </label>
+          </div>
+          <label className="mt-3 grid gap-1.5 text-xs font-semibold text-muted">
+            What changes at this level?
+            <textarea
+              className="min-h-20 resize-y rounded-xl border border-separator bg-field-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
+              maxLength={500}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Define the outcome or exit criteria."
+              value={description}
+            />
+          </label>
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              className="h-9 rounded-xl px-3 text-xs font-semibold text-muted hover:bg-surface-secondary"
+              onClick={() => setAdding(false)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="h-9 rounded-xl bg-accent px-3 text-xs font-semibold text-accent-foreground"
+              type="submit"
+            >
+              Add to roadmap
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {milestones.length > 0 ? (
+        <ol className="project-roadmap__timeline">
+          {milestones.map((milestone, index) => {
+            const actionLabel =
+              milestone.status === "planned"
+                ? "Start"
+                : milestone.status === "in-progress"
+                  ? "Complete"
+                  : "Reopen";
+            return (
+              <li
+                className="project-roadmap__level"
+                data-status={milestone.status}
+                key={milestone.id}
+                style={{ "--milestone-color": project.color } as CSSProperties}
+              >
+                <span className="project-roadmap__node">
+                  {milestone.status === "completed" ? (
+                    <Check className="h-3.5 w-3.5" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+                <div className="project-roadmap__card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                        Level {index + 1} · {milestone.status.replace("-", " ")}
+                      </p>
+                      <h4 className="mt-1 text-sm font-semibold">
+                        {milestone.title}
+                      </h4>
+                      {milestone.description ? (
+                        <p className="mt-1.5 text-xs leading-5 text-muted">
+                          {milestone.description}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-[10px] font-medium text-muted">
+                      {milestone.targetDate
+                        ? formatProjectDate(milestone.targetDate)
+                        : "No target"}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      className="h-8 rounded-lg bg-accent-soft px-3 text-[11px] font-semibold text-accent transition hover:bg-accent-soft-hover"
+                      onClick={() => advanceMilestone(milestone)}
+                      type="button"
+                    >
+                      {actionLabel}
+                    </button>
+                    <button
+                      aria-label={`Delete ${milestone.title}`}
+                      className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-danger-soft hover:text-danger"
+                      onClick={() =>
+                        onStoreChange((current) => ({
+                          ...current,
+                          milestones: current.milestones.filter(
+                            (item) => item.id !== milestone.id,
+                          ),
+                        }))
+                      }
+                      type="button"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <div className="project-roadmap__empty">
+          <Milestone className="h-5 w-5 text-accent" />
+          <p className="mt-2 text-sm font-semibold">No milestones yet</p>
+          <p className="mt-1 text-xs text-muted">
+            Add the next meaningful level, not every small task.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function readStoredProjectLayout() {
   if (typeof window === "undefined") return defaultProjectLayout;
   try {
@@ -2488,6 +2786,36 @@ function ProjectMiniCalendar({
         })}
       </div>
     </section>
+  );
+}
+
+function ProjectsWorkspaceSkeleton() {
+  return (
+    <div
+      aria-label="Loading projects and account metadata"
+      aria-live="polite"
+      className="projects-workspace project-workspace-loading flex min-h-full flex-col gap-4 md:h-full md:min-h-0"
+      role="status"
+    >
+      <div className="relay-panel h-20 shrink-0 animate-pulse rounded-2xl border border-separator bg-surface" />
+      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[210px_270px_minmax(0,1fr)]">
+        <div className="relay-panel animate-pulse rounded-2xl border border-separator bg-surface" />
+        <div className="relay-panel animate-pulse rounded-2xl border border-separator bg-surface" />
+        <div className="relay-panel overflow-hidden rounded-2xl border border-separator bg-surface p-5">
+          <div className="h-10 w-48 animate-pulse rounded-xl bg-surface-secondary" />
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {[0, 1, 2].map((item) => (
+              <div
+                className="h-28 animate-pulse rounded-xl bg-surface-secondary"
+                key={item}
+              />
+            ))}
+          </div>
+          <div className="mt-5 h-48 animate-pulse rounded-xl bg-surface-secondary" />
+        </div>
+      </div>
+      <span className="sr-only">Loading projects</span>
+    </div>
   );
 }
 
@@ -2856,6 +3184,8 @@ export function ProjectsWorkspace({
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
   }
+
+  if (!hydrated) return <ProjectsWorkspaceSkeleton />;
 
   const totalActive = store.projects.filter(
     (project) => !project.archived && project.status === "active",
@@ -3288,6 +3618,9 @@ export function ProjectsWorkspace({
               );
               const projectRepositories =
                 store.repositoryAssignments[selectedProject.id] ?? [];
+              const projectMilestones = store.milestones.filter(
+                (milestone) => milestone.projectId === selectedProject.id,
+              );
               const projectLocalTasks = store.localTasks.filter(
                 (task) => task.projectId === selectedProject.id,
               );
@@ -3445,6 +3778,13 @@ export function ProjectsWorkspace({
                         >
                           <Tabs.Tab id="overview">
                             Overview
+                            <Tabs.Indicator />
+                          </Tabs.Tab>
+                          <Tabs.Tab id="roadmap">
+                            Roadmap
+                            <span className="project-tab-badge">
+                              {projectMilestones.length}
+                            </span>
                             <Tabs.Indicator />
                           </Tabs.Tab>
                           <Tabs.Tab id="tasks">
@@ -3632,6 +3972,16 @@ export function ProjectsWorkspace({
                       </Tabs.Panel>
                       <Tabs.Panel
                         className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
+                        id="roadmap"
+                      >
+                        <ProjectRoadmapPanel
+                          onStoreChange={updateStore}
+                          project={selectedProject}
+                          store={store}
+                        />
+                      </Tabs.Panel>
+                      <Tabs.Panel
+                        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
                         id="tasks"
                       >
                         <TaskPanel
@@ -3759,6 +4109,9 @@ export function ProjectsWorkspace({
                     ),
                     localTasks: current.localTasks.filter(
                       (task) => task.projectId !== id,
+                    ),
+                    milestones: current.milestones.filter(
+                      (milestone) => milestone.projectId !== id,
                     ),
                     taskAssignments: Object.fromEntries(
                       Object.entries(current.taskAssignments).filter(

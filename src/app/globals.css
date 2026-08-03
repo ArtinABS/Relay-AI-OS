@@ -522,6 +522,60 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   letter-spacing: 0.01em;
 }
 
+.auth-session-loader {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  min-height: 17.5rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.auth-session-loader__orbit {
+  animation: auth-orbit 1.6s linear infinite;
+  background: conic-gradient(
+    from 40deg,
+    transparent 0 18%,
+    color-mix(in oklab, var(--accent) 82%, white) 48%,
+    transparent 72% 100%
+  );
+  border-radius: 999px;
+  display: grid;
+  height: 4.75rem;
+  padding: 2px;
+  place-items: center;
+  width: 4.75rem;
+}
+
+.auth-session-loader__core {
+  animation: auth-orbit 1.6s linear infinite reverse;
+  background: color-mix(in oklab, var(--surface) 94%, var(--accent) 6%);
+  border-radius: inherit;
+  color: var(--accent);
+  display: grid;
+  height: 100%;
+  place-items: center;
+  width: 100%;
+}
+
+.auth-session-loader__track {
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  border-radius: 999px;
+  height: 3px;
+  overflow: hidden;
+  width: min(12rem, 100%);
+}
+
+.auth-session-loader__track span {
+  animation: auth-session-scan 1.25s ease-in-out infinite;
+  background: var(--accent);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  width: 42%;
+}
+
 .soft-aurora {
   inset: 0;
   overflow: hidden;
@@ -1264,6 +1318,10 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   min-height: 100%;
 }
 
+.relay-product-shell .workspace-view-transition {
+  animation: workspace-view-enter 260ms cubic-bezier(0.2, 0.72, 0.2, 1) both;
+}
+
 .relay-product-shell .relay-page--chat {
   max-width: none;
 }
@@ -1309,6 +1367,129 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 .relay-product-shell .project-list-card:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
+}
+
+.relay-product-shell .project-workspace-loading {
+  animation: fade-in 180ms ease-out both;
+}
+
+.relay-product-shell .project-roadmap {
+  margin-inline: auto;
+  max-width: 56rem;
+}
+
+.relay-product-shell .project-roadmap__header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.relay-product-shell .project-roadmap__progress,
+.relay-product-shell .project-roadmap__composer {
+  background: var(--surface-secondary);
+  border: 1px solid var(--separator);
+  border-radius: 0.875rem;
+  margin-top: 1rem;
+  padding: 0.875rem;
+}
+
+.relay-product-shell .project-roadmap__composer {
+  animation: surface-pop 180ms ease-out both;
+}
+
+.relay-product-shell .project-roadmap__timeline {
+  list-style: none;
+  margin-top: 1.25rem;
+  padding: 0;
+}
+
+.relay-product-shell .project-roadmap__level {
+  display: grid;
+  gap: 0.875rem;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  min-height: 7rem;
+  position: relative;
+}
+
+.relay-product-shell .project-roadmap__level:not(:last-child)::before {
+  background: linear-gradient(
+    var(--milestone-color, var(--accent)),
+    color-mix(
+      in oklab,
+      var(--milestone-color, var(--accent)) 20%,
+      var(--separator)
+    )
+  );
+  content: "";
+  left: 0.96rem;
+  position: absolute;
+  top: 2rem;
+  bottom: -0.1rem;
+  width: 2px;
+}
+
+.relay-product-shell .project-roadmap__node {
+  align-items: center;
+  background: color-mix(
+    in oklab,
+    var(--milestone-color, var(--accent)) 14%,
+    var(--surface)
+  );
+  border: 1px solid
+    color-mix(in oklab, var(--milestone-color, var(--accent)) 55%, transparent);
+  border-radius: 999px;
+  color: var(--milestone-color, var(--accent));
+  display: flex;
+  font-size: 0.7rem;
+  font-weight: 800;
+  height: 2rem;
+  justify-content: center;
+  position: relative;
+  width: 2rem;
+  z-index: 1;
+}
+
+.relay-product-shell
+  .project-roadmap__level[data-status="completed"]
+  .project-roadmap__node {
+  background: var(--milestone-color, var(--accent));
+  color: #061820;
+}
+
+.relay-product-shell .project-roadmap__card {
+  background: color-mix(in oklab, var(--surface-secondary) 82%, transparent);
+  border: 1px solid var(--separator);
+  border-radius: 0.875rem;
+  margin-bottom: 0.875rem;
+  padding: 0.875rem;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.relay-product-shell
+  .project-roadmap__level[data-status="in-progress"]
+  .project-roadmap__card {
+  border-color: color-mix(
+    in oklab,
+    var(--milestone-color, var(--accent)) 52%,
+    var(--separator)
+  );
+  box-shadow: inset 3px 0 0 var(--milestone-color, var(--accent));
+}
+
+.relay-product-shell .project-roadmap__card:hover {
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+
+.relay-product-shell .project-roadmap__empty {
+  border: 1px dashed var(--separator);
+  border-radius: 0.875rem;
+  margin-top: 1.25rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
 }
 
 .relay-product-shell
@@ -1488,6 +1669,54 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   flex: 0 0 auto;
   height: 0.35rem;
   width: 0.35rem;
+}
+
+.relay-product-shell .calendar-month-event {
+  background: color-mix(in oklab, var(--warning) 12%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--warning) 28%, transparent);
+  box-shadow: inset 2px 0 0 var(--warning);
+  color: color-mix(in oklab, var(--warning) 78%, var(--foreground));
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.relay-product-shell .calendar-sync-progress {
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  border-radius: 999px;
+  height: 2px;
+  left: 0.75rem;
+  overflow: hidden;
+  position: absolute;
+  right: 0.75rem;
+  top: -0.35rem;
+  z-index: 30;
+}
+
+.relay-product-shell .calendar-sync-progress span {
+  animation: calendar-sync-scan 1.1s ease-in-out infinite;
+  background: var(--accent);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  width: 34%;
+}
+
+.relay-product-shell .calendar-month-event:hover {
+  background: color-mix(in oklab, var(--warning) 19%, var(--surface));
+  border-color: color-mix(in oklab, var(--warning) 52%, transparent);
+  transform: translateX(1px);
+}
+
+.relay-product-shell .week-calendar-day-heading {
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.relay-product-shell .calendar-inspector-event {
+  animation: fade-in 180ms ease-out both;
 }
 
 .relay-product-shell .month-interval-highlight {
@@ -1897,6 +2126,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   .ProseMirror
   li[data-type="taskItem"]
   > label {
+  cursor: pointer;
   margin-top: 0.17rem;
 }
 
@@ -1907,6 +2137,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   > label
   input {
   accent-color: var(--accent);
+  cursor: pointer;
   height: 0.95rem;
   width: 0.95rem;
 }
@@ -1918,6 +2149,16 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   > div {
   flex: 1;
   min-width: 0;
+}
+
+.relay-product-shell
+  .task-rich-text
+  .ProseMirror
+  li[data-type="taskItem"][data-checked="true"]
+  > div {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, var(--accent) 54%, transparent);
 }
 
 .relay-product-shell
@@ -2814,6 +3055,48 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes auth-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes auth-session-scan {
+  0% {
+    transform: translateX(-115%);
+  }
+
+  52%,
+  100% {
+    transform: translateX(240%);
+  }
+}
+
+@keyframes calendar-sync-scan {
+  0% {
+    transform: translateX(-105%);
+  }
+
+  58%,
+  100% {
+    transform: translateX(310%);
+  }
+}
+
+@keyframes workspace-view-enter {
+  from {
+    filter: blur(2px);
+    opacity: 0;
+    transform: translateY(8px) scale(0.997);
+  }
+
+  to {
+    filter: blur(0);
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
