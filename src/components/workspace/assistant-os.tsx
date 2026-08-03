@@ -5650,7 +5650,7 @@ function CalendarWorkspace({
   tasks: RelayTask[];
 }) {
   const events = briefing?.calendar.events ?? [];
-  const [view, setView] = useState<"day" | "week" | "month">("week");
+  const [view, setView] = useState<"day" | "week" | "month">("month");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [projectData, setProjectData] = useState<CalendarProjectData>(
     emptyCalendarProjectData,
@@ -12737,7 +12737,7 @@ function BrandMark() {
         <p className="brand-wordmark text-base font-semibold leading-5">
           Relay
         </p>
-        <p className="text-xs text-muted">Personal AI Assistant</p>
+        <p className="text-xs text-muted">Personal Workspace</p>
       </div>
     </div>
   );

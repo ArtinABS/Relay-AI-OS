@@ -1373,6 +1373,150 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   animation: fade-in 180ms ease-out both;
 }
 
+.relay-product-shell .project-milestone-summary {
+  background: color-mix(in oklab, var(--surface-secondary) 62%, transparent);
+  border: 1px solid var(--separator);
+  border-radius: 0.875rem;
+  min-width: 0;
+  overflow: hidden;
+  padding: 1rem;
+}
+
+.relay-product-shell .project-milestone-summary__viewport {
+  margin-top: 1rem;
+  overflow-x: auto;
+  padding: 0.15rem 0.1rem 0.35rem;
+  scrollbar-width: thin;
+}
+
+.relay-product-shell .project-milestone-summary__track {
+  display: grid;
+  grid-auto-columns: minmax(8rem, 1fr);
+  grid-auto-flow: column;
+  list-style: none;
+  margin: 0;
+  min-width: 100%;
+  padding: 0;
+  position: relative;
+}
+
+.relay-product-shell .project-milestone-summary__track::before,
+.relay-product-shell .project-milestone-summary__track::after {
+  border-radius: 999px;
+  content: "";
+  height: 2px;
+  left: 4rem;
+  position: absolute;
+  top: 0.92rem;
+}
+
+.relay-product-shell .project-milestone-summary__track::before {
+  background: var(--separator);
+  right: 4rem;
+}
+
+.relay-product-shell .project-milestone-summary__track::after {
+  background: var(--milestone-color, var(--accent));
+  box-shadow: 0 0 12px
+    color-mix(in oklab, var(--milestone-color, var(--accent)) 35%, transparent);
+  max-width: calc(100% - 8rem);
+  width: var(--milestone-progress, 0%);
+}
+
+.relay-product-shell .project-milestone-summary__step {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+  text-align: center;
+  z-index: 1;
+}
+
+.relay-product-shell .project-milestone-summary__node {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.62rem;
+  font-weight: 800;
+  height: 1.9rem;
+  justify-content: center;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+  width: 1.9rem;
+}
+
+.relay-product-shell
+  .project-milestone-summary__step[data-status="completed"]
+  .project-milestone-summary__node {
+  background: var(--milestone-color, var(--accent));
+  border-color: var(--milestone-color, var(--accent));
+  color: #061820;
+}
+
+.relay-product-shell
+  .project-milestone-summary__step[data-status="in-progress"]
+  .project-milestone-summary__node {
+  border-color: var(--milestone-color, var(--accent));
+  box-shadow: 0 0 0 4px
+    color-mix(in oklab, var(--milestone-color, var(--accent)) 14%, transparent);
+  color: var(--milestone-color, var(--accent));
+}
+
+.relay-product-shell .project-milestone-summary__label {
+  margin-top: 0.65rem;
+  max-width: 8.5rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.relay-product-shell .project-milestone-summary__empty {
+  align-items: center;
+  background: transparent;
+  border: 1px dashed var(--separator);
+  border-radius: 0.75rem;
+  display: flex;
+  gap: 0;
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+  width: 100%;
+}
+
+.relay-product-shell .project-milestone-summary__empty:hover {
+  background: var(--accent-soft);
+  border-color: color-mix(in oklab, var(--accent) 42%, var(--separator));
+}
+
+.relay-product-shell .project-milestone-summary__empty > span:not(:last-child) {
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  height: 0.75rem;
+  margin-right: 2rem;
+  position: relative;
+  width: 0.75rem;
+}
+
+.relay-product-shell
+  .project-milestone-summary__empty
+  > span:not(:last-child, :nth-last-child(2))::after {
+  background: var(--separator);
+  content: "";
+  height: 1px;
+  left: 0.72rem;
+  position: absolute;
+  top: 0.32rem;
+  width: 2.05rem;
+}
+
 .relay-product-shell .project-roadmap {
   margin-inline: auto;
   max-width: 56rem;
@@ -2706,6 +2850,123 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   transform: translateY(-0.28rem);
 }
 
+.relay-product-shell .github-overview-hero {
+  align-items: center;
+  background: linear-gradient(
+    120deg,
+    color-mix(in oklab, var(--accent) 11%, var(--surface-secondary)),
+    var(--surface-secondary) 62%
+  );
+  border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--separator));
+  border-radius: 0.875rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  min-height: 7rem;
+  overflow: hidden;
+  padding: 1rem;
+  position: relative;
+}
+
+.relay-product-shell .github-overview-pulse {
+  align-items: center;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in oklab, var(--accent) 38%, var(--separator));
+  border-radius: 1rem;
+  color: var(--accent);
+  display: flex;
+  flex: 0 0 auto;
+  height: 3rem;
+  justify-content: center;
+  position: relative;
+  width: 3rem;
+}
+
+.relay-product-shell .github-overview-pulse::after {
+  animation: github-pulse-ring 2.4s ease-out infinite;
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+  border-radius: inherit;
+  content: "";
+  inset: -1px;
+  position: absolute;
+}
+
+.relay-product-shell .github-overview-stat {
+  align-items: center;
+  background: var(--surface-secondary);
+  border: 1px solid var(--separator);
+  border-radius: 0.75rem;
+  display: flex;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.relay-product-shell .github-commit-filters {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.relay-product-shell .github-filter-field {
+  min-width: 0;
+  position: relative;
+}
+
+.relay-product-shell .github-filter-field > span {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.58rem;
+  font-weight: 750;
+  gap: 0.3rem;
+  left: 0.65rem;
+  pointer-events: none;
+  position: absolute;
+  text-transform: uppercase;
+  top: 0.35rem;
+  z-index: 1;
+}
+
+.relay-product-shell .github-filter-field select {
+  appearance: none;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%)
+      calc(100% - 0.9rem) 1.25rem / 0.3rem 0.3rem no-repeat,
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%)
+      calc(100% - 0.6rem) 1.25rem / 0.3rem 0.3rem no-repeat,
+    var(--field-background);
+  border: 1px solid var(--separator);
+  border-radius: 0.7rem;
+  color: var(--foreground);
+  font-size: 0.72rem;
+  font-weight: 650;
+  height: 3rem;
+  outline: none;
+  overflow: hidden;
+  padding: 1.05rem 1.7rem 0.15rem 0.65rem;
+  text-overflow: ellipsis;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+  width: 100%;
+}
+
+.relay-product-shell .github-filter-field select:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.relay-product-shell .github-filter-field select:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.relay-product-shell .github-filter-field option {
+  background: var(--surface);
+  color: var(--foreground);
+}
+
 .relay-product-shell
   .github-tabs-list-container
   .tabs__tab[aria-selected="true"]
@@ -3083,6 +3344,18 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   58%,
   100% {
     transform: translateX(310%);
+  }
+}
+
+@keyframes github-pulse-ring {
+  0% {
+    opacity: 0.72;
+    transform: scale(0.9);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
   }
 }
 

@@ -1,6 +1,6 @@
 # Daily Work Agent Copilot
 
-This project is a production-oriented personal AI assistant workspace.
+This project is a production-oriented Personal Workspace.
 
 ## Installed Stack
 

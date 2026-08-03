@@ -106,6 +106,14 @@ type GithubCommitResponse = {
   };
 };
 
+type GithubBranchResponse = {
+  name: string;
+  protected?: boolean;
+  commit?: {
+    sha?: string;
+  };
+};
+
 export type GithubRepository = {
   id: number;
   name: string;
@@ -190,6 +198,12 @@ export type GithubCommit = {
     changes: number;
     htmlUrl?: string | null;
   }>;
+};
+
+export type GithubBranch = {
+  name: string;
+  protected: boolean;
+  sha?: string | null;
 };
 
 function toRepository(repo: GithubRepoResponse): GithubRepository {
@@ -375,6 +389,33 @@ export async function listGithubRepositoryCommits(
   return {
     ok: true,
     commits: detailedCommits,
+  };
+}
+
+export async function listGithubRepositoryBranches(
+  tokens: DirectGithubTokens,
+  owner: string,
+  repo: string,
+) {
+  const branches = await githubApi<GithubBranchResponse[]>(
+    tokens,
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches?${new URLSearchParams(
+      {
+        per_page: "100",
+      },
+    )}`,
+  );
+
+  return {
+    ok: true,
+    branches: branches.map(
+      (branch) =>
+        ({
+          name: branch.name,
+          protected: Boolean(branch.protected),
+          sha: branch.commit?.sha ?? null,
+        }) satisfies GithubBranch,
+    ),
   };
 }
 

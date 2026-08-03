@@ -1,6 +1,6 @@
 # Relay AI Assistant
 
-Relay is an enterprise-style personal AI assistant workspace built with Next.js 16, React 19, Tailwind CSS, CopilotKit, Google Workspace OAuth, and local no-key tools.
+Relay is an enterprise-style Personal Workspace built with Next.js 16, React 19, Tailwind CSS, CopilotKit, Google Workspace OAuth, and local no-key tools.
 
 The app includes:
 

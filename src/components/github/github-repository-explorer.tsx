@@ -2,6 +2,7 @@
 
 import { Button, ScrollShadow, Tabs } from "@heroui/react";
 import {
+  Activity,
   Atom,
   BookOpenText,
   Braces,
@@ -18,6 +19,7 @@ import {
   FolderTree,
   GitBranch,
   GitCommitHorizontal,
+  GitFork,
   GitPullRequest,
   ListTodo,
   LockKeyhole,
@@ -121,7 +123,13 @@ type GithubPullRequest = {
   baseRef?: string | null;
 };
 
-type GithubPanelTab = "directory" | "commits" | "pullRequests";
+type GithubBranch = {
+  name: string;
+  protected: boolean;
+  sha?: string | null;
+};
+
+type GithubPanelTab = "overview" | "directory" | "commits" | "pullRequests";
 
 const panelClass =
   "relay-panel min-w-0 rounded-2xl border border-separator bg-surface shadow-surface transition duration-200 ease-out";
@@ -411,7 +419,13 @@ export function GithubRepositoryExplorer({
   const [treeError, setTreeError] = useState<string | null>(null);
   const [treeTruncated, setTreeTruncated] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<GithubPanelTab>("directory");
+  const [activeTab, setActiveTab] = useState<GithubPanelTab>("overview");
+  const [branches, setBranches] = useState<GithubBranch[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [branchError, setBranchError] = useState<string | null>(null);
+  const [branchFilter, setBranchFilter] = useState(
+    repositories[0]?.defaultBranch ?? "",
+  );
   const [commits, setCommits] = useState<GithubCommit[]>([]);
   const [loadingCommits, setLoadingCommits] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
@@ -427,7 +441,8 @@ export function GithubRepositoryExplorer({
     repositories[0] ??
     null;
   const selectedRepoFullName = selectedRepo?.fullName ?? "";
-  const branch = selectedRepo?.defaultBranch ?? "main";
+  const defaultBranch = selectedRepo?.defaultBranch ?? "main";
+  const branch = branchFilter || defaultBranch;
   const tree = useMemo(
     () => (selectedRepo ? buildGithubTree(entries) : []),
     [entries, selectedRepo],
@@ -472,16 +487,92 @@ export function GithubRepositoryExplorer({
           ),
     [commits, contributorFilter],
   );
+  const contributorActivity = useMemo(() => {
+    const counts = new Map<string, { count: number; name: string }>();
+    commits.forEach((commit) => {
+      const id = commit.author.login ?? commit.author.name;
+      const current = counts.get(id);
+      counts.set(id, {
+        count: (current?.count ?? 0) + 1,
+        name: commit.author.login ?? commit.author.name,
+      });
+    });
+    return Array.from(counts.entries())
+      .map(([id, value]) => ({ id, ...value }))
+      .sort((left, right) => right.count - left.count);
+  }, [commits]);
 
   function selectRepository(fullName: string) {
+    const nextRepository = repositories.find(
+      (repository) => repository.fullName === fullName,
+    );
     setSelectedRepoName(fullName);
     setEntries([]);
     setCommits([]);
     setPullRequests([]);
+    setBranches([]);
+    setSelectedPath(null);
+    setBranchFilter(nextRepository?.defaultBranch ?? "main");
+    setContributorFilter("all");
+    setExpandedCommitSha(null);
+  }
+
+  function selectBranch(nextBranch: string) {
+    setBranchFilter(nextBranch);
+    setEntries([]);
+    setCommits([]);
     setSelectedPath(null);
     setContributorFilter("all");
     setExpandedCommitSha(null);
   }
+
+  useEffect(() => {
+    if (!selectedRepoFullName) return;
+
+    const controller = new AbortController();
+    const [owner, repo] = selectedRepoFullName.split("/");
+
+    async function loadBranches() {
+      setLoadingBranches(true);
+      setBranchError(null);
+
+      try {
+        const response = await fetch(
+          `/api/github/branches?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`,
+          { signal: controller.signal },
+        );
+        const data = (await response.json()) as {
+          branches?: GithubBranch[];
+          ok?: boolean;
+          reason?: string;
+        };
+
+        if (!response.ok || !data.ok) {
+          throw new Error(data.reason ?? "Unable to load branches.");
+        }
+        const nextBranches = data.branches ?? [];
+        setBranches(nextBranches);
+        setBranchFilter((current) =>
+          nextBranches.some((item) => item.name === current)
+            ? current
+            : (nextBranches.find((item) => item.name === defaultBranch)?.name ??
+              nextBranches[0]?.name ??
+              defaultBranch),
+        );
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setBranches([]);
+        setBranchError(
+          error instanceof Error ? error.message : "Unable to load branches.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setLoadingBranches(false);
+      }
+    }
+
+    void loadBranches();
+    return () => controller.abort();
+  }, [defaultBranch, selectedRepoFullName]);
 
   useEffect(() => {
     if (!selectedRepoFullName || activeTab !== "directory") return;
@@ -530,7 +621,11 @@ export function GithubRepositoryExplorer({
   }, [activeTab, branch, selectedRepoFullName]);
 
   useEffect(() => {
-    if (!selectedRepoFullName || activeTab !== "commits") return;
+    if (
+      !selectedRepoFullName ||
+      (activeTab !== "commits" && activeTab !== "overview")
+    )
+      return;
 
     const controller = new AbortController();
     const [owner, repo] = selectedRepoFullName.split("/");
@@ -572,7 +667,11 @@ export function GithubRepositoryExplorer({
   }, [activeTab, branch, selectedRepoFullName]);
 
   useEffect(() => {
-    if (!selectedRepoFullName || activeTab !== "pullRequests") return;
+    if (
+      !selectedRepoFullName ||
+      (activeTab !== "pullRequests" && activeTab !== "overview")
+    )
+      return;
 
     const controller = new AbortController();
     const [owner, repo] = selectedRepoFullName.split("/");
@@ -751,6 +850,11 @@ export function GithubRepositoryExplorer({
               aria-label="Repository sections"
               className={githubTabsListClassName}
             >
+              <Tabs.Tab id="overview">
+                <Activity className="h-3.5 w-3.5" />
+                Overview
+                <Tabs.Indicator />
+              </Tabs.Tab>
               <Tabs.Tab id="directory">
                 <FolderTree className="h-3.5 w-3.5" />
                 Directory
@@ -773,6 +877,147 @@ export function GithubRepositoryExplorer({
               </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
+
+          <Tabs.Panel className="min-h-0 flex-1 overflow-hidden" id="overview">
+            {selectedRepo ? (
+              <ScrollShadow
+                className="h-full p-4"
+                hideScrollBar={false}
+                offset={8}
+                size={56}
+              >
+                <div className="github-overview space-y-4">
+                  <section className="github-overview-hero">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">
+                        Repository pulse
+                      </p>
+                      <h3 className="mt-1 text-base font-semibold">
+                        {commits[0]
+                          ? commitTitle(commits[0].message)
+                          : loadingCommits
+                            ? "Reading the latest changes"
+                            : "No recent commit loaded"}
+                      </h3>
+                      <p className="mt-1 text-xs text-muted">
+                        {commits[0]
+                          ? `${commits[0].author.login ?? commits[0].author.name} · ${relativeTime(commits[0].authoredAt)} on ${branch}`
+                          : (commitError ?? `Tracking activity on ${branch}.`)}
+                      </p>
+                    </div>
+                    <span className="github-overview-pulse" aria-hidden="true">
+                      <Activity className="h-5 w-5" />
+                    </span>
+                  </section>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="github-overview-stat">
+                      <GitBranch className="h-4 w-4 text-accent" />
+                      <div>
+                        <p className="text-lg font-semibold tabular-nums">
+                          {loadingBranches ? "—" : Math.max(branches.length, 1)}
+                        </p>
+                        <p className="text-[10px] text-muted">
+                          {branchError ? "Default branch loaded" : "Branches"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="github-overview-stat">
+                      <GitPullRequest className="h-4 w-4 text-violet-500" />
+                      <div>
+                        <p className="text-lg font-semibold tabular-nums">
+                          {loadingPullRequests ? "—" : pullRequests.length}
+                        </p>
+                        <p className="text-[10px] text-muted">
+                          Open pull requests
+                        </p>
+                      </div>
+                    </div>
+                    <div className="github-overview-stat">
+                      <UserRound className="h-4 w-4 text-emerald-500" />
+                      <div>
+                        <p className="text-lg font-semibold tabular-nums">
+                          {loadingCommits ? "—" : contributors.length}
+                        </p>
+                        <p className="text-[10px] text-muted">
+                          Recent contributors
+                        </p>
+                      </div>
+                    </div>
+                    <div className="github-overview-stat">
+                      <ListTodo className="h-4 w-4 text-amber-500" />
+                      <div>
+                        <p className="text-lg font-semibold tabular-nums">
+                          {
+                            linkedTasks.filter(
+                              (task) => task.status !== "completed",
+                            ).length
+                          }
+                        </p>
+                        <p className="text-[10px] text-muted">
+                          Open linked tasks
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <section className="rounded-xl border border-separator bg-surface-secondary/55 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-xs font-semibold">
+                          Contributor activity
+                        </h3>
+                        <p className="mt-0.5 text-[10px] text-muted">
+                          Share of the latest {commits.length} commits on{" "}
+                          {branch}
+                        </p>
+                      </div>
+                      <GitFork className="h-4 w-4 text-muted" />
+                    </div>
+                    <div className="mt-3 space-y-2.5">
+                      {contributorActivity.slice(0, 4).map((contributor) => (
+                        <div key={contributor.id}>
+                          <div className="flex items-center justify-between gap-3 text-[11px]">
+                            <span className="truncate font-semibold">
+                              {contributor.name}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-muted">
+                              {contributor.count}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1 overflow-hidden rounded-full bg-default">
+                            <div
+                              className="h-full rounded-full bg-accent"
+                              style={{
+                                width: `${Math.max(
+                                  8,
+                                  (contributor.count /
+                                    Math.max(commits.length, 1)) *
+                                    100,
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      {!loadingCommits && contributorActivity.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-separator px-3 py-5 text-center text-xs text-muted">
+                          Contributor activity will appear after the first
+                          commit.
+                        </p>
+                      ) : null}
+                    </div>
+                  </section>
+                </div>
+              </ScrollShadow>
+            ) : (
+              <EmptyPanel
+                detail="Choose a repository from the rail to see its delivery pulse."
+                icon={<Activity className="h-5 w-5" />}
+                title="Select a repository"
+              />
+            )}
+          </Tabs.Panel>
 
           <Tabs.Panel className="min-h-0 flex-1 overflow-hidden" id="directory">
             <div className="flex h-full min-h-0 flex-col">
@@ -866,30 +1111,51 @@ export function GithubRepositoryExplorer({
 
           <Tabs.Panel className="min-h-0 flex-1 overflow-hidden" id="commits">
             <div className="flex h-full min-h-0 flex-col">
-              {contributors.length > 0 ? (
-                <div className="shrink-0 border-b border-separator px-3 py-2.5">
-                  <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <UserRound className="h-3.5 w-3.5 shrink-0 text-muted" />
-                    <button
-                      aria-pressed={contributorFilter === "all"}
-                      className="github-contributor-filter"
-                      onClick={() => setContributorFilter("all")}
-                      type="button"
+              {selectedRepo ? (
+                <div className="github-commit-filters shrink-0 border-b border-separator px-3 py-2.5">
+                  <label className="github-filter-field">
+                    <span>
+                      <GitBranch className="h-3.5 w-3.5" />
+                      Branch
+                    </span>
+                    <select
+                      aria-label="Filter commits by branch"
+                      disabled={loadingBranches}
+                      onChange={(event) => selectBranch(event.target.value)}
+                      value={branch}
                     >
-                      Everyone
-                    </button>
-                    {contributors.map((contributor) => (
-                      <button
-                        aria-pressed={contributorFilter === contributor.id}
-                        className="github-contributor-filter"
-                        key={contributor.id}
-                        onClick={() => setContributorFilter(contributor.id)}
-                        type="button"
-                      >
-                        {contributor.login ?? contributor.name}
-                      </button>
-                    ))}
-                  </div>
+                      {!branches.some((item) => item.name === branch) ? (
+                        <option value={branch}>{branch}</option>
+                      ) : null}
+                      {branches.map((item) => (
+                        <option key={item.name} value={item.name}>
+                          {item.name}
+                          {item.protected ? " · protected" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="github-filter-field">
+                    <span>
+                      <UserRound className="h-3.5 w-3.5" />
+                      Contributor
+                    </span>
+                    <select
+                      aria-label="Filter commits by contributor"
+                      disabled={loadingCommits || contributors.length === 0}
+                      onChange={(event) =>
+                        setContributorFilter(event.target.value)
+                      }
+                      value={contributorFilter}
+                    >
+                      <option value="all">Everyone</option>
+                      {contributors.map((contributor) => (
+                        <option key={contributor.id} value={contributor.id}>
+                          {contributor.login ?? contributor.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
               ) : null}
 

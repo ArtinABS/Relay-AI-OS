@@ -2268,6 +2268,116 @@ function NotesPanel({
   );
 }
 
+function ProjectMilestoneSummary({
+  milestones,
+  onOpenRoadmap,
+  project,
+}: {
+  milestones: ProjectMilestone[];
+  onOpenRoadmap: () => void;
+  project: Project;
+}) {
+  const orderedMilestones = [...milestones].sort((left, right) => {
+    if (left.targetDate && right.targetDate) {
+      const difference = left.targetDate.localeCompare(right.targetDate);
+      if (difference) return difference;
+    }
+    if (left.targetDate) return -1;
+    if (right.targetDate) return 1;
+    return left.createdAt.localeCompare(right.createdAt);
+  });
+  const completed = orderedMilestones.filter(
+    (milestone) => milestone.status === "completed",
+  ).length;
+  const inProgress = orderedMilestones.filter(
+    (milestone) => milestone.status === "in-progress",
+  ).length;
+  const timelineProgress = orderedMilestones.length
+    ? Math.min(
+        100,
+        ((completed + inProgress * 0.5) / orderedMilestones.length) * 100,
+      )
+    : 0;
+
+  return (
+    <section className="project-milestone-summary">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Milestone className="h-4 w-4 text-accent" />
+            <h3 className="text-sm font-semibold">Milestone summary</h3>
+          </div>
+          <p className="mt-1 text-[11px] text-muted">
+            {orderedMilestones.length
+              ? `${completed} of ${orderedMilestones.length} levels reached`
+              : "Map the levels that move this project forward"}
+          </p>
+        </div>
+        <button
+          className="shrink-0 text-xs font-semibold text-accent hover:underline"
+          onClick={onOpenRoadmap}
+          type="button"
+        >
+          {orderedMilestones.length ? "Open roadmap" : "Build roadmap"}
+        </button>
+      </div>
+
+      {orderedMilestones.length ? (
+        <div className="project-milestone-summary__viewport">
+          <ol
+            className="project-milestone-summary__track"
+            style={
+              {
+                "--milestone-color": project.color,
+                "--milestone-progress": `${timelineProgress}%`,
+              } as CSSProperties
+            }
+          >
+            {orderedMilestones.map((milestone, index) => (
+              <li
+                className="project-milestone-summary__step"
+                data-status={milestone.status}
+                key={milestone.id}
+              >
+                <span className="project-milestone-summary__node">
+                  {milestone.status === "completed" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+                <div className="project-milestone-summary__label">
+                  <p className="truncate text-xs font-semibold">
+                    {milestone.title}
+                  </p>
+                  <p className="mt-0.5 truncate text-[9px] capitalize text-muted">
+                    {milestone.targetDate
+                      ? formatProjectDate(milestone.targetDate)
+                      : milestone.status.replace("-", " ")}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : (
+        <button
+          className="project-milestone-summary__empty"
+          onClick={onOpenRoadmap}
+          type="button"
+        >
+          <span />
+          <span />
+          <span />
+          <span className="text-[10px] font-semibold text-muted">
+            Add the first milestone
+          </span>
+        </button>
+      )}
+    </section>
+  );
+}
+
 function ProjectRoadmapPanel({
   onStoreChange,
   project,
@@ -3865,6 +3975,11 @@ export function ProjectsWorkspace({
                               </p>
                             </div>
                           </div>
+                          <ProjectMilestoneSummary
+                            milestones={projectMilestones}
+                            onOpenRoadmap={() => setTab("roadmap")}
+                            project={selectedProject}
+                          />
                           <div className="grid gap-4 xl:grid-cols-2">
                             <section className="rounded-xl border border-separator p-4">
                               <div className="flex items-center justify-between">

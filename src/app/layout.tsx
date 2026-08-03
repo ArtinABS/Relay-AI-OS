@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   applicationName: "Relay",
-  title: "Relay — Personal AI Assistant",
+  title: "Relay — Personal Workspace",
   description:
-    "An enterprise-grade personal AI assistant for chat, scheduling, files, memory, and workspace automation.",
+    "An enterprise-grade personal workspace for chat, scheduling, files, memory, and workspace automation.",
 };
 
 export default function RootLayout({
