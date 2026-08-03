@@ -449,8 +449,51 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--line));
   border-radius: 0.85rem;
   display: flex;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.auth-saved-account[data-session-ready="true"] {
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface) 65%);
+  border-color: color-mix(in oklab, var(--accent) 36%, var(--line));
+  box-shadow: inset 3px 0 0 color-mix(in oklab, var(--accent) 72%, transparent);
+}
+
+.auth-saved-account__continue {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.65rem;
+  color: var(--text);
+  display: flex;
+  flex: 1 1 auto;
   gap: 0.75rem;
-  padding: 0.55rem 0.6rem;
+  min-width: 0;
+  padding: 0.25rem 0.35rem;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.auth-saved-account__continue:not(:disabled) {
+  cursor: pointer;
+}
+
+.auth-saved-account__continue:not(:disabled):hover {
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+
+.auth-saved-account__continue:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.auth-saved-account__continue:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .auth-saved-account__avatar {
@@ -462,9 +505,21 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   display: inline-flex;
   font-size: 0.78rem;
   font-weight: 750;
+  flex: 0 0 auto;
   height: 2rem;
   justify-content: center;
   width: 2rem;
+}
+
+.auth-saved-account__ready {
+  align-items: center;
+  color: var(--accent);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  letter-spacing: 0.01em;
 }
 
 .soft-aurora {

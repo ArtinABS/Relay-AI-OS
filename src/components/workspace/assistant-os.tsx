@@ -1370,6 +1370,7 @@ function AssistantOSContent({
         <AuthExperience
           {...shared}
           authMode={authMode}
+          onPasswordSignOut={handleSignOut}
           setAuthMode={setAuthMode}
         />
       ) : null}
@@ -1431,6 +1432,7 @@ function AuthExperience({
   connectGoogle,
   enterAfterAuth,
   onPasswordAuthenticated,
+  onPasswordSignOut,
 }: {
   authMode: AuthMode;
   setAuthMode: (mode: AuthMode) => void;
@@ -1443,6 +1445,7 @@ function AuthExperience({
   connectGoogle: () => void;
   enterAfterAuth: () => void;
   onPasswordAuthenticated: (detail?: string) => Promise<void>;
+  onPasswordSignOut: () => Promise<void>;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [remember, setRemember] = useState(true);
@@ -1466,6 +1469,47 @@ function AuthExperience({
 
     return () => window.clearTimeout(hydrationTimer);
   }, []);
+
+  const authenticatedEmail = signedInWithPassword
+    ? (passwordAuth?.user?.email.trim() ?? "")
+    : "";
+  const recognizedEmail = authenticatedEmail || rememberedEmail;
+  const hasActivePasswordSession = Boolean(authenticatedEmail);
+
+  async function continueWithRecognizedAccount() {
+    if (!hasActivePasswordSession || submitting) return;
+    setSubmitting(true);
+    setAuthNotice(null);
+    try {
+      await onPasswordAuthenticated(`Continued as ${authenticatedEmail}.`);
+    } catch (error) {
+      setAuthNotice(
+        error instanceof Error
+          ? error.message
+          : "Your session could not be opened.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function changeRecognizedAccount() {
+    if (submitting) return;
+    setSubmitting(true);
+    setAuthNotice(null);
+    try {
+      if (hasActivePasswordSession) await onPasswordSignOut();
+      window.localStorage.removeItem("relay:remembered-email");
+      setRememberedEmail("");
+      setEmail("");
+    } catch (error) {
+      setAuthNotice(
+        error instanceof Error ? error.message : "Unable to change account.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function submit(
     event: FormEvent<HTMLFormElement>,
@@ -1602,7 +1646,9 @@ function AuthExperience({
         ? "Request a code, then enter it with your new password."
         : authMode === "verify"
           ? "Enter the code created for your account."
-          : "Sign in to continue to your personal workspace.";
+          : hasActivePasswordSession
+            ? "Your verified session is ready. Continue to your workspace."
+            : "Sign in to continue to your personal workspace.";
 
   const renderAuthContent = (mode: AuthMode) => (
     <>
@@ -1617,27 +1663,44 @@ function AuthExperience({
           />
         ) : null}
 
-        {mode === "login" && rememberedEmail ? (
-          <div className="auth-saved-account">
-            <input name="email" type="hidden" value={rememberedEmail} />
-            <span className="auth-saved-account__avatar" aria-hidden="true">
-              {rememberedEmail.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[11px] font-medium text-muted">
-                Continue as
+        {mode === "login" && recognizedEmail ? (
+          <div
+            className="auth-saved-account"
+            data-session-ready={hasActivePasswordSession || undefined}
+          >
+            <input name="email" type="hidden" value={recognizedEmail} />
+            <button
+              className="auth-saved-account__continue"
+              disabled={!hasActivePasswordSession || submitting}
+              onClick={() => void continueWithRecognizedAccount()}
+              type="button"
+            >
+              <span className="auth-saved-account__avatar" aria-hidden="true">
+                {recognizedEmail.slice(0, 1).toUpperCase()}
               </span>
-              <span className="block truncate text-sm font-semibold">
-                {rememberedEmail}
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block text-[11px] font-medium text-muted">
+                  {hasActivePasswordSession ? "Continue as" : "Saved email"}
+                </span>
+                <span className="block truncate text-sm font-semibold">
+                  {recognizedEmail}
+                </span>
               </span>
-            </span>
+              {hasActivePasswordSession ? (
+                <span className="auth-saved-account__ready">
+                  <span className="hidden sm:inline">Session ready</span>
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
+                </span>
+              ) : null}
+            </button>
             <Button
               className="h-8 px-2 text-xs"
-              onPress={() => {
-                window.localStorage.removeItem("relay:remembered-email");
-                setRememberedEmail("");
-                setEmail("");
-              }}
+              isDisabled={submitting}
+              onPress={() => void changeRecognizedAccount()}
               size="sm"
               variant="ghost"
             >
@@ -1666,7 +1729,9 @@ function AuthExperience({
           />
         ) : null}
 
-        {mode === "login" || mode === "signup" || mode === "forgot" ? (
+        {(mode === "login" && !hasActivePasswordSession) ||
+        mode === "signup" ||
+        mode === "forgot" ? (
           <Field
             autoComplete={
               mode === "login" ? "current-password" : "new-password"
@@ -1678,7 +1743,7 @@ function AuthExperience({
           />
         ) : null}
 
-        {mode === "login" ? (
+        {mode === "login" && !hasActivePasswordSession ? (
           <div className="flex items-center justify-between gap-4 text-sm">
             <Checkbox isSelected={remember} onChange={setRemember}>
               <Checkbox.Content className="text-[var(--muted)]">
@@ -1702,20 +1767,22 @@ function AuthExperience({
           </div>
         ) : null}
 
-        <Button
-          className="auth-primary-action"
-          fullWidth
-          isDisabled={submitting}
-          type="submit"
-          variant="primary"
-        >
-          {submitting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <LogIn className="h-4 w-4" />
-          )}
-          {authActionLabel(mode)}
-        </Button>
+        {mode !== "login" || !hasActivePasswordSession ? (
+          <Button
+            className="auth-primary-action"
+            fullWidth
+            isDisabled={submitting}
+            type="submit"
+            variant="primary"
+          >
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <LogIn className="h-4 w-4" />
+            )}
+            {authActionLabel(mode)}
+          </Button>
+        ) : null}
 
         {authNotice ? (
           <p className="rounded-xl border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-sm font-medium text-[var(--warning)]">
@@ -1728,11 +1795,6 @@ function AuthExperience({
             <span className="font-mono font-semibold text-[var(--text)]">
               {devCode}
             </span>
-          </p>
-        ) : null}
-        {signedInWithPassword ? (
-          <p className="rounded-xl border border-[var(--success)] bg-[var(--success-soft)] px-3 py-2 text-sm font-medium text-[var(--success)]">
-            Signed in as {passwordAuth?.user?.email ?? "email user"}.
           </p>
         ) : null}
       </form>
