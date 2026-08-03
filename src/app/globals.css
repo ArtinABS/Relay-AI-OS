@@ -1377,6 +1377,115 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   min-height: 0;
 }
 
+.relay-product-shell .calendar-deadline-item {
+  background: color-mix(
+    in oklab,
+    var(--deadline-color, var(--accent)) 9%,
+    transparent
+  );
+  border: 1px solid
+    color-mix(in oklab, var(--deadline-color, var(--accent)) 22%, transparent);
+  color: color-mix(
+    in oklab,
+    var(--deadline-color, var(--accent)) 72%,
+    var(--foreground)
+  );
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.relay-product-shell .calendar-deadline-item:hover {
+  background: color-mix(
+    in oklab,
+    var(--deadline-color, var(--accent)) 16%,
+    var(--surface)
+  );
+  border-color: color-mix(
+    in oklab,
+    var(--deadline-color, var(--accent)) 45%,
+    var(--separator)
+  );
+  transform: translateY(-1px);
+}
+
+.relay-product-shell .calendar-deadline-item:focus-visible {
+  outline: 2px solid var(--deadline-color, var(--focus));
+  outline-offset: 1px;
+}
+
+.relay-product-shell .calendar-deadline-item[data-completed="true"] {
+  opacity: 0.56;
+}
+
+.relay-product-shell
+  .calendar-deadline-item[data-completed="true"]
+  > span:last-child {
+  text-decoration: line-through;
+}
+
+.relay-product-shell .calendar-deadline-item__signal {
+  background: var(--deadline-color, var(--accent));
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px
+    color-mix(in oklab, var(--deadline-color, var(--accent)) 14%, transparent);
+  flex: 0 0 auto;
+  height: 0.35rem;
+  width: 0.35rem;
+}
+
+.relay-product-shell .month-interval-highlight {
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--interval-color) 11%, transparent),
+      transparent 58%
+    ),
+    color-mix(in oklab, var(--interval-color) 3%, transparent);
+  border: 1px solid color-mix(in oklab, var(--interval-color) 24%, transparent);
+  border-radius: calc(0.42rem - var(--interval-depth, 0) * 0.025rem);
+  box-shadow: inset 3px 0 0
+    color-mix(in oklab, var(--interval-color) 54%, transparent);
+  inset: calc(2px + var(--interval-depth, 0) * 3px);
+  position: absolute;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.relay-product-shell .month-deadline-day:hover .month-interval-highlight {
+  border-color: color-mix(in oklab, var(--interval-color) 38%, transparent);
+}
+
+.relay-product-shell .month-interval-swatches {
+  align-items: center;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.relay-product-shell .month-interval-swatch {
+  border: 1px solid color-mix(in oklab, white 38%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--surface) 72%, transparent);
+  height: 0.36rem;
+  width: 0.36rem;
+}
+
+@media (max-width: 767px) {
+  .relay-product-shell .calendar-deadline-rail-grid[data-days="7"] {
+    min-width: 44rem;
+  }
+
+  .relay-product-shell .month-deadline-grid {
+    min-width: 43rem;
+  }
+
+  .relay-product-shell .month-deadline-weekdays {
+    min-width: 43rem;
+  }
+}
+
 .relay-product-shell .relay-chat-viewport {
   scrollbar-gutter: stable;
 }

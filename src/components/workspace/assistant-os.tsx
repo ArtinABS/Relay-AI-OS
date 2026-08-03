@@ -98,6 +98,7 @@ import {
   Database,
   ExternalLink,
   Filter,
+  Flag,
   FileSpreadsheet,
   FileText,
   FolderTree,
@@ -2204,7 +2205,18 @@ function WorkspaceExperience({
             {activeView === "calendar" ? (
               <CalendarView
                 briefing={briefing}
+                onOpenProject={(projectId) => {
+                  setRequestedProjectId(projectId);
+                  setActiveView("projects");
+                }}
+                onOpenTask={(task) => {
+                  setRequestedTaskKey(
+                    `${task.taskListId ?? task.columnId ?? "@default"}:${task.id}`,
+                  );
+                  setActiveView("tasks");
+                }}
                 refreshWorkspace={refreshWorkspace}
+                tasks={tasks}
               />
             ) : null}
 
@@ -2778,6 +2790,111 @@ function safeDashboardProjectData(value: unknown): DashboardProjectData {
       )
     : [];
   return { categories, projects };
+}
+
+type CalendarLocalProjectTask = {
+  completed: boolean;
+  dueDate: string | null;
+  id: string;
+  projectId: string;
+  title: string;
+};
+
+type CalendarProjectData = {
+  localTasks: CalendarLocalProjectTask[];
+  projects: DashboardProject[];
+  taskAssignments: Record<string, string>;
+};
+
+type CalendarDeadline = {
+  color: string;
+  completed: boolean;
+  date: Date;
+  id: string;
+  kind: "project" | "task";
+  projectId: string | null;
+  projectName: string | null;
+  sourceTask: RelayTask | null;
+  title: string;
+};
+
+type MonthIntervalHighlight = {
+  color: string;
+  id: string;
+  projectName: string;
+  taskTitles: string[];
+};
+
+const emptyCalendarProjectData: CalendarProjectData = {
+  localTasks: [],
+  projects: [],
+  taskAssignments: {},
+};
+
+function safeCalendarProjectData(value: unknown): CalendarProjectData {
+  const dashboardData = safeDashboardProjectData(value);
+  if (!value || typeof value !== "object") {
+    return { ...emptyCalendarProjectData, projects: dashboardData.projects };
+  }
+  const store = value as {
+    localTasks?: unknown;
+    taskAssignments?: unknown;
+  };
+  const localTasks = Array.isArray(store.localTasks)
+    ? store.localTasks.filter((task): task is CalendarLocalProjectTask => {
+        if (!task || typeof task !== "object") return false;
+        const candidate = task as Partial<CalendarLocalProjectTask>;
+        return (
+          typeof candidate.id === "string" &&
+          typeof candidate.projectId === "string" &&
+          typeof candidate.title === "string" &&
+          typeof candidate.completed === "boolean" &&
+          (candidate.dueDate === null || typeof candidate.dueDate === "string")
+        );
+      })
+    : [];
+  const taskAssignments =
+    store.taskAssignments && typeof store.taskAssignments === "object"
+      ? Object.fromEntries(
+          Object.entries(store.taskAssignments).filter(
+            (entry): entry is [string, string] => typeof entry[1] === "string",
+          ),
+        )
+      : {};
+
+  return {
+    localTasks,
+    projects: dashboardData.projects,
+    taskAssignments,
+  };
+}
+
+async function readCalendarProjectData(signal?: AbortSignal) {
+  let localData = emptyCalendarProjectData;
+  try {
+    const saved = window.localStorage.getItem("relay.projects.v1");
+    if (saved) localData = safeCalendarProjectData(JSON.parse(saved));
+  } catch {
+    // Ignore malformed local project data and continue with account sync.
+  }
+
+  try {
+    const response = await fetch("/api/projects", {
+      cache: "no-store",
+      signal,
+    });
+    const data = (await response.json()) as {
+      account?: unknown;
+      record?: { store?: unknown } | null;
+    };
+    return response.ok && data.account && data.record?.store
+      ? safeCalendarProjectData(data.record.store)
+      : localData;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    console.warn("Project deadlines are unavailable from account sync.", error);
+    return localData;
+  }
 }
 
 function DashboardView({
@@ -5245,6 +5362,7 @@ function ContextWorkspace({
           <CalendarWorkspace
             briefing={briefing}
             refreshWorkspace={refreshWorkspace}
+            tasks={tasks}
           />
         ) : null}
         {mode === "tasks" ? (
@@ -5411,18 +5529,46 @@ function FocusWorkspace({
 
 function CalendarWorkspace({
   briefing,
+  onOpenProject,
+  onOpenTask,
   refreshWorkspace,
+  tasks,
 }: {
   briefing: Briefing | null;
+  onOpenProject?: (projectId: string) => void;
+  onOpenTask?: (task: RelayTask) => void;
   refreshWorkspace: () => Promise<void>;
+  tasks: RelayTask[];
 }) {
   const events = briefing?.calendar.events ?? [];
   const [view, setView] = useState<"day" | "week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [projectData, setProjectData] = useState<CalendarProjectData>(
+    emptyCalendarProjectData,
+  );
+  const [loadingProjectData, setLoadingProjectData] = useState(true);
   const [calendarAction, setCalendarAction] = useState<CalendarAction | null>(
     null,
   );
   const [savingEvent, setSavingEvent] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void readCalendarProjectData(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) setProjectData(data);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingProjectData(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const deadlines = useMemo(
+    () => buildCalendarDeadlines(projectData, tasks),
+    [projectData, tasks],
+  );
   const dayEvents = events.filter((event) =>
     sameCalendarDay(parseEventDate(event.start), selectedDate),
   );
@@ -5430,7 +5576,20 @@ function CalendarWorkspace({
   const weekDays = Array.from({ length: 7 }, (_, index) =>
     addDays(weekStart, index),
   );
-  const monthDays = getMonthGrid(selectedDate);
+  const monthDays = useMemo(() => getMonthGrid(selectedDate), [selectedDate]);
+
+  async function refreshCalendar() {
+    setLoadingProjectData(true);
+    try {
+      const [, nextProjectData] = await Promise.all([
+        refreshWorkspace(),
+        readCalendarProjectData(),
+      ]);
+      setProjectData(nextProjectData);
+    } finally {
+      setLoadingProjectData(false);
+    }
+  }
 
   function openSlot(date: Date, hour: number) {
     const start = new Date(date);
@@ -5555,9 +5714,9 @@ function CalendarWorkspace({
               })}
             </span>
             <span className="block truncate text-xs text-muted">
-              {briefing?.calendar.ok
-                ? "Google Calendar"
-                : (briefing?.calendar.reason ?? "Calendar not connected")}
+              {loadingProjectData
+                ? "Loading task and project deadlines"
+                : `${briefing?.calendar.ok ? "Google Calendar" : "Local calendar"} · ${deadlines.length} deadlines`}
             </span>
           </Button>
           <Button
@@ -5599,7 +5758,7 @@ function CalendarWorkspace({
           <Button
             aria-label="Refresh calendar"
             className={iconButtonClass}
-            onClick={() => void refreshWorkspace()}
+            onClick={() => void refreshCalendar()}
             type="button"
             title="Refresh calendar"
           >
@@ -5617,6 +5776,17 @@ function CalendarWorkspace({
           </Button>
         </div>
       </section>
+
+      <CalendarDeadlineLegend deadlines={deadlines} />
+
+      {view !== "month" ? (
+        <CalendarDeadlineRail
+          days={view === "day" ? [selectedDate] : weekDays}
+          deadlines={deadlines}
+          onOpenProject={onOpenProject}
+          onOpenTask={onOpenTask}
+        />
+      ) : null}
 
       {view === "day" ? (
         <DayCalendar
@@ -5640,70 +5810,15 @@ function CalendarWorkspace({
       ) : null}
 
       {view === "month" ? (
-        <section
-          className={
-            softPanelClass + " flex min-h-0 flex-1 flex-col overflow-hidden p-3"
-          }
-        >
-          <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase text-muted">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-1">
-            {monthDays.map((day) => {
-              const dayCount = events.filter((event) =>
-                sameCalendarDay(parseEventDate(event.start), day),
-              ).length;
-              const currentMonth = day.getMonth() === selectedDate.getMonth();
-              const isSelected = sameCalendarDay(day, selectedDate);
-              const isToday = sameCalendarDay(day, new Date());
-              return (
-                <Button
-                  className={`relay-content-card min-h-0 rounded-md border p-2 text-left transition hover:border-[var(--accent)] hover:bg-accent-soft ${
-                    isSelected
-                      ? "border-[var(--accent)] bg-accent-soft"
-                      : "border-separator bg-surface"
-                  } ${currentMonth ? "" : "opacity-45"}`}
-                  key={day.toISOString()}
-                  onClick={() => setSelectedDate(day)}
-                  style={{ height: "100%" }}
-                  type="button"
-                >
-                  <span className="flex items-center justify-between gap-1">
-                    <span
-                      className={`grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${
-                        isToday
-                          ? "bg-accent text-accent-foreground shadow-sm"
-                          : ""
-                      }`}
-                    >
-                      {day.getDate()}
-                    </span>
-                    {isToday ? (
-                      <span className="text-[9px] font-semibold uppercase tracking-wide text-accent">
-                        Today
-                      </span>
-                    ) : null}
-                  </span>
-                  {dayCount > 0 ? (
-                    <span className="mt-2 flex gap-1">
-                      {Array.from(
-                        { length: Math.min(3, dayCount) },
-                        (_, index) => (
-                          <span
-                            className="h-1.5 w-1.5 rounded-full bg-accent"
-                            key={index}
-                          />
-                        ),
-                      )}
-                    </span>
-                  ) : null}
-                </Button>
-              );
-            })}
-          </div>
-        </section>
+        <MonthDeadlineCalendar
+          deadlines={deadlines}
+          events={events}
+          monthDays={monthDays}
+          onOpenProject={onOpenProject}
+          onOpenTask={onOpenTask}
+          onSelectDate={setSelectedDate}
+          selectedDate={selectedDate}
+        />
       ) : null}
 
       {calendarAction ? (
@@ -5716,6 +5831,301 @@ function CalendarWorkspace({
         />
       ) : null}
     </div>
+  );
+}
+
+function openCalendarDeadline(
+  deadline: CalendarDeadline,
+  onOpenProject?: (projectId: string) => void,
+  onOpenTask?: (task: RelayTask) => void,
+) {
+  if (deadline.kind === "project" && deadline.projectId && onOpenProject) {
+    onOpenProject(deadline.projectId);
+    return;
+  }
+  if (deadline.sourceTask && onOpenTask) {
+    onOpenTask(deadline.sourceTask);
+    return;
+  }
+  if (deadline.projectId && onOpenProject) onOpenProject(deadline.projectId);
+}
+
+function CalendarDeadlineLegend({
+  deadlines,
+}: {
+  deadlines: CalendarDeadline[];
+}) {
+  const taskCount = deadlines.filter(
+    (deadline) => deadline.kind === "task",
+  ).length;
+  const projectCount = deadlines.filter(
+    (deadline) => deadline.kind === "project",
+  ).length;
+
+  return (
+    <section
+      aria-label="Calendar deadline legend"
+      className="calendar-deadline-legend flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[10px] font-semibold text-muted"
+    >
+      <span className="inline-flex items-center gap-1.5">
+        <ListTodo className="h-3.5 w-3.5 text-accent" />
+        {taskCount} task {taskCount === 1 ? "deadline" : "deadlines"}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Flag className="h-3.5 w-3.5 text-accent" />
+        {projectCount} project {projectCount === 1 ? "deadline" : "deadlines"}
+      </span>
+      <span className="hidden items-center gap-1.5 sm:inline-flex">
+        <span className="h-3 w-5 rounded border border-accent/30 bg-accent-soft" />
+        Month highlights show each open task-to-project due interval
+      </span>
+    </section>
+  );
+}
+
+function CalendarDeadlineRail({
+  days,
+  deadlines,
+  onOpenProject,
+  onOpenTask,
+}: {
+  days: Date[];
+  deadlines: CalendarDeadline[];
+  onOpenProject?: (projectId: string) => void;
+  onOpenTask?: (task: RelayTask) => void;
+}) {
+  return (
+    <section
+      aria-label="Task and project deadlines"
+      className={softPanelClass + " shrink-0 overflow-x-auto p-3"}
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Flag className="h-3.5 w-3.5 text-accent" />
+          <h3 className="text-xs font-semibold">Due on these days</h3>
+        </div>
+        <span className="text-[10px] text-muted">Tasks and projects</span>
+      </div>
+      <div
+        className="calendar-deadline-rail-grid grid gap-1.5 overflow-x-auto"
+        data-days={days.length}
+        style={{
+          gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {days.map((day) => {
+          const dayDeadlines = deadlines.filter((deadline) =>
+            sameCalendarDay(deadline.date, day),
+          );
+          return (
+            <div
+              className="calendar-deadline-rail-day min-w-0 rounded-lg border border-separator bg-surface p-1.5"
+              key={day.toISOString()}
+            >
+              <p className="mb-1 truncate px-1 text-[9px] font-semibold uppercase tracking-wide text-muted">
+                {days.length === 1
+                  ? day.toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "long",
+                      weekday: "long",
+                    })
+                  : day.toLocaleDateString(undefined, { weekday: "short" })}
+              </p>
+              <div className="max-h-24 space-y-1 overflow-y-auto">
+                {dayDeadlines.map((deadline) => (
+                  <button
+                    className="calendar-deadline-item flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left"
+                    data-completed={deadline.completed || undefined}
+                    key={deadline.id}
+                    onClick={() =>
+                      openCalendarDeadline(deadline, onOpenProject, onOpenTask)
+                    }
+                    style={
+                      {
+                        "--deadline-color": deadline.color,
+                      } as CSSProperties
+                    }
+                    title={`${deadline.kind === "project" ? "Project" : "Task"}: ${deadline.title}${deadline.projectName ? ` · ${deadline.projectName}` : ""}`}
+                    type="button"
+                  >
+                    <span className="calendar-deadline-item__signal" />
+                    {deadline.kind === "project" ? (
+                      <Flag className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <ListTodo className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="truncate text-[10px] font-semibold">
+                      {deadline.title}
+                    </span>
+                  </button>
+                ))}
+                {dayDeadlines.length === 0 ? (
+                  <span className="block px-1 py-1 text-[9px] text-muted/70">
+                    No deadlines
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function MonthDeadlineCalendar({
+  deadlines,
+  events,
+  monthDays,
+  onOpenProject,
+  onOpenTask,
+  onSelectDate,
+  selectedDate,
+}: {
+  deadlines: CalendarDeadline[];
+  events: CalendarEvent[];
+  monthDays: Date[];
+  onOpenProject?: (projectId: string) => void;
+  onOpenTask?: (task: RelayTask) => void;
+  onSelectDate: (date: Date) => void;
+  selectedDate: Date;
+}) {
+  const intervalHighlightsByDay = useMemo(
+    () => buildMonthIntervalHighlights(monthDays, deadlines),
+    [deadlines, monthDays],
+  );
+
+  return (
+    <section
+      className={
+        softPanelClass + " flex min-h-0 flex-1 flex-col overflow-auto p-3"
+      }
+    >
+      <div className="month-deadline-weekdays mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase text-muted">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="month-deadline-grid relative grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-1">
+        {monthDays.map((day) => {
+          const dayEvents = events.filter((event) =>
+            sameCalendarDay(parseEventDate(event.start), day),
+          );
+          const dayDeadlines = deadlines.filter((deadline) =>
+            sameCalendarDay(deadline.date, day),
+          );
+          const currentMonth = day.getMonth() === selectedDate.getMonth();
+          const isSelected = sameCalendarDay(day, selectedDate);
+          const isToday = sameCalendarDay(day, new Date());
+          const intervalHighlights =
+            intervalHighlightsByDay.get(calendarDayNumber(day)) ?? [];
+
+          return (
+            <div
+              className={`month-deadline-day relay-content-card relative z-0 flex min-h-0 flex-col overflow-hidden rounded-md border p-1.5 transition hover:border-[var(--accent)] ${
+                isSelected
+                  ? "border-[var(--accent)] bg-accent-soft"
+                  : "border-separator bg-surface"
+              } ${currentMonth ? "" : "opacity-45"}`}
+              key={day.toISOString()}
+            >
+              {intervalHighlights.length > 0 ? (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-0"
+                >
+                  {intervalHighlights.map((highlight, index) => (
+                    <span
+                      className="month-interval-highlight"
+                      key={highlight.id}
+                      style={
+                        {
+                          "--interval-color": highlight.color,
+                          "--interval-depth": Math.min(index, 4),
+                        } as CSSProperties
+                      }
+                    />
+                  ))}
+                </div>
+              ) : null}
+              <button
+                className="relative z-30 flex w-full shrink-0 items-center justify-between gap-1 rounded-md text-left focus-visible:outline-2 focus-visible:outline-accent"
+                onClick={() => onSelectDate(day)}
+                type="button"
+              >
+                <span
+                  className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-semibold ${
+                    isToday ? "bg-accent text-accent-foreground shadow-sm" : ""
+                  }`}
+                >
+                  {day.getDate()}
+                </span>
+                <span className="flex items-center gap-1">
+                  {intervalHighlights.length > 0 ? (
+                    <span
+                      aria-label={`${intervalHighlights.length} active project intervals`}
+                      className="month-interval-swatches"
+                    >
+                      {intervalHighlights.slice(0, 4).map((highlight) => (
+                        <span
+                          className="month-interval-swatch"
+                          key={highlight.id}
+                          style={{ backgroundColor: highlight.color }}
+                          title={`${highlight.projectName}: ${highlight.taskTitles.join(", ")}`}
+                        />
+                      ))}
+                    </span>
+                  ) : null}
+                  {dayEvents.length > 0 ? (
+                    <span
+                      className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[8px] font-bold text-accent"
+                      title={`${dayEvents.length} calendar events`}
+                    >
+                      {dayEvents.length}e
+                    </span>
+                  ) : null}
+                  {isToday ? (
+                    <span className="hidden text-[8px] font-semibold uppercase tracking-wide text-accent xl:inline">
+                      Today
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+
+              <div className="relative z-30 mt-1.5 min-h-0 flex-1 space-y-1 overflow-y-auto">
+                {dayDeadlines.map((deadline) => (
+                  <button
+                    className="calendar-deadline-item flex w-full min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-left"
+                    data-completed={deadline.completed || undefined}
+                    key={deadline.id}
+                    onClick={() =>
+                      openCalendarDeadline(deadline, onOpenProject, onOpenTask)
+                    }
+                    style={
+                      {
+                        "--deadline-color": deadline.color,
+                      } as CSSProperties
+                    }
+                    title={`${deadline.kind === "project" ? "Project due" : "Task due"}: ${deadline.title}${deadline.projectName ? ` · ${deadline.projectName}` : ""}`}
+                    type="button"
+                  >
+                    <span className="calendar-deadline-item__signal" />
+                    {deadline.kind === "project" ? (
+                      <Flag className="h-2.5 w-2.5 shrink-0" />
+                    ) : (
+                      <ListTodo className="h-2.5 w-2.5 shrink-0" />
+                    )}
+                    <span className="truncate text-[9px] font-semibold">
+                      {deadline.title}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -7241,16 +7651,25 @@ function EmailApprovalSurface({
 
 function CalendarView({
   briefing,
+  onOpenProject,
+  onOpenTask,
   refreshWorkspace,
+  tasks,
 }: {
   briefing: Briefing | null;
+  onOpenProject: (projectId: string) => void;
+  onOpenTask: (task: RelayTask) => void;
   refreshWorkspace: () => Promise<void>;
+  tasks: RelayTask[];
 }) {
   return (
     <div className="calendar-page animate-fade-in">
       <CalendarWorkspace
         briefing={briefing}
+        onOpenProject={onOpenProject}
+        onOpenTask={onOpenTask}
         refreshWorkspace={refreshWorkspace}
+        tasks={tasks}
       />
     </div>
   );
@@ -12670,6 +13089,146 @@ function parseEventDate(value?: string | null) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseDeadlineDate(value?: string | null) {
+  if (!value) return null;
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  const date = dateOnly
+    ? new Date(
+        Number(dateOnly[1]),
+        Number(dateOnly[2]) - 1,
+        Number(dateOnly[3]),
+        12,
+      )
+    : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function calendarDayNumber(date: Date) {
+  return Math.round(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000,
+  );
+}
+
+function buildCalendarDeadlines(
+  projectData: CalendarProjectData,
+  tasks: RelayTask[],
+) {
+  const projectsById = new Map(
+    projectData.projects.map((project) => [project.id, project]),
+  );
+  const deadlines: CalendarDeadline[] = [];
+
+  for (const project of projectData.projects) {
+    const date = parseDeadlineDate(project.dueDate);
+    if (!date || project.archived) continue;
+    deadlines.push({
+      color: project.color,
+      completed: project.status === "completed",
+      date,
+      id: `project:${project.id}`,
+      kind: "project",
+      projectId: project.id,
+      projectName: project.name,
+      sourceTask: null,
+      title: project.name,
+    });
+  }
+
+  for (const task of tasks) {
+    const date = parseDeadlineDate(task.due);
+    if (!date) continue;
+    const projectId = projectData.taskAssignments[task.id] ?? null;
+    const project = projectId ? projectsById.get(projectId) : null;
+    deadlines.push({
+      color: project?.color ?? "var(--accent)",
+      completed: task.completed,
+      date,
+      id: `task:${task.id}`,
+      kind: "task",
+      projectId: project?.id ?? null,
+      projectName: project?.name ?? null,
+      sourceTask: task,
+      title: task.title,
+    });
+  }
+
+  for (const task of projectData.localTasks) {
+    const date = parseDeadlineDate(task.dueDate);
+    if (!date) continue;
+    const project = projectsById.get(task.projectId);
+    deadlines.push({
+      color: project?.color ?? "var(--accent)",
+      completed: task.completed,
+      date,
+      id: `local-task:${task.id}`,
+      kind: "task",
+      projectId: project?.id ?? task.projectId,
+      projectName: project?.name ?? null,
+      sourceTask: null,
+      title: task.title,
+    });
+  }
+
+  return deadlines.sort((left, right) => {
+    const dateDifference = left.date.getTime() - right.date.getTime();
+    if (dateDifference) return dateDifference;
+    if (left.kind !== right.kind) return left.kind === "project" ? -1 : 1;
+    return left.title.localeCompare(right.title);
+  });
+}
+
+function buildMonthIntervalHighlights(
+  monthDays: Date[],
+  deadlines: CalendarDeadline[],
+) {
+  const highlightsByDay = new Map<number, MonthIntervalHighlight[]>();
+  const projects = new Map(
+    deadlines
+      .filter(
+        (deadline): deadline is CalendarDeadline & { projectId: string } =>
+          deadline.kind === "project" && Boolean(deadline.projectId),
+      )
+      .map((deadline) => [deadline.projectId, deadline]),
+  );
+  const visibleDays = monthDays.map((day) => calendarDayNumber(day));
+
+  for (const task of deadlines) {
+    if (task.kind !== "task" || task.completed || !task.projectId) continue;
+    const project = projects.get(task.projectId);
+    if (!project) continue;
+    const taskDay = calendarDayNumber(task.date);
+    const projectDay = calendarDayNumber(project.date);
+    const rangeStart = Math.min(taskDay, projectDay);
+    const rangeEnd = Math.max(taskDay, projectDay);
+
+    for (const dayNumber of visibleDays) {
+      if (dayNumber < rangeStart || dayNumber > rangeEnd) continue;
+      const dayHighlights = highlightsByDay.get(dayNumber) ?? [];
+      const existing = dayHighlights.find(
+        (highlight) => highlight.id === project.id,
+      );
+      if (existing) {
+        if (!existing.taskTitles.includes(task.title)) {
+          existing.taskTitles.push(task.title);
+        }
+      } else {
+        dayHighlights.push({
+          color: project.color,
+          id: project.id,
+          projectName: project.title,
+          taskTitles: [task.title],
+        });
+        dayHighlights.sort((left, right) =>
+          left.projectName.localeCompare(right.projectName),
+        );
+        highlightsByDay.set(dayNumber, dayHighlights);
+      }
+    }
+  }
+
+  return highlightsByDay;
 }
 
 function sameCalendarDay(left: Date | null, right: Date | null) {
