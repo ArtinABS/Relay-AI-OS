@@ -395,6 +395,208 @@ const githubBranchColors = [
   "#facc15",
 ];
 
+type GithubGraphLane = {
+  colorIndex: number;
+  sha: string;
+};
+
+type GithubGraphNodeLayout = {
+  colorIndex: number;
+  joinLanes: Array<{ colorIndex: number; lane: number }>;
+  lane: number;
+};
+
+type GithubGraphEdgeLayout = {
+  colorIndex: number;
+  kind: "direct" | "fork" | "merge";
+  parentSha: string;
+  sourceSha: string;
+};
+
+function githubCommitTimestamp(commit: GithubGraphCommit) {
+  return commit.authoredAt ? new Date(commit.authoredAt).getTime() : 0;
+}
+
+function orderGithubGraphCommits(commits: GithubGraphCommit[]) {
+  const commitBySha = new Map(commits.map((commit) => [commit.sha, commit]));
+  const originalIndex = new Map(
+    commits.map((commit, index) => [commit.sha, index]),
+  );
+  const remainingChildren = new Map(commits.map((commit) => [commit.sha, 0]));
+
+  commits.forEach((commit) => {
+    commit.parents.forEach((parentSha) => {
+      if (!commitBySha.has(parentSha)) return;
+      remainingChildren.set(
+        parentSha,
+        (remainingChildren.get(parentSha) ?? 0) + 1,
+      );
+    });
+  });
+
+  const compareCommits = (left: GithubGraphCommit, right: GithubGraphCommit) =>
+    githubCommitTimestamp(right) - githubCommitTimestamp(left) ||
+    (originalIndex.get(left.sha) ?? 0) - (originalIndex.get(right.sha) ?? 0);
+  const available = commits
+    .filter((commit) => (remainingChildren.get(commit.sha) ?? 0) === 0)
+    .sort(compareCommits);
+  const ordered: GithubGraphCommit[] = [];
+  const visited = new Set<string>();
+
+  while (available.length > 0) {
+    const commit = available.shift()!;
+    if (visited.has(commit.sha)) continue;
+    visited.add(commit.sha);
+    ordered.push(commit);
+
+    commit.parents.forEach((parentSha) => {
+      const parent = commitBySha.get(parentSha);
+      if (!parent) return;
+      const nextCount = Math.max(
+        0,
+        (remainingChildren.get(parentSha) ?? 0) - 1,
+      );
+      remainingChildren.set(parentSha, nextCount);
+      if (nextCount === 0) {
+        available.push(parent);
+        available.sort(compareCommits);
+      }
+    });
+  }
+
+  if (ordered.length < commits.length) {
+    ordered.push(
+      ...commits
+        .filter((commit) => !visited.has(commit.sha))
+        .sort(compareCommits),
+    );
+  }
+
+  return ordered;
+}
+
+function buildGithubGraphLayout(
+  commits: GithubGraphCommit[],
+  branches: GithubBranch[],
+  selectedBranches: string[],
+) {
+  const commitBySha = new Map(commits.map((commit) => [commit.sha, commit]));
+  const branchByName = new Map(branches.map((branch) => [branch.name, branch]));
+  const childCountBySha = new Map<string, number>();
+  const lanes: Array<GithubGraphLane | null> = [];
+  const nodes = new Map<string, GithubGraphNodeLayout>();
+  const edges: GithubGraphEdgeLayout[] = [];
+  let nextColorIndex = selectedBranches.length;
+  let maxLane = 0;
+
+  commits.forEach((commit) => {
+    commit.parents.forEach((parentSha) => {
+      if (!commitBySha.has(parentSha)) return;
+      childCountBySha.set(parentSha, (childCountBySha.get(parentSha) ?? 0) + 1);
+    });
+  });
+
+  selectedBranches.forEach((branchName, colorIndex) => {
+    const sha = branchByName.get(branchName)?.sha;
+    if (!sha || !commitBySha.has(sha)) return;
+    if (lanes.some((lane) => lane?.sha === sha)) return;
+    lanes.push({ colorIndex, sha });
+  });
+
+  const openLane = (lane: GithubGraphLane, afterLane = -1) => {
+    for (
+      let index = Math.max(0, afterLane + 1);
+      index < lanes.length;
+      index += 1
+    ) {
+      if (lanes[index] !== null) continue;
+      lanes[index] = lane;
+      maxLane = Math.max(maxLane, index);
+      return index;
+    }
+    lanes.push(lane);
+    maxLane = Math.max(maxLane, lanes.length - 1);
+    return lanes.length - 1;
+  };
+
+  commits.forEach((commit) => {
+    const matchingLanes = lanes.flatMap((lane, index) =>
+      lane?.sha === commit.sha ? [index] : [],
+    );
+    let nodeLane = matchingLanes[0];
+
+    if (nodeLane === undefined) {
+      nodeLane = openLane({
+        colorIndex: nextColorIndex,
+        sha: commit.sha,
+      });
+      nextColorIndex += 1;
+    }
+
+    const nodeColorIndex = lanes[nodeLane]?.colorIndex ?? 0;
+    const joinLanes = matchingLanes.slice(1).map((lane) => ({
+      colorIndex: lanes[lane]?.colorIndex ?? nodeColorIndex,
+      lane,
+    }));
+    matchingLanes.slice(1).forEach((lane) => {
+      lanes[lane] = null;
+    });
+    nodes.set(commit.sha, {
+      colorIndex: nodeColorIndex,
+      joinLanes,
+      lane: nodeLane,
+    });
+    maxLane = Math.max(
+      maxLane,
+      nodeLane,
+      ...joinLanes.map((item) => item.lane),
+    );
+
+    const [firstParent, ...mergeParents] = commit.parents;
+    if (firstParent && commitBySha.has(firstParent)) {
+      const existingParentLane = lanes.findIndex(
+        (lane, index) => index !== nodeLane && lane?.sha === firstParent,
+      );
+      if (existingParentLane >= 0) {
+        lanes[nodeLane] = null;
+      } else {
+        lanes[nodeLane] = { colorIndex: nodeColorIndex, sha: firstParent };
+      }
+      edges.push({
+        colorIndex: nodeColorIndex,
+        kind: (childCountBySha.get(firstParent) ?? 0) > 1 ? "fork" : "direct",
+        parentSha: firstParent,
+        sourceSha: commit.sha,
+      });
+    } else {
+      lanes[nodeLane] = null;
+    }
+
+    mergeParents.forEach((parentSha) => {
+      if (!commitBySha.has(parentSha)) return;
+      const existingParentLane = lanes.findIndex(
+        (lane) => lane?.sha === parentSha,
+      );
+      let colorIndex: number;
+      if (existingParentLane >= 0) {
+        colorIndex = lanes[existingParentLane]?.colorIndex ?? nodeColorIndex;
+      } else {
+        colorIndex = nextColorIndex;
+        nextColorIndex += 1;
+        openLane({ colorIndex, sha: parentSha }, nodeLane);
+      }
+      edges.push({
+        colorIndex,
+        kind: "merge",
+        parentSha,
+        sourceSha: commit.sha,
+      });
+    });
+  });
+
+  return { edges, maxLane, nodes };
+}
+
 function GithubCommitGraph({
   branches,
   commits,
@@ -417,9 +619,14 @@ function GithubCommitGraph({
   const rowHeight = 48;
   const laneGap = 18;
   const laneStart = 14;
+  const graphLayout = buildGithubGraphLayout(
+    commits,
+    branches,
+    selectedBranches,
+  );
   const graphWidth = Math.max(
-    48,
-    laneStart * 2 + selectedBranches.length * laneGap,
+    52,
+    laneStart * 2 + (graphLayout.maxLane + 1) * laneGap,
   );
   const totalHeight = commits.length * rowHeight;
   const rowIndexBySha = new Map(
@@ -428,66 +635,39 @@ function GithubCommitGraph({
   const selectedCommit = commits.find(
     (commit) => commit.sha === expandedCommitSha,
   );
-  const branchIndex = new Map(
-    selectedBranches.map((branch, index) => [branch, index]),
-  );
-  const laneX = (branch: string) =>
-    laneStart + (branchIndex.get(branch) ?? 0) * laneGap;
+  const laneX = (lane: number) => laneStart + lane * laneGap;
   const rowY = (index: number) => index * rowHeight + rowHeight / 2;
-  const displayBranchForCommit = (commit: GithubGraphCommit) =>
-    selectedBranches.find((branch) => commit.branchNames.includes(branch)) ??
-    selectedBranches[0] ??
-    "main";
-  const branchPaths = selectedBranches.flatMap((branch, index) => {
-    const rows = commits.flatMap((commit, commitIndex) =>
-      commit.branchNames.includes(branch) ? [commitIndex] : [],
-    );
-    return rows.slice(0, -1).flatMap((sourceRow, pathIndex) => {
-      const targetRow = rows[pathIndex + 1];
-      const sourceBranch = displayBranchForCommit(commits[sourceRow]);
-      const targetBranch = displayBranchForCommit(commits[targetRow]);
-      if (branch !== sourceBranch && branch !== targetBranch) return [];
-      const sourceX = laneX(sourceBranch);
-      const targetX = laneX(targetBranch);
-      const sourceY = rowY(sourceRow);
-      const targetY = rowY(targetRow);
-      const middleY = sourceY + (targetY - sourceY) / 2;
-      return [
-        {
-          branch,
-          color: githubBranchColors[index % githubBranchColors.length],
-          d:
-            sourceX === targetX
-              ? `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`
-              : `M ${sourceX} ${sourceY} C ${sourceX} ${middleY}, ${targetX} ${middleY}, ${targetX} ${targetY}`,
-          key: `${branch}-${sourceRow}-${targetRow}`,
-        },
-      ];
-    });
+  const graphPaths = graphLayout.edges.flatMap((edge, index) => {
+    const sourceRow = rowIndexBySha.get(edge.sourceSha);
+    const targetRow = rowIndexBySha.get(edge.parentSha);
+    const sourceNode = graphLayout.nodes.get(edge.sourceSha);
+    const targetNode = graphLayout.nodes.get(edge.parentSha);
+    if (
+      sourceRow === undefined ||
+      targetRow === undefined ||
+      targetRow <= sourceRow ||
+      !sourceNode ||
+      !targetNode
+    ) {
+      return [];
+    }
+    const sourceX = laneX(sourceNode.lane);
+    const targetX = laneX(targetNode.lane);
+    const sourceY = rowY(sourceRow);
+    const targetY = rowY(targetRow);
+    const middleY = sourceY + (targetY - sourceY) / 2;
+    return [
+      {
+        color: githubBranchColors[edge.colorIndex % githubBranchColors.length],
+        d:
+          sourceX === targetX
+            ? `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`
+            : `M ${sourceX} ${sourceY} C ${sourceX} ${middleY}, ${targetX} ${middleY}, ${targetX} ${targetY}`,
+        key: `${edge.kind}-${edge.sourceSha}-${edge.parentSha}-${index}`,
+        kind: edge.kind,
+      },
+    ];
   });
-  const mergePaths = commits.flatMap((commit, sourceRow) =>
-    commit.parents.slice(1).flatMap((parentSha, parentIndex) => {
-      const targetRow = rowIndexBySha.get(parentSha);
-      if (targetRow === undefined || targetRow <= sourceRow) return [];
-      const sourceBranch = displayBranchForCommit(commit);
-      const parentCommit = commits[targetRow];
-      const targetBranch = displayBranchForCommit(parentCommit);
-      const sourceX = laneX(sourceBranch);
-      const targetX = laneX(targetBranch);
-      const sourceY = rowY(sourceRow);
-      const targetY = rowY(targetRow);
-      const bend = Math.min(34, Math.max(16, (targetY - sourceY) / 3));
-      const colorIndex = Math.max(0, branchIndex.get(targetBranch) ?? 0);
-
-      return [
-        {
-          color: githubBranchColors[colorIndex % githubBranchColors.length],
-          d: `M ${sourceX} ${sourceY} C ${sourceX} ${sourceY + bend}, ${targetX} ${targetY - bend}, ${targetX} ${targetY}`,
-          key: `merge-${commit.sha}-${parentIndex}-${parentSha}`,
-        },
-      ];
-    }),
-  );
 
   return (
     <div className="github-commit-graph-shell">
@@ -499,28 +679,20 @@ function GithubCommitGraph({
           viewBox={`0 0 ${graphWidth} ${totalHeight}`}
           width={graphWidth}
         >
-          {selectedBranches.map((branch, index) => (
+          {Array.from({ length: graphLayout.maxLane + 1 }, (_, lane) => (
             <line
               className="github-graph-guide"
-              key={`guide-${branch}`}
-              stroke={githubBranchColors[index % githubBranchColors.length]}
-              x1={laneStart + index * laneGap}
-              x2={laneStart + index * laneGap}
+              key={`guide-${lane}`}
+              stroke="var(--separator)"
+              x1={laneX(lane)}
+              x2={laneX(lane)}
               y1={0}
               y2={totalHeight}
             />
           ))}
-          {branchPaths.map((path) => (
+          {graphPaths.map((path) => (
             <path
-              className="github-graph-path"
-              d={path.d}
-              key={path.key}
-              stroke={path.color}
-            />
-          ))}
-          {mergePaths.map((path) => (
-            <path
-              className="github-graph-path github-graph-path--merge"
+              className={`github-graph-path github-graph-path--${path.kind}`}
               d={path.d}
               key={path.key}
               stroke={path.color}
@@ -528,41 +700,58 @@ function GithubCommitGraph({
           ))}
           {commits.map((commit, commitIndex) => {
             const nodeY = rowY(commitIndex);
-            const nodeLanes = [displayBranchForCommit(commit)];
+            const node = graphLayout.nodes.get(commit.sha);
+            if (!node) return null;
+            const nodeX = laneX(node.lane);
+            const color =
+              githubBranchColors[node.colorIndex % githubBranchColors.length];
+            const isRoot = commit.parents.length === 0;
 
             return (
               <g key={`nodes-${commit.sha}`}>
-                {nodeLanes.map((branch) => {
-                  const index = branchIndex.get(branch) ?? 0;
-                  const color =
-                    githubBranchColors[index % githubBranchColors.length];
-                  const isTip = branches.some(
-                    (item) => item.name === branch && item.sha === commit.sha,
-                  );
+                {node.joinLanes.map((joinLane) => {
+                  const joinX = laneX(joinLane.lane);
+                  const joinColor =
+                    githubBranchColors[
+                      joinLane.colorIndex % githubBranchColors.length
+                    ];
                   return (
-                    <g key={`${commit.sha}-${branch}`}>
-                      {isTip ? (
-                        <rect
-                          className="github-graph-tip-ribbon"
-                          fill={color}
-                          height={10}
-                          rx={1}
-                          width={Math.max(12, graphWidth - laneX(branch) - 4)}
-                          x={laneX(branch)}
-                          y={nodeY - 5}
-                        />
-                      ) : null}
+                    <g key={`${commit.sha}-join-${joinLane.lane}`}>
+                      <path
+                        className="github-graph-path github-graph-path--reference"
+                        d={`M ${joinX} ${nodeY} C ${joinX} ${nodeY + 8}, ${nodeX} ${nodeY + 8}, ${nodeX} ${nodeY}`}
+                        stroke={joinColor}
+                      />
                       <circle
-                        className="github-graph-node"
-                        cx={laneX(branch)}
+                        className="github-graph-reference-node"
+                        cx={joinX}
                         cy={nodeY}
                         fill="var(--surface)"
-                        r={commit.parents.length > 1 ? 4 : isTip ? 5 : 4.5}
-                        stroke={color}
+                        r={3.25}
+                        stroke={joinColor}
                       />
                     </g>
                   );
                 })}
+                {isRoot ? (
+                  <rect
+                    className="github-graph-root-ribbon"
+                    fill={color}
+                    height={10}
+                    rx={1}
+                    width={Math.max(12, graphWidth - nodeX - 4)}
+                    x={nodeX}
+                    y={nodeY - 5}
+                  />
+                ) : null}
+                <circle
+                  className="github-graph-node"
+                  cx={nodeX}
+                  cy={nodeY}
+                  fill="var(--surface)"
+                  r={commit.parents.length > 1 || isRoot ? 5 : 4.5}
+                  stroke={color}
+                />
               </g>
             );
           })}
@@ -1039,17 +1228,7 @@ export function GithubRepositoryExplorer({
             });
           });
         });
-        setCommits(
-          Array.from(commitMap.values()).sort((left, right) => {
-            const leftTime = left.authoredAt
-              ? new Date(left.authoredAt).getTime()
-              : 0;
-            const rightTime = right.authoredAt
-              ? new Date(right.authoredAt).getTime()
-              : 0;
-            return rightTime - leftTime || right.sha.localeCompare(left.sha);
-          }),
-        );
+        setCommits(orderGithubGraphCommits(Array.from(commitMap.values())));
       } catch (error) {
         if (controller.signal.aborted) return;
         setCommits([]);

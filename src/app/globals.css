@@ -3126,13 +3126,29 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   stroke-width: 2;
 }
 
-.relay-product-shell .github-graph-tip-ribbon {
+.relay-product-shell .github-graph-path--fork {
+  opacity: 1;
+}
+
+.relay-product-shell .github-graph-path--reference {
+  opacity: 0.82;
+  stroke-dasharray: 2 2;
+  stroke-width: 1.5;
+}
+
+.relay-product-shell .github-graph-root-ribbon {
   opacity: 0.28;
 }
 
-.relay-product-shell .github-graph-node {
+.relay-product-shell .github-graph-node,
+.relay-product-shell .github-graph-reference-node {
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+}
+
+.relay-product-shell .github-graph-reference-node {
+  stroke-dasharray: 2 1;
+  stroke-width: 1.5;
 }
 
 .relay-product-shell .github-commit-graph__row {
