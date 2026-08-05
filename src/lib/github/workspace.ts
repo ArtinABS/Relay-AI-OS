@@ -91,6 +91,9 @@ type GithubCommitResponse = {
     login?: string;
     avatar_url?: string | null;
   } | null;
+  parents?: Array<{
+    sha: string;
+  }>;
   files?: Array<{
     filename: string;
     status: string;
@@ -190,6 +193,8 @@ export type GithubCommit = {
   additions: number;
   deletions: number;
   changedFiles: number;
+  detailsLoaded: boolean;
+  parents: string[];
   files: Array<{
     path: string;
     status: string;
@@ -199,6 +204,51 @@ export type GithubCommit = {
     htmlUrl?: string | null;
   }>;
 };
+
+function toGithubCommit(
+  commit: GithubCommitResponse,
+  detailsLoaded: boolean,
+): GithubCommit {
+  const authorName =
+    commit.author?.login ??
+    commit.commit.author?.name ??
+    commit.commit.author?.email ??
+    "Unknown contributor";
+
+  return {
+    sha: commit.sha,
+    shortSha: commit.sha.slice(0, 7),
+    htmlUrl: commit.html_url,
+    message: commit.commit.message,
+    authoredAt: commit.commit.author?.date ?? null,
+    author: {
+      login: commit.author?.login ?? null,
+      name: authorName,
+      email: commit.commit.author?.email ?? null,
+      avatarUrl: commit.author?.avatar_url ?? null,
+    },
+    additions:
+      commit.stats?.additions ??
+      commit.files?.reduce((sum, file) => sum + (file.additions ?? 0), 0) ??
+      0,
+    deletions:
+      commit.stats?.deletions ??
+      commit.files?.reduce((sum, file) => sum + (file.deletions ?? 0), 0) ??
+      0,
+    changedFiles: commit.files?.length ?? 0,
+    detailsLoaded,
+    parents: commit.parents?.map((parent) => parent.sha) ?? [],
+    files:
+      commit.files?.map((file) => ({
+        path: file.filename,
+        status: file.status,
+        additions: file.additions ?? 0,
+        deletions: file.deletions ?? 0,
+        changes: file.changes ?? 0,
+        htmlUrl: file.blob_url ?? null,
+      })) ?? [],
+  };
+}
 
 export type GithubBranch = {
   name: string;
@@ -329,66 +379,52 @@ export async function listGithubRepositoryCommits(
   repo: string,
   ref: string,
   maxResults = 10,
+  includeDetails = true,
 ) {
   const commits = await githubApi<GithubCommitResponse[]>(
     tokens,
     `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?${new URLSearchParams(
       {
         sha: ref,
-        per_page: String(Math.min(Math.max(maxResults, 1), 20)),
+        per_page: String(
+          Math.min(Math.max(maxResults, 1), includeDetails ? 20 : 50),
+        ),
       },
     )}`,
   );
 
-  const detailedCommits = await Promise.all(
-    commits.map(async (commit) => {
-      const detail = await githubApi<GithubCommitResponse>(
-        tokens,
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(commit.sha)}`,
-      ).catch(() => commit);
-      const authorName =
-        detail.author?.login ??
-        detail.commit.author?.name ??
-        detail.commit.author?.email ??
-        "Unknown contributor";
+  const normalizedCommits = includeDetails
+    ? await Promise.all(
+        commits.map(async (commit) => {
+          const detail = await githubApi<GithubCommitResponse>(
+            tokens,
+            `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(commit.sha)}`,
+          ).catch(() => commit);
+          return toGithubCommit(detail, true);
+        }),
+      )
+    : commits.map((commit) => toGithubCommit(commit, false));
 
-      return {
-        sha: detail.sha,
-        shortSha: detail.sha.slice(0, 7),
-        htmlUrl: detail.html_url,
-        message: detail.commit.message,
-        authoredAt: detail.commit.author?.date ?? null,
-        author: {
-          login: detail.author?.login ?? null,
-          name: authorName,
-          email: detail.commit.author?.email ?? null,
-          avatarUrl: detail.author?.avatar_url ?? null,
-        },
-        additions:
-          detail.stats?.additions ??
-          detail.files?.reduce((sum, file) => sum + (file.additions ?? 0), 0) ??
-          0,
-        deletions:
-          detail.stats?.deletions ??
-          detail.files?.reduce((sum, file) => sum + (file.deletions ?? 0), 0) ??
-          0,
-        changedFiles: detail.files?.length ?? 0,
-        files:
-          detail.files?.map((file) => ({
-            path: file.filename,
-            status: file.status,
-            additions: file.additions ?? 0,
-            deletions: file.deletions ?? 0,
-            changes: file.changes ?? 0,
-            htmlUrl: file.blob_url ?? null,
-          })) ?? [],
-      } satisfies GithubCommit;
-    }),
+  return {
+    ok: true,
+    commits: normalizedCommits,
+  };
+}
+
+export async function getGithubRepositoryCommit(
+  tokens: DirectGithubTokens,
+  owner: string,
+  repo: string,
+  sha: string,
+) {
+  const commit = await githubApi<GithubCommitResponse>(
+    tokens,
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(sha)}`,
   );
 
   return {
     ok: true,
-    commits: detailedCommits,
+    commit: toGithubCommit(commit, true),
   };
 }
 

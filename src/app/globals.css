@@ -2906,6 +2906,127 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   display: grid;
   gap: 0.6rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: visible;
+  position: relative;
+  z-index: 8;
+}
+
+.relay-product-shell .github-branch-picker {
+  min-width: 0;
+  position: relative;
+}
+
+.relay-product-shell .github-branch-picker > summary {
+  align-items: center;
+  background: var(--field-background);
+  border: 1px solid var(--separator);
+  border-radius: 0.7rem;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  height: 3rem;
+  list-style: none;
+  outline: none;
+  padding: 0.35rem 2rem 0.2rem 0.65rem;
+  position: relative;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.relay-product-shell .github-branch-picker > summary::-webkit-details-marker {
+  display: none;
+}
+
+.relay-product-shell .github-branch-picker > summary:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.relay-product-shell .github-branch-picker__label {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.58rem;
+  font-weight: 750;
+  gap: 0.3rem;
+  grid-column: 1;
+  text-transform: uppercase;
+}
+
+.relay-product-shell .github-branch-picker__value {
+  color: var(--foreground);
+  font-size: 0.72rem;
+  font-weight: 650;
+  grid-column: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relay-product-shell .github-branch-picker__chevron {
+  color: var(--muted);
+  position: absolute;
+  right: 0.65rem;
+  top: 1rem;
+  transition: transform 160ms ease;
+}
+
+.relay-product-shell
+  .github-branch-picker[open]
+  .github-branch-picker__chevron {
+  transform: rotate(180deg);
+}
+
+.relay-product-shell .github-branch-picker__menu {
+  animation: surface-pop 160ms ease-out both;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  box-shadow: var(--shadow-strong);
+  left: 0;
+  min-width: min(22rem, calc(100vw - 4rem));
+  overflow: hidden;
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  z-index: 30;
+}
+
+.relay-product-shell .github-branch-picker__option {
+  align-items: center;
+  border-radius: 0.6rem;
+  cursor: pointer;
+  display: flex;
+  gap: 0.55rem;
+  min-height: 2.3rem;
+  padding: 0.45rem 0.55rem;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.relay-product-shell .github-branch-picker__option:hover {
+  background: var(--accent-soft);
+}
+
+.relay-product-shell .github-branch-picker__option[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.relay-product-shell .github-branch-picker__option input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.relay-product-shell .github-branch-picker__swatch {
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 10%, transparent);
+  flex: 0 0 auto;
+  height: 0.55rem;
+  width: 0.55rem;
 }
 
 .relay-product-shell .github-filter-field {
@@ -2965,6 +3086,199 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 .relay-product-shell .github-filter-field option {
   background: var(--surface);
   color: var(--foreground);
+}
+
+.relay-product-shell .github-commit-graph-shell {
+  min-width: 31rem;
+  padding-bottom: 0.75rem;
+}
+
+.relay-product-shell .github-commit-graph-header {
+  align-items: center;
+  backdrop-filter: blur(12px);
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
+  border-bottom: 1px solid var(--separator);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  min-height: 2.7rem;
+  padding: 0.55rem 0.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+}
+
+.relay-product-shell .github-branch-legend {
+  align-items: center;
+  background: var(--surface-secondary);
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  color: var(--foreground);
+  display: inline-flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.58rem;
+  font-weight: 650;
+  gap: 0.35rem;
+  max-width: 9rem;
+  overflow: hidden;
+  padding: 0.28rem 0.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relay-product-shell .github-branch-legend > span {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 0.45rem;
+  width: 0.45rem;
+}
+
+.relay-product-shell .github-commit-graph {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--surface-secondary) 68%, transparent),
+    transparent 34%
+  );
+  position: relative;
+}
+
+.relay-product-shell .github-commit-graph__canvas {
+  inset: 0 auto auto 0;
+  overflow: visible;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.relay-product-shell .github-graph-guide {
+  opacity: 0.08;
+  stroke-width: 1;
+}
+
+.relay-product-shell .github-graph-path {
+  fill: none;
+  opacity: 0.78;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.relay-product-shell .github-graph-path--merge {
+  opacity: 0.92;
+  stroke-width: 1.75;
+}
+
+.relay-product-shell .github-graph-shared-bridge {
+  opacity: 0.42;
+  stroke-dasharray: 2 2;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.relay-product-shell .github-graph-node-ring {
+  fill: var(--surface);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.relay-product-shell .github-graph-node {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.relay-product-shell .github-commit-graph__row {
+  align-items: stretch;
+  background: transparent;
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--separator) 58%, transparent);
+  display: grid;
+  overflow: hidden;
+  padding: 0;
+  transition:
+    background-color 140ms ease,
+    opacity 180ms ease;
+  width: 100%;
+}
+
+.relay-product-shell .github-commit-graph__row:hover {
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface));
+}
+
+.relay-product-shell .github-commit-graph__row[data-selected="true"] {
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.relay-product-shell .github-commit-graph__row[data-context="true"] {
+  opacity: 0.3;
+}
+
+.relay-product-shell .github-commit-graph__row:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+  position: relative;
+  z-index: 4;
+}
+
+.relay-product-shell .github-branch-tip {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.5rem;
+  font-weight: 750;
+  line-height: 1;
+  max-width: 7rem;
+  overflow: hidden;
+  padding: 0.2rem 0.35rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relay-product-shell .github-shared-commit-badge {
+  background: color-mix(in oklab, var(--accent) 9%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, transparent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.5rem;
+  font-weight: 750;
+  padding: 0.18rem 0.35rem;
+  white-space: nowrap;
+}
+
+.relay-product-shell .github-graph-context-note {
+  background: var(--surface-secondary);
+  border-bottom: 1px solid var(--separator);
+  border-top: 1px solid var(--separator);
+  color: var(--muted);
+  font-size: 0.6rem;
+  line-height: 1rem;
+  padding: 0.45rem 0.75rem;
+}
+
+.relay-product-shell .github-commit-detail {
+  background: color-mix(in oklab, var(--surface-secondary) 72%, transparent);
+  border: 1px solid var(--separator);
+  border-radius: 0.8rem;
+  margin: 0.75rem;
+  padding: 0.8rem;
+}
+
+.relay-product-shell .github-commit-file-row {
+  align-items: center;
+  border-radius: 0.5rem;
+  display: flex;
+  font-size: 0.65rem;
+  gap: 0.5rem;
+  min-height: 1.9rem;
+  padding: 0.3rem 0.45rem;
+  transition: background-color 140ms ease;
+}
+
+.relay-product-shell .github-commit-file-row:hover {
+  background: var(--surface);
 }
 
 .relay-product-shell

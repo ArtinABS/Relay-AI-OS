@@ -6,7 +6,9 @@ import {
   Atom,
   BookOpenText,
   Braces,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Clock,
   Database,
@@ -20,6 +22,7 @@ import {
   GitBranch,
   GitCommitHorizontal,
   GitFork,
+  GitMerge,
   GitPullRequest,
   ListTodo,
   LockKeyhole,
@@ -100,6 +103,8 @@ type GithubCommit = {
   additions: number;
   deletions: number;
   changedFiles: number;
+  detailsLoaded: boolean;
+  parents: string[];
   files: Array<{
     path: string;
     status: string;
@@ -108,6 +113,10 @@ type GithubCommit = {
     changes: number;
     htmlUrl?: string | null;
   }>;
+};
+
+type GithubGraphCommit = GithubCommit & {
+  branchNames: string[];
 };
 
 type GithubPullRequest = {
@@ -378,6 +387,374 @@ function GithubTreeBranch({
   });
 }
 
+const githubBranchColors = [
+  "#22d3ee",
+  "#f97316",
+  "#d946ef",
+  "#22c55e",
+  "#facc15",
+];
+
+function GithubCommitGraph({
+  branches,
+  commits,
+  contributorFilter,
+  detailError,
+  detailLoadingSha,
+  expandedCommitSha,
+  onSelectCommit,
+  selectedBranches,
+}: {
+  branches: GithubBranch[];
+  commits: GithubGraphCommit[];
+  contributorFilter: string;
+  detailError: string | null;
+  detailLoadingSha: string | null;
+  expandedCommitSha: string | null;
+  onSelectCommit: (commit: GithubGraphCommit) => void;
+  selectedBranches: string[];
+}) {
+  const rowHeight = 64;
+  const laneGap = 24;
+  const laneStart = 18;
+  const graphWidth = Math.max(
+    58,
+    laneStart * 2 + selectedBranches.length * laneGap,
+  );
+  const totalHeight = commits.length * rowHeight;
+  const rowIndexBySha = new Map(
+    commits.map((commit, index) => [commit.sha, index]),
+  );
+  const selectedCommit = commits.find(
+    (commit) => commit.sha === expandedCommitSha,
+  );
+  const branchIndex = new Map(
+    selectedBranches.map((branch, index) => [branch, index]),
+  );
+  const laneX = (branch: string) =>
+    laneStart + (branchIndex.get(branch) ?? 0) * laneGap;
+  const rowY = (index: number) => index * rowHeight + rowHeight / 2;
+  const branchPaths = selectedBranches.flatMap((branch, index) => {
+    const rows = commits.flatMap((commit, commitIndex) =>
+      commit.branchNames.includes(branch) ? [commitIndex] : [],
+    );
+    return rows.slice(0, -1).map((sourceRow, pathIndex) => {
+      const targetRow = rows[pathIndex + 1];
+      const x = laneStart + index * laneGap;
+      return {
+        branch,
+        color: githubBranchColors[index % githubBranchColors.length],
+        d: `M ${x} ${rowY(sourceRow)} L ${x} ${rowY(targetRow)}`,
+        key: `${branch}-${sourceRow}-${targetRow}`,
+      };
+    });
+  });
+  const mergePaths = commits.flatMap((commit, sourceRow) =>
+    commit.parents.slice(1).flatMap((parentSha, parentIndex) => {
+      const targetRow = rowIndexBySha.get(parentSha);
+      if (targetRow === undefined || targetRow <= sourceRow) return [];
+      const sourceBranch = commit.branchNames[0] ?? selectedBranches[0];
+      const parentCommit = commits[targetRow];
+      const targetBranch =
+        parentCommit.branchNames.find((branch) => branch !== sourceBranch) ??
+        parentCommit.branchNames[0] ??
+        sourceBranch;
+      const sourceX = laneX(sourceBranch);
+      const targetX = laneX(targetBranch);
+      const sourceY = rowY(sourceRow);
+      const targetY = rowY(targetRow);
+      const bend = Math.min(34, Math.max(16, (targetY - sourceY) / 3));
+      const colorIndex = Math.max(0, branchIndex.get(targetBranch) ?? 0);
+
+      return [
+        {
+          color: githubBranchColors[colorIndex % githubBranchColors.length],
+          d: `M ${sourceX} ${sourceY} C ${sourceX} ${sourceY + bend}, ${targetX} ${targetY - bend}, ${targetX} ${targetY}`,
+          key: `merge-${commit.sha}-${parentIndex}-${parentSha}`,
+        },
+      ];
+    }),
+  );
+
+  return (
+    <div className="github-commit-graph-shell">
+      <div className="github-commit-graph-header">
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedBranches.map((branch, index) => (
+            <span className="github-branch-legend" key={branch}>
+              <span
+                style={{
+                  backgroundColor:
+                    githubBranchColors[index % githubBranchColors.length],
+                }}
+              />
+              {branch}
+            </span>
+          ))}
+        </div>
+        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
+          Time aligned
+        </span>
+      </div>
+
+      <div className="github-commit-graph" style={{ minHeight: totalHeight }}>
+        <svg
+          aria-hidden="true"
+          className="github-commit-graph__canvas"
+          height={totalHeight}
+          viewBox={`0 0 ${graphWidth} ${totalHeight}`}
+          width={graphWidth}
+        >
+          {selectedBranches.map((branch, index) => (
+            <line
+              className="github-graph-guide"
+              key={`guide-${branch}`}
+              stroke={githubBranchColors[index % githubBranchColors.length]}
+              x1={laneStart + index * laneGap}
+              x2={laneStart + index * laneGap}
+              y1={0}
+              y2={totalHeight}
+            />
+          ))}
+          {branchPaths.map((path) => (
+            <path
+              className="github-graph-path"
+              d={path.d}
+              key={path.key}
+              stroke={path.color}
+            />
+          ))}
+          {mergePaths.map((path) => (
+            <path
+              className="github-graph-path github-graph-path--merge"
+              d={path.d}
+              key={path.key}
+              stroke={path.color}
+            />
+          ))}
+          {commits.map((commit, commitIndex) => {
+            const shared = commit.branchNames.length > 1;
+            const nodeY = rowY(commitIndex);
+            const nodeLanes = commit.branchNames.filter((branch) =>
+              branchIndex.has(branch),
+            );
+            const nodeXs = nodeLanes.map(laneX);
+
+            return (
+              <g key={`nodes-${commit.sha}`}>
+                {shared && nodeXs.length > 1 ? (
+                  <line
+                    className="github-graph-shared-bridge"
+                    stroke={githubBranchColors[0]}
+                    x1={Math.min(...nodeXs)}
+                    x2={Math.max(...nodeXs)}
+                    y1={nodeY}
+                    y2={nodeY}
+                  />
+                ) : null}
+                {nodeLanes.map((branch) => {
+                  const index = branchIndex.get(branch) ?? 0;
+                  const color =
+                    githubBranchColors[index % githubBranchColors.length];
+                  const isTip = branches.some(
+                    (item) => item.name === branch && item.sha === commit.sha,
+                  );
+                  return (
+                    <g key={`${commit.sha}-${branch}`}>
+                      {commit.parents.length > 1 ? (
+                        <circle
+                          className="github-graph-node-ring"
+                          cx={laneX(branch)}
+                          cy={nodeY}
+                          r={isTip ? 7 : 6}
+                          stroke={color}
+                        />
+                      ) : null}
+                      <circle
+                        className="github-graph-node"
+                        cx={laneX(branch)}
+                        cy={nodeY}
+                        fill={color}
+                        r={isTip ? 4.5 : 3.5}
+                      />
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
+
+        <div className="github-commit-graph__rows">
+          {commits.map((commit) => {
+            const selected = commit.sha === expandedCommitSha;
+            const authorId = commit.author.login ?? commit.author.name;
+            const matchesContributor =
+              contributorFilter === "all" || authorId === contributorFilter;
+            const tipBranches = selectedBranches.filter((branch) =>
+              branches.some(
+                (item) => item.name === branch && item.sha === commit.sha,
+              ),
+            );
+
+            return (
+              <button
+                aria-expanded={selected}
+                aria-label={`Inspect commit ${commit.shortSha}: ${commitTitle(commit.message)}`}
+                className="github-commit-graph__row"
+                data-context={!matchesContributor || undefined}
+                data-selected={selected || undefined}
+                key={commit.sha}
+                onClick={() => onSelectCommit(commit)}
+                style={{
+                  gridTemplateColumns: `${graphWidth}px minmax(0, 1fr) auto`,
+                  height: rowHeight,
+                }}
+                type="button"
+              >
+                <span aria-hidden="true" />
+                <span className="min-w-0 py-2.5 text-left">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {commit.parents.length > 1 ? (
+                      <GitMerge className="h-3.5 w-3.5 shrink-0 text-muted" />
+                    ) : null}
+                    <span className="truncate text-xs font-semibold text-foreground">
+                      {commitTitle(commit.message)}
+                    </span>
+                    {tipBranches.map((branch) => {
+                      const colorIndex = selectedBranches.indexOf(branch);
+                      return (
+                        <span
+                          className="github-branch-tip"
+                          key={branch}
+                          style={{
+                            borderColor:
+                              githubBranchColors[
+                                colorIndex % githubBranchColors.length
+                              ],
+                            color:
+                              githubBranchColors[
+                                colorIndex % githubBranchColors.length
+                              ],
+                          }}
+                        >
+                          {branch}
+                        </span>
+                      );
+                    })}
+                  </span>
+                  <span className="mt-1 flex min-w-0 items-center gap-2 text-[10px] text-muted">
+                    <span className="truncate font-semibold text-foreground/80">
+                      {authorId}
+                    </span>
+                    <span className="shrink-0">
+                      {formatCommitTime(commit.authoredAt)}
+                    </span>
+                  </span>
+                </span>
+                <span className="flex items-center gap-2 pr-3 text-[10px] text-muted">
+                  {commit.branchNames.length > 1 ? (
+                    <span className="github-shared-commit-badge">
+                      {commit.branchNames.length} branches
+                    </span>
+                  ) : null}
+                  <span className="font-mono">{commit.shortSha}</span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform ${selected ? "rotate-180" : ""}`}
+                  />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {contributorFilter !== "all" ? (
+        <p className="github-graph-context-note">
+          Other contributors remain dimmed so branch and merge paths stay
+          continuous.
+        </p>
+      ) : null}
+
+      {selectedCommit ? (
+        <article className="github-commit-detail">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
+                Commit detail
+              </p>
+              <h4 className="mt-1 truncate text-sm font-semibold">
+                {commitTitle(selectedCommit.message)}
+              </h4>
+            </div>
+            <a
+              className="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold text-accent hover:underline"
+              href={selectedCommit.htmlUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open on GitHub
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+
+          {detailLoadingSha === selectedCommit.sha ? (
+            <div className="mt-3 space-y-2">
+              <div className="skeleton h-8 rounded-lg" />
+              <div className="skeleton h-8 rounded-lg" />
+            </div>
+          ) : detailError ? (
+            <p className="mt-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
+              {detailError}
+            </p>
+          ) : selectedCommit.detailsLoaded ? (
+            <>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-semibold">
+                <span className="text-muted">
+                  {selectedCommit.changedFiles} changed files
+                </span>
+                <span className="text-success">
+                  +{selectedCommit.additions}
+                </span>
+                <span className="text-danger">-{selectedCommit.deletions}</span>
+                {selectedCommit.parents.length > 1 ? (
+                  <span className="inline-flex items-center gap-1 text-muted">
+                    <GitMerge className="h-3 w-3" />
+                    {selectedCommit.parents.length} parents
+                  </span>
+                ) : null}
+              </div>
+              {selectedCommit.files.length ? (
+                <div className="mt-3 space-y-1">
+                  {selectedCommit.files.map((file) => (
+                    <div className="github-commit-file-row" key={file.path}>
+                      <span
+                        className="github-file-status"
+                        data-status={file.status}
+                      >
+                        {fileStatusLabel(file.status).slice(0, 1)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-mono text-foreground">
+                        {file.path}
+                      </span>
+                      <span className="text-success">+{file.additions}</span>
+                      <span className="text-danger">-{file.deletions}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-muted">
+                  This commit has no changed-file details available.
+                </p>
+              )}
+            </>
+          ) : null}
+        </article>
+      ) : null}
+    </div>
+  );
+}
+
 function EmptyPanel({
   detail,
   icon,
@@ -423,12 +800,18 @@ export function GithubRepositoryExplorer({
   const [branches, setBranches] = useState<GithubBranch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchError, setBranchError] = useState<string | null>(null);
-  const [branchFilter, setBranchFilter] = useState(
-    repositories[0]?.defaultBranch ?? "",
+  const [selectedBranches, setSelectedBranches] = useState<string[]>(
+    repositories[0]?.defaultBranch ? [repositories[0].defaultBranch] : [],
   );
-  const [commits, setCommits] = useState<GithubCommit[]>([]);
+  const [commits, setCommits] = useState<GithubGraphCommit[]>([]);
   const [loadingCommits, setLoadingCommits] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [commitDetailError, setCommitDetailError] = useState<string | null>(
+    null,
+  );
+  const [loadingCommitDetailSha, setLoadingCommitDetailSha] = useState<
+    string | null
+  >(null);
   const [contributorFilter, setContributorFilter] = useState("all");
   const [expandedCommitSha, setExpandedCommitSha] = useState<string | null>(
     null,
@@ -442,7 +825,8 @@ export function GithubRepositoryExplorer({
     null;
   const selectedRepoFullName = selectedRepo?.fullName ?? "";
   const defaultBranch = selectedRepo?.defaultBranch ?? "main";
-  const branch = branchFilter || defaultBranch;
+  const branch = selectedBranches[0] ?? defaultBranch;
+  const selectedBranchKey = selectedBranches.join("\u0000");
   const tree = useMemo(
     () => (selectedRepo ? buildGithubTree(entries) : []),
     [entries, selectedRepo],
@@ -477,16 +861,6 @@ export function GithubRepositoryExplorer({
       ).map(([id, author]) => ({ id, ...author })),
     [commits],
   );
-  const filteredCommits = useMemo(
-    () =>
-      contributorFilter === "all"
-        ? commits
-        : commits.filter(
-            (commit) =>
-              (commit.author.login ?? commit.author.name) === contributorFilter,
-          ),
-    [commits, contributorFilter],
-  );
   const contributorActivity = useMemo(() => {
     const counts = new Map<string, { count: number; name: string }>();
     commits.forEach((commit) => {
@@ -512,18 +886,26 @@ export function GithubRepositoryExplorer({
     setPullRequests([]);
     setBranches([]);
     setSelectedPath(null);
-    setBranchFilter(nextRepository?.defaultBranch ?? "main");
+    setSelectedBranches([nextRepository?.defaultBranch ?? "main"]);
     setContributorFilter("all");
     setExpandedCommitSha(null);
   }
 
-  function selectBranch(nextBranch: string) {
-    setBranchFilter(nextBranch);
+  function toggleBranch(nextBranch: string) {
+    setSelectedBranches((current) => {
+      if (current.includes(nextBranch)) {
+        return current.length > 1
+          ? current.filter((branch) => branch !== nextBranch)
+          : current;
+      }
+      return current.length < 5 ? [...current, nextBranch] : current;
+    });
     setEntries([]);
     setCommits([]);
     setSelectedPath(null);
     setContributorFilter("all");
     setExpandedCommitSha(null);
+    setCommitDetailError(null);
   }
 
   useEffect(() => {
@@ -552,13 +934,18 @@ export function GithubRepositoryExplorer({
         }
         const nextBranches = data.branches ?? [];
         setBranches(nextBranches);
-        setBranchFilter((current) =>
-          nextBranches.some((item) => item.name === current)
-            ? current
-            : (nextBranches.find((item) => item.name === defaultBranch)?.name ??
-              nextBranches[0]?.name ??
-              defaultBranch),
-        );
+        setSelectedBranches((current) => {
+          const available = new Set(nextBranches.map((item) => item.name));
+          const retained = current.filter((branch) => available.has(branch));
+          return retained.length
+            ? retained.slice(0, 5)
+            : [
+                nextBranches.find((item) => item.name === defaultBranch)
+                  ?.name ??
+                  nextBranches[0]?.name ??
+                  defaultBranch,
+              ];
+        });
       } catch (error) {
         if (controller.signal.aborted) return;
         setBranches([]);
@@ -621,11 +1008,7 @@ export function GithubRepositoryExplorer({
   }, [activeTab, branch, selectedRepoFullName]);
 
   useEffect(() => {
-    if (
-      !selectedRepoFullName ||
-      (activeTab !== "commits" && activeTab !== "overview")
-    )
-      return;
+    if (!selectedRepoFullName) return;
 
     const controller = new AbortController();
     const [owner, repo] = selectedRepoFullName.split("/");
@@ -635,20 +1018,60 @@ export function GithubRepositoryExplorer({
       setCommitError(null);
 
       try {
-        const response = await fetch(
-          `/api/github/commits?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&ref=${encodeURIComponent(branch)}&maxResults=12`,
-          { signal: controller.signal },
-        );
-        const data = (await response.json()) as {
-          commits?: GithubCommit[];
-          ok?: boolean;
-          reason?: string;
-        };
+        const branchesForHistory = selectedBranchKey
+          ? selectedBranchKey.split("\u0000")
+          : [defaultBranch];
+        const historyByBranch = await Promise.all(
+          branchesForHistory.map(async (selectedBranch) => {
+            const response = await fetch(
+              `/api/github/commits?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&ref=${encodeURIComponent(selectedBranch)}&maxResults=40&includeDetails=false`,
+              { signal: controller.signal },
+            );
+            const data = (await response.json()) as {
+              commits?: GithubCommit[];
+              ok?: boolean;
+              reason?: string;
+            };
 
-        if (!response.ok || !data.ok) {
-          throw new Error(data.reason ?? "Unable to load commit history.");
-        }
-        setCommits(data.commits ?? []);
+            if (!response.ok || !data.ok) {
+              throw new Error(
+                data.reason ??
+                  `Unable to load commit history for ${selectedBranch}.`,
+              );
+            }
+            return {
+              branch: selectedBranch,
+              commits: data.commits ?? [],
+            };
+          }),
+        );
+        const commitMap = new Map<string, GithubGraphCommit>();
+        historyByBranch.forEach((history) => {
+          history.commits.forEach((commit) => {
+            const existing = commitMap.get(commit.sha);
+            if (existing) {
+              if (!existing.branchNames.includes(history.branch)) {
+                existing.branchNames.push(history.branch);
+              }
+              return;
+            }
+            commitMap.set(commit.sha, {
+              ...commit,
+              branchNames: [history.branch],
+            });
+          });
+        });
+        setCommits(
+          Array.from(commitMap.values()).sort((left, right) => {
+            const leftTime = left.authoredAt
+              ? new Date(left.authoredAt).getTime()
+              : 0;
+            const rightTime = right.authoredAt
+              ? new Date(right.authoredAt).getTime()
+              : 0;
+            return rightTime - leftTime || right.sha.localeCompare(left.sha);
+          }),
+        );
       } catch (error) {
         if (controller.signal.aborted) return;
         setCommits([]);
@@ -664,7 +1087,7 @@ export function GithubRepositoryExplorer({
 
     void loadCommits();
     return () => controller.abort();
-  }, [activeTab, branch, selectedRepoFullName]);
+  }, [defaultBranch, selectedBranchKey, selectedRepoFullName]);
 
   useEffect(() => {
     if (
@@ -711,6 +1134,49 @@ export function GithubRepositoryExplorer({
     void loadPullRequests();
     return () => controller.abort();
   }, [activeTab, selectedRepoFullName]);
+
+  async function selectCommit(commit: GithubGraphCommit) {
+    if (expandedCommitSha === commit.sha) {
+      setExpandedCommitSha(null);
+      setCommitDetailError(null);
+      return;
+    }
+
+    setExpandedCommitSha(commit.sha);
+    setCommitDetailError(null);
+    if (commit.detailsLoaded || !selectedRepoFullName) return;
+
+    const [owner, repo] = selectedRepoFullName.split("/");
+    setLoadingCommitDetailSha(commit.sha);
+    try {
+      const response = await fetch(
+        `/api/github/commits?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&commitSha=${encodeURIComponent(commit.sha)}`,
+      );
+      const data = (await response.json()) as {
+        commit?: GithubCommit;
+        ok?: boolean;
+        reason?: string;
+      };
+      if (!response.ok || !data.ok || !data.commit) {
+        throw new Error(data.reason ?? "Unable to load commit details.");
+      }
+      setCommits((current) =>
+        current.map((item) =>
+          item.sha === commit.sha
+            ? { ...data.commit!, branchNames: item.branchNames }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setCommitDetailError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load commit details.",
+      );
+    } finally {
+      setLoadingCommitDetailSha(null);
+    }
+  }
 
   const selectedFileUrl =
     selectedRepo && selectedNode?.type === "blob"
@@ -901,7 +1367,7 @@ export function GithubRepositoryExplorer({
                       </h3>
                       <p className="mt-1 text-xs text-muted">
                         {commits[0]
-                          ? `${commits[0].author.login ?? commits[0].author.name} · ${relativeTime(commits[0].authoredAt)} on ${branch}`
+                          ? `${commits[0].author.login ?? commits[0].author.name} · ${relativeTime(commits[0].authoredAt)} on ${commits[0].branchNames.join(", ")}`
                           : (commitError ?? `Tracking activity on ${branch}.`)}
                       </p>
                     </div>
@@ -968,8 +1434,9 @@ export function GithubRepositoryExplorer({
                           Contributor activity
                         </h3>
                         <p className="mt-0.5 text-[10px] text-muted">
-                          Share of the latest {commits.length} commits on{" "}
-                          {branch}
+                          Share of the latest {commits.length} commits across{" "}
+                          {selectedBranches.length || 1} selected branch
+                          {(selectedBranches.length || 1) === 1 ? "" : "es"}
                         </p>
                       </div>
                       <GitFork className="h-4 w-4 text-muted" />
@@ -1113,28 +1580,89 @@ export function GithubRepositoryExplorer({
             <div className="flex h-full min-h-0 flex-col">
               {selectedRepo ? (
                 <div className="github-commit-filters shrink-0 border-b border-separator px-3 py-2.5">
-                  <label className="github-filter-field">
-                    <span>
-                      <GitBranch className="h-3.5 w-3.5" />
-                      Branch
-                    </span>
-                    <select
-                      aria-label="Filter commits by branch"
-                      disabled={loadingBranches}
-                      onChange={(event) => selectBranch(event.target.value)}
-                      value={branch}
-                    >
-                      {!branches.some((item) => item.name === branch) ? (
-                        <option value={branch}>{branch}</option>
-                      ) : null}
-                      {branches.map((item) => (
-                        <option key={item.name} value={item.name}>
-                          {item.name}
-                          {item.protected ? " · protected" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <details className="github-branch-picker">
+                    <summary aria-label="Select branches to compare">
+                      <span className="github-branch-picker__label">
+                        <GitBranch className="h-3.5 w-3.5" />
+                        Branches
+                      </span>
+                      <span className="github-branch-picker__value">
+                        {selectedBranches[0] ?? defaultBranch}
+                        {selectedBranches.length > 1
+                          ? ` +${selectedBranches.length - 1}`
+                          : ""}
+                      </span>
+                      <ChevronDown className="github-branch-picker__chevron h-3.5 w-3.5" />
+                    </summary>
+                    <div className="github-branch-picker__menu">
+                      <div className="flex items-center justify-between gap-3 border-b border-separator px-3 py-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                          Compare branches
+                        </span>
+                        <span className="text-[9px] text-muted">
+                          {selectedBranches.length}/5
+                        </span>
+                      </div>
+                      <div className="max-h-52 overflow-y-auto p-1.5">
+                        {loadingBranches ? (
+                          <p className="px-2 py-6 text-center text-xs text-muted">
+                            Loading branches…
+                          </p>
+                        ) : branchError ? (
+                          <p className="px-2 py-6 text-center text-xs text-danger">
+                            {branchError}
+                          </p>
+                        ) : null}
+                        {branches.map((item, index) => {
+                          const selected = selectedBranches.includes(item.name);
+                          const limitReached =
+                            !selected && selectedBranches.length >= 5;
+                          const colorIndex = selected
+                            ? selectedBranches.indexOf(item.name)
+                            : index;
+                          return (
+                            <label
+                              className="github-branch-picker__option"
+                              data-disabled={limitReached || undefined}
+                              key={item.name}
+                            >
+                              <input
+                                checked={selected}
+                                disabled={limitReached}
+                                onChange={() => toggleBranch(item.name)}
+                                type="checkbox"
+                              />
+                              <span
+                                className="github-branch-picker__swatch"
+                                style={{
+                                  backgroundColor:
+                                    githubBranchColors[
+                                      Math.max(0, colorIndex) %
+                                        githubBranchColors.length
+                                    ],
+                                }}
+                              />
+                              <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                                {item.name}
+                              </span>
+                              {item.protected ? (
+                                <span className="text-[9px] text-muted">
+                                  Protected
+                                </span>
+                              ) : null}
+                              {selected ? (
+                                <Check className="h-3.5 w-3.5 text-accent" />
+                              ) : null}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="border-t border-separator px-3 py-2 text-[9px] leading-4 text-muted">
+                        Keep at least one branch selected. Up to five lanes can
+                        be compared at once.
+                      </p>
+                    </div>
+                  </details>
                   <label className="github-filter-field">
                     <span>
                       <UserRound className="h-3.5 w-3.5" />
@@ -1160,10 +1688,10 @@ export function GithubRepositoryExplorer({
               ) : null}
 
               {loadingCommits ? (
-                <div className="space-y-3 p-4">
-                  {Array.from({ length: 5 }, (_, index) => (
+                <div className="space-y-px p-3">
+                  {Array.from({ length: 7 }, (_, index) => (
                     <div
-                      className="skeleton h-24 rounded-xl"
+                      className="skeleton h-16 rounded-lg"
                       key={`commit-skeleton-${index}`}
                     />
                   ))}
@@ -1174,140 +1702,33 @@ export function GithubRepositoryExplorer({
                   icon={<GitCommitHorizontal className="h-5 w-5" />}
                   title="Commit history unavailable"
                 />
-              ) : filteredCommits.length > 0 ? (
+              ) : commits.length > 0 ? (
                 <ScrollShadow
-                  className="min-h-0 flex-1 p-3"
+                  className="min-h-0 flex-1"
                   hideScrollBar={false}
                   offset={8}
                   size={56}
                 >
-                  <div className="space-y-2.5">
-                    {filteredCommits.map((commit) => {
-                      const expanded = expandedCommitSha === commit.sha;
-                      const authorInitial = (
-                        commit.author.login ?? commit.author.name
-                      )
-                        .slice(0, 1)
-                        .toUpperCase();
-
-                      return (
-                        <article
-                          className="overflow-hidden rounded-xl border border-separator bg-surface"
-                          key={commit.sha}
-                        >
-                          <button
-                            aria-expanded={expanded}
-                            className="github-commit-trigger w-full p-3 text-left"
-                            onClick={() =>
-                              setExpandedCommitSha(expanded ? null : commit.sha)
-                            }
-                            type="button"
-                          >
-                            <span className="flex items-start gap-3">
-                              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-separator bg-accent-soft text-xs font-bold text-accent">
-                                {authorInitial}
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-semibold text-foreground">
-                                  {commitTitle(commit.message)}
-                                </span>
-                                <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted">
-                                  <span className="font-semibold text-foreground">
-                                    {commit.author.login ?? commit.author.name}
-                                  </span>
-                                  <span>
-                                    {formatCommitTime(commit.authoredAt)}
-                                  </span>
-                                  <span className="font-mono">
-                                    {commit.shortSha}
-                                  </span>
-                                </span>
-                                <span className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold">
-                                  <span className="text-muted">
-                                    {commit.changedFiles} changed
-                                  </span>
-                                  <span className="text-success">
-                                    +{commit.additions}
-                                  </span>
-                                  <span className="text-danger">
-                                    -{commit.deletions}
-                                  </span>
-                                </span>
-                              </span>
-                            </span>
-                          </button>
-
-                          {expanded ? (
-                            <div className="border-t border-separator bg-surface-secondary/60 p-2">
-                              {commit.files.length > 0 ? (
-                                <div className="space-y-1">
-                                  {commit.files.map((file) => (
-                                    <div
-                                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] hover:bg-surface"
-                                      key={file.path}
-                                    >
-                                      <span
-                                        className="github-file-status"
-                                        data-status={file.status}
-                                      >
-                                        {fileStatusLabel(file.status).slice(
-                                          0,
-                                          1,
-                                        )}
-                                      </span>
-                                      <span className="min-w-0 flex-1 truncate font-mono text-foreground">
-                                        {file.path}
-                                      </span>
-                                      <span className="shrink-0 text-success">
-                                        +{file.additions}
-                                      </span>
-                                      <span className="shrink-0 text-danger">
-                                        -{file.deletions}
-                                      </span>
-                                      {file.htmlUrl ? (
-                                        <a
-                                          aria-label={`Open ${file.path} on GitHub`}
-                                          className="shrink-0 text-muted hover:text-accent"
-                                          href={file.htmlUrl}
-                                          onClick={(event) =>
-                                            event.stopPropagation()
-                                          }
-                                          rel="noreferrer"
-                                          target="_blank"
-                                        >
-                                          <ExternalLink className="h-3 w-3" />
-                                        </a>
-                                      ) : null}
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="px-2 py-3 text-xs text-muted">
-                                  Changed-file details are unavailable for this
-                                  commit.
-                                </p>
-                              )}
-                              <a
-                                className="mt-2 inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-accent hover:underline"
-                                href={commit.htmlUrl}
-                                rel="noreferrer"
-                                target="_blank"
-                              >
-                                Open commit
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            </div>
-                          ) : null}
-                        </article>
-                      );
-                    })}
-                  </div>
+                  <GithubCommitGraph
+                    branches={branches}
+                    commits={commits}
+                    contributorFilter={contributorFilter}
+                    detailError={commitDetailError}
+                    detailLoadingSha={loadingCommitDetailSha}
+                    expandedCommitSha={expandedCommitSha}
+                    onSelectCommit={(commit) => void selectCommit(commit)}
+                    selectedBranches={
+                      selectedBranches.length
+                        ? selectedBranches
+                        : [defaultBranch]
+                    }
+                  />
                 </ScrollShadow>
               ) : (
                 <EmptyPanel
                   detail={
                     contributorFilter === "all"
-                      ? "No commits were returned for this branch."
+                      ? "No commits were returned for the selected branches."
                       : "This contributor has no commits in the loaded history."
                   }
                   icon={<GitCommitHorizontal className="h-5 w-5" />}
