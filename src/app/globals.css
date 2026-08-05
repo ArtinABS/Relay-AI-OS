@@ -3089,56 +3089,12 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 }
 
 .relay-product-shell .github-commit-graph-shell {
-  min-width: 31rem;
-  padding-bottom: 0.75rem;
-}
-
-.relay-product-shell .github-commit-graph-header {
-  align-items: center;
-  backdrop-filter: blur(12px);
-  background: color-mix(in oklab, var(--surface) 92%, transparent);
-  border-bottom: 1px solid var(--separator);
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-  min-height: 2.7rem;
-  padding: 0.55rem 0.75rem;
-  position: sticky;
-  top: 0;
-  z-index: 6;
-}
-
-.relay-product-shell .github-branch-legend {
-  align-items: center;
-  background: var(--surface-secondary);
-  border: 1px solid var(--separator);
-  border-radius: 999px;
-  color: var(--foreground);
-  display: inline-flex;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 0.58rem;
-  font-weight: 650;
-  gap: 0.35rem;
-  max-width: 9rem;
-  overflow: hidden;
-  padding: 0.28rem 0.5rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.relay-product-shell .github-branch-legend > span {
-  border-radius: 999px;
-  flex: 0 0 auto;
-  height: 0.45rem;
-  width: 0.45rem;
+  min-width: 28rem;
+  padding-block: 0.35rem 0.75rem;
 }
 
 .relay-product-shell .github-commit-graph {
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--surface-secondary) 68%, transparent),
-    transparent 34%
-  );
+  background: var(--surface);
   position: relative;
 }
 
@@ -3151,40 +3107,31 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 }
 
 .relay-product-shell .github-graph-guide {
-  opacity: 0.08;
+  opacity: 0.12;
+  stroke-dasharray: 2 3;
   stroke-width: 1;
 }
 
 .relay-product-shell .github-graph-path {
   fill: none;
-  opacity: 0.78;
+  opacity: 0.92;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.5;
+  stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
 .relay-product-shell .github-graph-path--merge {
-  opacity: 0.92;
-  stroke-width: 1.75;
+  opacity: 1;
+  stroke-width: 2;
 }
 
-.relay-product-shell .github-graph-shared-bridge {
-  opacity: 0.42;
-  stroke-dasharray: 2 2;
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.relay-product-shell .github-graph-node-ring {
-  fill: var(--surface);
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
+.relay-product-shell .github-graph-tip-ribbon {
+  opacity: 0.28;
 }
 
 .relay-product-shell .github-graph-node {
-  stroke: var(--surface);
-  stroke-width: 1.5;
+  stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
@@ -3192,7 +3139,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   align-items: stretch;
   background: transparent;
   border-bottom: 1px solid
-    color-mix(in oklab, var(--separator) 58%, transparent);
+    color-mix(in oklab, var(--separator) 32%, transparent);
   display: grid;
   overflow: hidden;
   padding: 0;
@@ -3203,7 +3150,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 }
 
 .relay-product-shell .github-commit-graph__row:hover {
-  background: color-mix(in oklab, var(--accent) 5%, var(--surface));
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
 }
 
 .relay-product-shell .github-commit-graph__row[data-selected="true"] {
@@ -3234,17 +3181,6 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   overflow: hidden;
   padding: 0.2rem 0.35rem;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.relay-product-shell .github-shared-commit-badge {
-  background: color-mix(in oklab, var(--accent) 9%, transparent);
-  border: 1px solid color-mix(in oklab, var(--accent) 18%, transparent);
-  border-radius: 999px;
-  color: var(--accent);
-  font-size: 0.5rem;
-  font-weight: 750;
-  padding: 0.18rem 0.35rem;
   white-space: nowrap;
 }
 

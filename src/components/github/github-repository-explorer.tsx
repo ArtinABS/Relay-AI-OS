@@ -414,11 +414,11 @@ function GithubCommitGraph({
   onSelectCommit: (commit: GithubGraphCommit) => void;
   selectedBranches: string[];
 }) {
-  const rowHeight = 64;
-  const laneGap = 24;
-  const laneStart = 18;
+  const rowHeight = 48;
+  const laneGap = 18;
+  const laneStart = 14;
   const graphWidth = Math.max(
-    58,
+    48,
     laneStart * 2 + selectedBranches.length * laneGap,
   );
   const totalHeight = commits.length * rowHeight;
@@ -434,31 +434,44 @@ function GithubCommitGraph({
   const laneX = (branch: string) =>
     laneStart + (branchIndex.get(branch) ?? 0) * laneGap;
   const rowY = (index: number) => index * rowHeight + rowHeight / 2;
+  const displayBranchForCommit = (commit: GithubGraphCommit) =>
+    selectedBranches.find((branch) => commit.branchNames.includes(branch)) ??
+    selectedBranches[0] ??
+    "main";
   const branchPaths = selectedBranches.flatMap((branch, index) => {
     const rows = commits.flatMap((commit, commitIndex) =>
       commit.branchNames.includes(branch) ? [commitIndex] : [],
     );
-    return rows.slice(0, -1).map((sourceRow, pathIndex) => {
+    return rows.slice(0, -1).flatMap((sourceRow, pathIndex) => {
       const targetRow = rows[pathIndex + 1];
-      const x = laneStart + index * laneGap;
-      return {
-        branch,
-        color: githubBranchColors[index % githubBranchColors.length],
-        d: `M ${x} ${rowY(sourceRow)} L ${x} ${rowY(targetRow)}`,
-        key: `${branch}-${sourceRow}-${targetRow}`,
-      };
+      const sourceBranch = displayBranchForCommit(commits[sourceRow]);
+      const targetBranch = displayBranchForCommit(commits[targetRow]);
+      if (branch !== sourceBranch && branch !== targetBranch) return [];
+      const sourceX = laneX(sourceBranch);
+      const targetX = laneX(targetBranch);
+      const sourceY = rowY(sourceRow);
+      const targetY = rowY(targetRow);
+      const middleY = sourceY + (targetY - sourceY) / 2;
+      return [
+        {
+          branch,
+          color: githubBranchColors[index % githubBranchColors.length],
+          d:
+            sourceX === targetX
+              ? `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`
+              : `M ${sourceX} ${sourceY} C ${sourceX} ${middleY}, ${targetX} ${middleY}, ${targetX} ${targetY}`,
+          key: `${branch}-${sourceRow}-${targetRow}`,
+        },
+      ];
     });
   });
   const mergePaths = commits.flatMap((commit, sourceRow) =>
     commit.parents.slice(1).flatMap((parentSha, parentIndex) => {
       const targetRow = rowIndexBySha.get(parentSha);
       if (targetRow === undefined || targetRow <= sourceRow) return [];
-      const sourceBranch = commit.branchNames[0] ?? selectedBranches[0];
+      const sourceBranch = displayBranchForCommit(commit);
       const parentCommit = commits[targetRow];
-      const targetBranch =
-        parentCommit.branchNames.find((branch) => branch !== sourceBranch) ??
-        parentCommit.branchNames[0] ??
-        sourceBranch;
+      const targetBranch = displayBranchForCommit(parentCommit);
       const sourceX = laneX(sourceBranch);
       const targetX = laneX(targetBranch);
       const sourceY = rowY(sourceRow);
@@ -478,25 +491,6 @@ function GithubCommitGraph({
 
   return (
     <div className="github-commit-graph-shell">
-      <div className="github-commit-graph-header">
-        <div className="flex flex-wrap items-center gap-2">
-          {selectedBranches.map((branch, index) => (
-            <span className="github-branch-legend" key={branch}>
-              <span
-                style={{
-                  backgroundColor:
-                    githubBranchColors[index % githubBranchColors.length],
-                }}
-              />
-              {branch}
-            </span>
-          ))}
-        </div>
-        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
-          Time aligned
-        </span>
-      </div>
-
       <div className="github-commit-graph" style={{ minHeight: totalHeight }}>
         <svg
           aria-hidden="true"
@@ -533,25 +527,11 @@ function GithubCommitGraph({
             />
           ))}
           {commits.map((commit, commitIndex) => {
-            const shared = commit.branchNames.length > 1;
             const nodeY = rowY(commitIndex);
-            const nodeLanes = commit.branchNames.filter((branch) =>
-              branchIndex.has(branch),
-            );
-            const nodeXs = nodeLanes.map(laneX);
+            const nodeLanes = [displayBranchForCommit(commit)];
 
             return (
               <g key={`nodes-${commit.sha}`}>
-                {shared && nodeXs.length > 1 ? (
-                  <line
-                    className="github-graph-shared-bridge"
-                    stroke={githubBranchColors[0]}
-                    x1={Math.min(...nodeXs)}
-                    x2={Math.max(...nodeXs)}
-                    y1={nodeY}
-                    y2={nodeY}
-                  />
-                ) : null}
                 {nodeLanes.map((branch) => {
                   const index = branchIndex.get(branch) ?? 0;
                   const color =
@@ -561,21 +541,24 @@ function GithubCommitGraph({
                   );
                   return (
                     <g key={`${commit.sha}-${branch}`}>
-                      {commit.parents.length > 1 ? (
-                        <circle
-                          className="github-graph-node-ring"
-                          cx={laneX(branch)}
-                          cy={nodeY}
-                          r={isTip ? 7 : 6}
-                          stroke={color}
+                      {isTip ? (
+                        <rect
+                          className="github-graph-tip-ribbon"
+                          fill={color}
+                          height={10}
+                          rx={1}
+                          width={Math.max(12, graphWidth - laneX(branch) - 4)}
+                          x={laneX(branch)}
+                          y={nodeY - 5}
                         />
                       ) : null}
                       <circle
                         className="github-graph-node"
                         cx={laneX(branch)}
                         cy={nodeY}
-                        fill={color}
-                        r={isTip ? 4.5 : 3.5}
+                        fill="var(--surface)"
+                        r={commit.parents.length > 1 ? 4 : isTip ? 5 : 4.5}
+                        stroke={color}
                       />
                     </g>
                   );
@@ -613,12 +596,12 @@ function GithubCommitGraph({
                 type="button"
               >
                 <span aria-hidden="true" />
-                <span className="min-w-0 py-2.5 text-left">
+                <span className="min-w-0 py-1.5 text-left">
                   <span className="flex min-w-0 items-center gap-1.5">
                     {commit.parents.length > 1 ? (
                       <GitMerge className="h-3.5 w-3.5 shrink-0 text-muted" />
                     ) : null}
-                    <span className="truncate text-xs font-semibold text-foreground">
+                    <span className="truncate text-[11px] font-semibold text-foreground">
                       {commitTitle(commit.message)}
                     </span>
                     {tipBranches.map((branch) => {
@@ -643,7 +626,7 @@ function GithubCommitGraph({
                       );
                     })}
                   </span>
-                  <span className="mt-1 flex min-w-0 items-center gap-2 text-[10px] text-muted">
+                  <span className="mt-0.5 flex min-w-0 items-center gap-2 text-[9px] text-muted">
                     <span className="truncate font-semibold text-foreground/80">
                       {authorId}
                     </span>
@@ -652,12 +635,7 @@ function GithubCommitGraph({
                     </span>
                   </span>
                 </span>
-                <span className="flex items-center gap-2 pr-3 text-[10px] text-muted">
-                  {commit.branchNames.length > 1 ? (
-                    <span className="github-shared-commit-badge">
-                      {commit.branchNames.length} branches
-                    </span>
-                  ) : null}
+                <span className="flex items-center gap-2 pr-3 text-[9px] text-muted">
                   <span className="font-mono">{commit.shortSha}</span>
                   <ChevronDown
                     className={`h-3.5 w-3.5 transition-transform ${selected ? "rotate-180" : ""}`}
