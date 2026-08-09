@@ -1,0 +1,163 @@
+@use "../../../styles/variables";
+@use "../../../styles/keyframe-animations";
+
+.relay-simple-editor {
+  --tt-toolbar-height: 3rem;
+  --tt-bg-color: var(--surface-secondary);
+  --tt-toolbar-bg-color: color-mix(
+    in oklab,
+    var(--surface-secondary) 94%,
+    var(--background)
+  );
+  --tt-toolbar-border-color: var(--separator);
+  --tt-border-color: var(--separator);
+  --tt-border-color-tint: var(--separator);
+  --tt-card-bg-color: var(--overlay);
+  --tt-card-border-color: var(--border);
+  --tt-cursor-color: var(--accent);
+  --tt-selection-color: color-mix(in oklab, var(--accent) 22%, transparent);
+  --tt-brand-color-100: color-mix(in oklab, var(--accent) 14%, transparent);
+  --tt-brand-color-200: color-mix(in oklab, var(--accent) 24%, transparent);
+  --tt-brand-color-300: color-mix(in oklab, var(--accent) 42%, transparent);
+  --tt-brand-color-400: var(--accent);
+  --tt-brand-color-500: var(--accent);
+  --tt-brand-color-600: var(--accent-hover);
+  --tt-brand-color-700: var(--accent-hover);
+  --relay-editor-min-height: 9rem;
+
+  background: var(--surface-secondary);
+  border: 1px solid var(--separator);
+  border-radius: 0.875rem;
+  color: var(--foreground);
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+  width: 100%;
+
+  &:focus-within {
+    border-color: color-mix(in oklab, var(--accent) 70%, var(--border));
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  &.task-rich-text--compact {
+    --relay-editor-min-height: 7rem;
+  }
+
+  &.task-rich-text--tall {
+    --relay-editor-min-height: 12rem;
+  }
+}
+
+.relay-product-shell[data-theme="light"] .relay-simple-editor {
+  // Relay owns theme state on the product shell. Alias the generated template's
+  // dark tokens so its `.dark &` rules still resolve to Relay's light palette.
+  --tt-gray-dark-a-50: var(--tt-gray-light-a-50);
+  --tt-gray-dark-a-100: var(--tt-gray-light-a-100);
+  --tt-gray-dark-a-200: var(--tt-gray-light-a-200);
+  --tt-gray-dark-a-300: var(--tt-gray-light-a-300);
+  --tt-gray-dark-a-400: var(--tt-gray-light-a-400);
+  --tt-gray-dark-a-500: var(--tt-gray-light-a-500);
+  --tt-gray-dark-a-600: var(--tt-gray-light-a-600);
+  --tt-gray-dark-a-700: var(--tt-gray-light-a-700);
+  --tt-gray-dark-a-800: var(--tt-gray-light-a-800);
+  --tt-gray-dark-a-900: var(--tt-gray-light-a-900);
+  --tt-gray-dark-50: var(--tt-gray-light-50);
+  --tt-gray-dark-100: var(--tt-gray-light-100);
+  --tt-gray-dark-200: var(--tt-gray-light-200);
+  --tt-gray-dark-300: var(--tt-gray-light-300);
+  --tt-gray-dark-400: var(--tt-gray-light-400);
+  --tt-gray-dark-500: var(--tt-gray-light-500);
+  --tt-gray-dark-600: var(--tt-gray-light-600);
+  --tt-gray-dark-700: var(--tt-gray-light-700);
+  --tt-gray-dark-800: var(--tt-gray-light-800);
+  --tt-gray-dark-900: var(--tt-gray-light-900);
+}
+
+.relay-simple-editor .tiptap-toolbar[data-variant="fixed"] {
+  background: var(--tt-toolbar-bg-color);
+  border-bottom: 1px solid var(--separator);
+  border-top: 0;
+  bottom: auto;
+  height: auto;
+  min-height: var(--tt-toolbar-height);
+  overflow-x: auto;
+  padding: 0.375rem 0.5rem;
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 3;
+}
+
+.relay-simple-editor .tiptap-toolbar-group {
+  flex: 0 0 auto;
+}
+
+.simple-editor-search-and-replace {
+  max-height: min(24rem, calc(100dvh - 7rem));
+  position: absolute;
+  right: 0.5rem;
+  top: calc(var(--tt-toolbar-height) + 0.5rem);
+  z-index: 51;
+}
+
+.simple-editor-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: auto;
+  margin: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor {
+  color: var(--foreground);
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  min-height: var(--relay-editor-min-height);
+  padding: 1rem;
+}
+
+.relay-simple-editor--readonly {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+
+  &:focus-within {
+    box-shadow: none;
+  }
+
+  .simple-editor-content .tiptap.ProseMirror.simple-editor {
+    min-height: 0;
+    padding: 0;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .relay-simple-editor .tiptap-toolbar[data-variant="fixed"] {
+    border-bottom: 1px solid var(--separator);
+    border-top: 0;
+    bottom: auto;
+    height: auto;
+    min-height: var(--tt-toolbar-height);
+    padding: 0.375rem 0.5rem;
+    position: sticky;
+    top: 0;
+  }
+
+  .simple-editor-search-and-replace {
+    left: 0.5rem;
+    max-height: min(22rem, calc(100dvh - 7rem));
+    right: 0.5rem;
+    top: calc(var(--tt-toolbar-height) + 0.5rem);
+    width: auto;
+  }
+
+  .simple-editor-content .tiptap.ProseMirror.simple-editor {
+    padding: 0.875rem;
+  }
+}

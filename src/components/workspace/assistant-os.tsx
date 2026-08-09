@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/attachment";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import {
+  RichTextEditor,
   TaskRichTextEditor,
   type TaskRichDocument,
 } from "@/components/ui/task-rich-text-editor";
@@ -6949,19 +6950,20 @@ function CalendarEventEditor({
                   value={action.location ?? ""}
                 />
               </label>
-              <label className="space-y-1">
+              <div className="space-y-1">
                 <span className="text-xs font-semibold uppercase text-muted">
                   Notes
                 </span>
-                <TextArea
-                  className="min-h-24 w-full resize-y rounded-lg border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-[var(--accent)]"
-                  onChange={(event) =>
-                    onChange({ ...action, notes: event.target.value })
+                <RichTextEditor
+                  ariaLabel="Event notes formatting"
+                  className="task-rich-text--compact"
+                  onChange={(_, plainText) =>
+                    onChange({ ...action, notes: plainText })
                   }
                   placeholder="Agenda, prep notes, links, or context"
                   value={action.notes ?? ""}
                 />
-              </label>
+              </div>
             </div>
             <div className="mt-5 flex gap-2">
               <Button
@@ -7102,7 +7104,9 @@ function MemoryWorkspace({
               className="rounded-lg border border-separator bg-surface p-3"
               key={note.id}
             >
-              <p className="text-sm leading-5">{note.body}</p>
+              <p className="whitespace-pre-wrap text-sm leading-5">
+                {note.body}
+              </p>
               <p className="mt-2 text-xs text-muted">
                 {formatFileTime(note.createdAt)}
               </p>
@@ -7631,8 +7635,8 @@ function TaskComposer({
           </Select>
         </label>
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr]">
-        <label className="space-y-1">
+      <div className="mt-3 space-y-3">
+        <label className="block max-w-40 space-y-1">
           <span className="text-xs font-semibold uppercase text-muted">
             Due date
           </span>
@@ -7643,17 +7647,18 @@ function TaskComposer({
             value={due}
           />
         </label>
-        <label className="space-y-1">
+        <div className="space-y-1">
           <span className="text-xs font-semibold uppercase text-muted">
             Notes
           </span>
-          <Input
-            className="h-10 w-full rounded-md border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
-            onChange={(event) => setNotes(event.target.value)}
+          <RichTextEditor
+            ariaLabel="Task notes formatting"
+            className="task-rich-text--compact"
+            onChange={(_, plainText) => setNotes(plainText)}
             placeholder="Context, project, or reminder details"
             value={notes}
           />
-        </label>
+        </div>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <MiniControl label="Storage" value="Google Tasks" />
@@ -7841,14 +7846,13 @@ function MemoryPermissionSurface({
           </p>
         </div>
       </div>
-      <div className="rounded-lg border border-separator bg-surface-secondary p-3 text-sm leading-6">
-        <TextArea
-          className="min-h-24 w-full resize-y bg-transparent text-sm outline-none placeholder:text-muted"
-          onChange={(event) => setMemory(event.target.value)}
-          placeholder="Write the exact preference, project fact, contact note, or habit to remember."
-          value={memory}
-        />
-      </div>
+      <RichTextEditor
+        ariaLabel="Memory formatting"
+        className="task-rich-text--compact"
+        onChange={(_, plainText) => setMemory(plainText)}
+        placeholder="Write the exact preference, project fact, contact note, or habit to remember."
+        value={memory}
+      />
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <ToggleRow
           checked={allowed}
@@ -7962,18 +7966,19 @@ function EmailApprovalSurface({
             value={subject}
           />
         </label>
-        <label className="block space-y-1">
+        <div className="block space-y-1">
           <span className="text-xs font-semibold uppercase text-muted">
             Body
           </span>
-          <TextArea
-            className="min-h-28 w-full resize-y rounded-md border border-separator bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-[var(--accent)]"
-            disabled={!editing}
-            onChange={(event) => setBody(event.target.value)}
+          <RichTextEditor
+            ariaLabel="Email body formatting"
+            maxLength={20000}
+            onChange={(_, plainText) => setBody(plainText)}
             placeholder="Write or ask the assistant to draft the email body."
+            readOnly={!editing}
             value={body}
           />
-        </label>
+        </div>
       </div>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <Button
@@ -11632,7 +11637,9 @@ function MemoryView({
                 className="rounded-lg border border-separator bg-surface-secondary p-4"
                 key={note.id}
               >
-                <p className="text-sm leading-6">{note.body}</p>
+                <p className="whitespace-pre-wrap text-sm leading-6">
+                  {note.body}
+                </p>
                 <p className="mt-2 text-xs text-muted">
                   {new Date(note.createdAt).toLocaleString()}
                 </p>

@@ -10,6 +10,7 @@ import {
 import { FormEvent, useEffect, useState } from "react";
 import { Card, Link, Surface } from "@heroui/react";
 import { Button, Input } from "@/components/ui/relay-ui";
+import { RichTextEditor } from "@/components/ui/task-rich-text-editor";
 
 type GoogleTask = {
   id?: string | null;
@@ -238,14 +239,15 @@ export function RelayToolsPanel() {
             <StickyNote className="h-5 w-5 text-accent" />
             <h2 className="text-lg font-semibold">Notes</h2>
           </div>
-          <form className="mt-4 flex gap-2" onSubmit={addNoteFromForm}>
-            <Input
-              className="h-10 min-w-0 flex-1 rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
-              onChange={(event) => setNoteBody(event.target.value)}
+          <form className="mt-4 space-y-2" onSubmit={addNoteFromForm}>
+            <RichTextEditor
+              ariaLabel="Note formatting"
+              className="task-rich-text--compact"
+              onChange={(_, plainText) => setNoteBody(plainText)}
               placeholder="Remember something..."
               value={noteBody}
             />
-            <Button className="h-10 rounded-xl bg-accent px-3 text-sm font-medium text-accent-foreground hover:bg-accent-hover">
+            <Button className="h-10 w-full rounded-xl bg-accent px-3 text-sm font-medium text-accent-foreground hover:bg-accent-hover">
               Add
             </Button>
           </form>
@@ -256,7 +258,7 @@ export function RelayToolsPanel() {
                 key={note.id}
                 variant="secondary"
               >
-                {note.body}
+                <span className="whitespace-pre-wrap">{note.body}</span>
               </Surface>
             ))}
             {notes.length === 0 ? (

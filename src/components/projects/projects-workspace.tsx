@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input, Select } from "@/components/ui/relay-ui";
+import { RichTextEditor } from "@/components/ui/task-rich-text-editor";
 import {
   TreeExpander,
   TreeIcon,
@@ -1381,14 +1382,16 @@ function ProjectTaskCreationModal({
               value={title}
             />
           </label>
-          <label className="grid gap-1.5 text-sm font-medium">
+          <div className="grid gap-1.5 text-sm font-medium">
             Notes
-            <textarea
-              className="min-h-28 resize-y rounded-xl border border-separator bg-surface-secondary px-3 py-2 text-sm outline-none focus:border-accent"
-              onChange={(event) => setNotes(event.target.value)}
+            <RichTextEditor
+              ariaLabel="Project task notes formatting"
+              className="task-rich-text--compact"
+              onChange={(_, plainText) => setNotes(plainText)}
+              placeholder="Add context, links, decisions, or a checklist..."
               value={notes}
             />
-          </label>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <ProjectDueDatePicker
               ariaLabel="Choose task due date"
@@ -2235,12 +2238,12 @@ function NotesPanel({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <textarea
+            <RichTextEditor
+              ariaLabel="Project note formatting"
               autoFocus
-              className="mt-5 min-h-48 w-full resize-y rounded-xl border border-separator bg-field-background px-3.5 py-3 text-sm leading-6 outline-none placeholder:text-field-placeholder focus:border-accent focus:ring-3 focus:ring-accent-soft"
-              onChange={(event) => setBody(event.target.value)}
+              className="mt-5 task-rich-text--tall"
+              onChange={(_, plainText) => setBody(plainText)}
               placeholder="Capture enough context for future you..."
-              required
               value={body}
             />
             <div className="mt-5 flex justify-end gap-2">
@@ -2517,16 +2520,17 @@ function ProjectRoadmapPanel({
               />
             </label>
           </div>
-          <label className="mt-3 grid gap-1.5 text-xs font-semibold text-muted">
+          <div className="mt-3 grid gap-1.5 text-xs font-semibold text-muted">
             What changes at this level?
-            <textarea
-              className="min-h-20 resize-y rounded-xl border border-separator bg-field-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
+            <RichTextEditor
+              ariaLabel="Roadmap milestone description formatting"
+              className="task-rich-text--compact"
               maxLength={500}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(_, plainText) => setDescription(plainText)}
               placeholder="Define the outcome or exit criteria."
               value={description}
             />
-          </label>
+          </div>
           <div className="mt-3 flex justify-end gap-2">
             <button
               className="h-9 rounded-xl px-3 text-xs font-semibold text-muted hover:bg-surface-secondary"
