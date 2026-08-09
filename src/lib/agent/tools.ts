@@ -52,6 +52,7 @@ import {
   updateGoogleTaskForUser,
 } from "@/lib/google/workspace";
 import { toolCatalog } from "@/lib/tools/catalog";
+import { projectAgentTools } from "@/lib/projects/agent-tools";
 
 const gmailEmailParameters = z.object({
   to: z.string().min(1),
@@ -63,6 +64,7 @@ const gmailEmailParameters = z.object({
 });
 
 export const agentTools = [
+  ...projectAgentTools,
   defineTool({
     name: "get_workspace_setup_status",
     description:

@@ -70,6 +70,10 @@ import {
   TreeView,
   useTree,
 } from "@/components/ui/tree";
+import {
+  projectRecordSchema,
+  projectRecordUpdatedEvent,
+} from "@/lib/projects/model";
 
 type ProjectStatus = "planning" | "active" | "on-hold" | "completed";
 type ProjectPriority = "low" | "medium" | "high";
@@ -3066,6 +3070,25 @@ export function ProjectsWorkspace({
     void hydrateProjects();
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    function applyAgentProjectUpdate(event: Event) {
+      const detail = (event as CustomEvent<unknown>).detail;
+      const parsed = projectRecordSchema.safeParse(detail);
+      if (!parsed.success) return;
+      setStore(parsed.data.store);
+      setLayoutSizes(parsed.data.layout);
+      setHydrated(true);
+      setSaveState(accountPersistence ? "saved" : "idle");
+    }
+
+    window.addEventListener(projectRecordUpdatedEvent, applyAgentProjectUpdate);
+    return () =>
+      window.removeEventListener(
+        projectRecordUpdatedEvent,
+        applyAgentProjectUpdate,
+      );
+  }, [accountPersistence]);
 
   useEffect(() => {
     if (!hydrated) return;

@@ -6,6 +6,12 @@ import type {
   UIMessagePart,
 } from "ai";
 
+import {
+  applyBrowserProjectRecord,
+  readBrowserProjectRecord,
+} from "@/lib/projects/client";
+import type { ProjectRecord } from "@/lib/projects/model";
+
 export type RelayChatMetadata = {
   timestamp?: string;
   surface?: "schedule" | "task" | "files" | "memory" | "email";
@@ -76,6 +82,7 @@ type AssistantEndpointResponse = {
   role?: "assistant";
   content?: string;
   aiUsed?: boolean;
+  projectRecord?: ProjectRecord;
 };
 
 export const initialRelayChatMessages: RelayChatMessage[] = [];
@@ -168,11 +175,15 @@ export class RelayChatTransport
         body: JSON.stringify({
           message: requestWithContext,
           history,
+          projectRecord: readBrowserProjectRecord(),
         }),
         signal: options.abortSignal,
       });
       providerData =
         await readJsonResponse<AssistantEndpointResponse>(providerResponse);
+      if (providerData?.projectRecord) {
+        applyBrowserProjectRecord(providerData.projectRecord);
+      }
     } catch (error) {
       if (options.abortSignal?.aborted) throw error;
       providerData = {

@@ -56,6 +56,33 @@ import {
 } from "@/lib/google/workspace";
 import { calculateExpression } from "@/lib/local-tools/calculator";
 import { addNote, listNotes, searchNotes } from "@/lib/local-store/notes";
+import {
+  inspectProjectWorkspace,
+  inspectProjectWorkspaceSchema,
+  manageProject,
+  manageProjectCategory,
+  manageProjectCategorySchema,
+  manageProjectMilestone,
+  manageProjectMilestoneSchema,
+  manageProjectNote,
+  manageProjectNoteSchema,
+  manageProjectRepository,
+  manageProjectRepositorySchema,
+  manageProjectSchema,
+  manageProjectTask,
+  manageProjectTaskSchema,
+  type ProjectCommandOutcome,
+} from "@/lib/projects/commands";
+import {
+  defaultProjectRecord,
+  projectPrioritySchema,
+  projectRecordSchema,
+  type ProjectRecord,
+} from "@/lib/projects/model";
+import {
+  readAccountProjectRecord,
+  writeAccountProjectRecord,
+} from "@/lib/projects/persistence";
 
 const requestSchema = z.object({
   message: z.string().min(1),
@@ -68,6 +95,7 @@ const requestSchema = z.object({
     )
     .max(20)
     .optional(),
+  projectRecord: projectRecordSchema.optional(),
 });
 
 const emailToolSchema = z.object({
@@ -85,6 +113,7 @@ type ChatResponse = {
   provider: string;
   modelId: string;
   aiUsed: boolean;
+  projectRecord?: ProjectRecord;
 };
 
 export async function POST(request: Request) {
@@ -147,6 +176,30 @@ export async function POST(request: Request) {
         }))
       : { ok: false, taskLists: [], tasks: [] };
   const notes = await listNotes();
+  const persistedProjects = await readAccountProjectRecord();
+  let activeProjectRecord = structuredClone(
+    persistedProjects.record ??
+      parsed.data.projectRecord ??
+      defaultProjectRecord,
+  );
+  let projectRecordChanged = false;
+
+  function applyProjectOutcome(outcome: ProjectCommandOutcome) {
+    if (outcome.changed) {
+      activeProjectRecord = outcome.record;
+      projectRecordChanged = true;
+    }
+    return outcome.result;
+  }
+
+  async function persistActiveProjectRecord() {
+    if (!projectRecordChanged || !persistedProjects.account) return;
+    try {
+      await writeAccountProjectRecord(activeProjectRecord);
+    } catch (error) {
+      console.error("Project agent sync failed", error);
+    }
+  }
 
   try {
     const result = await generateText({
@@ -161,7 +214,9 @@ export async function POST(request: Request) {
         "Use lifecycle tools, not just creation tools. For any supported object, prefer read/search before update/delete/move/share when identity is ambiguous.",
         "Do not ask for information the user already provided. If generated UI appears, it is for missing or confirmation-only fields and should be prefilled from the user's request.",
         "If the user says they finished/did/completed something, search/list matching tasks before creating follow-up work. Ask for confirmation before marking, deleting, moving, or otherwise changing the existing object.",
-        "Use the available tools when the user asks about tasks, notes, schedule, calendar, OAuth, Gmail, Drive, Contacts, GitHub, repositories, issues, pull requests, or calculations.",
+        "Use the available tools when the user asks about projects, project categories, project notes, milestones, project tasks, project repositories, tasks, notes, schedule, calendar, OAuth, Gmail, Drive, Contacts, GitHub, repositories, issues, pull requests, or calculations.",
+        "The project tools cover the complete Projects workspace. Inspect projects before ambiguous edits. You can create/edit/archive/favorite/reorder/delete projects; manage nested categories and icons; manage project notes and milestones; create or edit local project tasks; link/unlink Google Tasks; and assign/unassign GitHub repositories.",
+        "For a new Google Task that belongs to a project, prefer create_project_google_task so creation and linking happen together. For existing Google Tasks, list them first and then use manage_project_task with link_existing or unlink_existing.",
         "When missing details can be collected through generated UI, acknowledge briefly and rely on the UI instead of asking a numbered plain-text questionnaire.",
         "Never output XML-like control tags such as <need-more-info> or <ui-component>. Use Markdown only; the client renders any needed interactive UI.",
         "For scheduling, task, reminder, file, memory, and email workflows, be concise and let the application surface collect structured details.",
@@ -182,6 +237,20 @@ export async function POST(request: Request) {
             .slice(0, 12),
         )}`,
         `Known recent notes: ${JSON.stringify(notes.slice(0, 8))}`,
+        `Current Projects index: ${JSON.stringify({
+          categories: activeProjectRecord.store.categories.map(
+            ({ id, name, parentId, icon }) => ({ id, name, parentId, icon }),
+          ),
+          projects: activeProjectRecord.store.projects.map(
+            ({ id, name, status, archived, categoryId }) => ({
+              id,
+              name,
+              status,
+              archived,
+              categoryId,
+            }),
+          ),
+        })}`,
         `Google signed in: ${Boolean(directTokens?.accessToken || directTokens?.refreshToken)}`,
         `Google email: ${directTokens?.email ?? "not connected"}`,
         `GitHub signed in: ${Boolean(githubTokens?.accessToken)}`,
@@ -190,7 +259,7 @@ export async function POST(request: Request) {
       ].join("\n"),
       prompt: parsed.data.message,
       temperature: 0.35,
-      stopWhen: stepCountIs(8),
+      stopWhen: stepCountIs(12),
       tools: {
         get_workspace_setup_status: tool({
           description:
@@ -239,6 +308,128 @@ export async function POST(request: Request) {
           }),
           execute: async ({ expression }) =>
             calculateExpression(`calculate ${expression}`),
+        }),
+        inspect_project_workspace: tool({
+          description:
+            "Read the Projects workspace. With no projectRef, list projects, nested categories, ids, settings, and item counts. With a project id or name, return its full settings, notes, local tasks, linked Google Task ids, milestones, and assigned repositories. Use this before ambiguous project changes.",
+          inputSchema: inspectProjectWorkspaceSchema,
+          execute: async (input) => {
+            const result = inspectProjectWorkspace(activeProjectRecord, input);
+            if (
+              !result.ok ||
+              !("project" in result) ||
+              !result.project ||
+              !result.linkedTaskIds
+            ) {
+              return result;
+            }
+            return {
+              ...result,
+              linkedTasks: result.linkedTaskIds.map((taskId) => ({
+                taskId,
+                task:
+                  googleTaskSnapshot.tasks.find((task) => task.id === taskId) ??
+                  null,
+              })),
+            };
+          },
+        }),
+        manage_project: tool({
+          description:
+            "Create or fully edit a Relay project, set favorite/archive state, reorder projects, update Projects layout preferences, or delete a project. Project fields include name, summary, status, priority, nested category, due date, and six-digit hex color. update_layout can change calendarExpanded, calendarHeight, categoryWidth, and projectRailWidth within their validated ranges. Resolve ids with inspect_project_workspace first. Delete requires confirmed=true after explicit approval.",
+          inputSchema: manageProjectSchema,
+          execute: async (input) =>
+            applyProjectOutcome(manageProject(activeProjectRecord, input)),
+        }),
+        manage_project_category: tool({
+          description:
+            "Create a top-level or nested Project category, edit its name/icon, or delete it and its descendants. Available icons are book, briefcase, code, fitness, folder, globe, heart, home, palette, plane, rocket, shopping, sparkles, target, and users. Delete requires confirmed=true after explicit approval.",
+          inputSchema: manageProjectCategorySchema,
+          execute: async (input) =>
+            applyProjectOutcome(
+              manageProjectCategory(activeProjectRecord, input),
+            ),
+        }),
+        manage_project_note: tool({
+          description:
+            "Create, edit, move between sections, or delete a note inside a project. Note sections are brief, research, decisions, and updates. Inspect the project first to obtain note ids. Delete requires confirmed=true after explicit approval.",
+          inputSchema: manageProjectNoteSchema,
+          execute: async (input) =>
+            applyProjectOutcome(manageProjectNote(activeProjectRecord, input)),
+        }),
+        manage_project_milestone: tool({
+          description:
+            "Create, edit, change status, reschedule, or delete a project roadmap milestone. Statuses are planned, in-progress, and completed. Inspect the project first to obtain milestone ids. Delete requires confirmed=true after explicit approval.",
+          inputSchema: manageProjectMilestoneSchema,
+          execute: async (input) =>
+            applyProjectOutcome(
+              manageProjectMilestone(activeProjectRecord, input),
+            ),
+        }),
+        manage_project_task: tool({
+          description:
+            "Manage tasks inside Projects. Use link_existing with a Google Task id and projectRef to link an existing task, or unlink_existing to unlink it without deleting the Google Task. Local project tasks can also be created, edited/completed, or deleted. Prefer create_project_google_task for a new synced task. Local deletion requires confirmed=true.",
+          inputSchema: manageProjectTaskSchema,
+          execute: async (input) =>
+            applyProjectOutcome(manageProjectTask(activeProjectRecord, input)),
+        }),
+        create_project_google_task: tool({
+          description:
+            "Create a synced Google Task and immediately link it to a Relay project. Use this instead of separate create/link calls when the user asks to add a new task inside a project.",
+          inputSchema: z.object({
+            projectRef: z.string().min(1),
+            title: z.string().min(1),
+            notes: z.string().optional(),
+            due: z.string().datetime().nullable().optional(),
+            priority: projectPrioritySchema.optional(),
+            taskListId: z.string().nullable().optional(),
+          }),
+          execute: async ({ projectRef, ...taskInput }) => {
+            const projectResult = inspectProjectWorkspace(activeProjectRecord, {
+              includeArchived: true,
+              projectRef,
+            });
+            if (
+              !projectResult.ok ||
+              !("project" in projectResult) ||
+              !projectResult.project
+            ) {
+              return projectResult;
+            }
+            if (!directTokens?.accessToken && !directTokens?.refreshToken) {
+              return {
+                ok: false,
+                reason:
+                  "Google Tasks is not connected in this browser session. Connect Google before creating a synced project task.",
+              };
+            }
+            const created = await createGoogleTaskForUser(
+              {
+                accessToken: directTokens.accessToken,
+                refreshToken: directTokens.refreshToken,
+              },
+              taskInput,
+            );
+            if (!created.ok || !created.task?.id) return created;
+            const linked = applyProjectOutcome(
+              manageProjectTask(activeProjectRecord, {
+                action: "link_existing",
+                confirmed: false,
+                projectRef: projectResult.project.id,
+                taskRef: created.task.id,
+              }),
+            );
+            return { ...created, projectLink: linked };
+          },
+        }),
+        manage_project_repository: tool({
+          description:
+            "Assign or unassign a GitHub repository in owner/name form to a Relay project. Use list_github_repositories first if the exact repository name is unknown.",
+          inputSchema: manageProjectRepositorySchema,
+          execute: async (input) =>
+            applyProjectOutcome(
+              manageProjectRepository(activeProjectRecord, input),
+            ),
         }),
         list_upcoming_calendar_events: tool({
           description:
@@ -1423,6 +1614,8 @@ export async function POST(request: Request) {
       },
     });
 
+    await persistActiveProjectRecord();
+
     return NextResponse.json<ChatResponse>({
       role: "assistant",
       content:
@@ -1431,9 +1624,13 @@ export async function POST(request: Request) {
       provider: config.provider,
       modelId: config.modelId,
       aiUsed: true,
+      ...(projectRecordChanged
+        ? { projectRecord: activeProjectRecord }
+        : {}),
     });
   } catch (error) {
     console.error("AI assistant chat failed", error);
+    await persistActiveProjectRecord();
 
     return NextResponse.json<ChatResponse>(
       {
@@ -1445,6 +1642,9 @@ export async function POST(request: Request) {
         provider: config.provider,
         modelId: config.modelId,
         aiUsed: false,
+        ...(projectRecordChanged
+          ? { projectRecord: activeProjectRecord }
+          : {}),
       },
       { status: 502 },
     );

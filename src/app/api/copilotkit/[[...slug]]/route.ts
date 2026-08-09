@@ -16,7 +16,7 @@ const runtime = new CopilotRuntime({
       model: assistantModel.model,
       apiKey: assistantModel.apiKey,
       prompt: workAgentPrompt,
-      maxSteps: 6,
+      maxSteps: 12,
       tools: [...agentTools],
       forwardSystemMessages: true,
       forwardDeveloperMessages: true,
