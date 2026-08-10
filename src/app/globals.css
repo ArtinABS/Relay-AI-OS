@@ -1345,11 +1345,24 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 
 .relay-product-shell .project-workspace-tabs {
   overflow: visible;
+  position: relative;
+  z-index: 2;
 }
 
-.relay-product-shell
-  .project-github-workspace
-  > .github-workspace-grid {
+.relay-product-shell .project-workspace-tabs.relay-panel:hover,
+.relay-product-shell .project-workspace-surface.relay-panel:hover {
+  border-color: var(--separator);
+  box-shadow: var(--surface-shadow);
+  transform: none;
+}
+
+.relay-product-shell .project-workspace-surface {
+  margin-top: -1px;
+  position: relative;
+  z-index: 1;
+}
+
+.relay-product-shell .project-github-workspace > .github-workspace-grid {
   height: 100%;
   min-height: 0;
 }
@@ -1378,7 +1391,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 }
 
 .relay-product-shell .project-workspace-tab[data-active="true"] {
-  background: var(--surface-secondary);
+  background: var(--surface);
   color: var(--foreground);
   z-index: 1;
 }
@@ -1395,13 +1408,13 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 
 .relay-product-shell .project-workspace-tab[data-active="true"]::before {
   border-bottom-right-radius: 0.9rem;
-  box-shadow: 0.35rem 0.35rem 0 var(--surface-secondary);
+  box-shadow: 0.35rem 0.35rem 0 var(--surface);
   left: -0.9rem;
 }
 
 .relay-product-shell .project-workspace-tab[data-active="true"]::after {
   border-bottom-left-radius: 0.9rem;
-  box-shadow: -0.35rem 0.35rem 0 var(--surface-secondary);
+  box-shadow: -0.35rem 0.35rem 0 var(--surface);
   right: -0.9rem;
 }
 
@@ -1445,6 +1458,16 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 
 .relay-product-shell .project-workspace-loading {
   animation: fade-in 180ms ease-out both;
+}
+
+.relay-product-shell .project-resizable-layout > .task-resize-handle--vertical {
+  border-inline: 1px solid var(--separator);
+}
+
+@media (max-width: 47.99rem) {
+  .relay-product-shell .project-workspace-pane:not(:last-child) {
+    border-bottom: 1px solid var(--separator);
+  }
 }
 
 .relay-product-shell .project-milestone-summary {

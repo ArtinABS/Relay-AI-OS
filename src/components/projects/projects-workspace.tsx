@@ -26,6 +26,7 @@ import {
   Dumbbell,
   ExternalLink,
   FileText,
+  Filter,
   Folder,
   FolderOpen,
   FolderTree,
@@ -2907,6 +2908,7 @@ export function ProjectsWorkspace({
     null,
   );
   const [query, setQuery] = useState("");
+  const [projectFiltersExpanded, setProjectFiltersExpanded] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">(
     "all",
   );
@@ -3274,10 +3276,12 @@ export function ProjectsWorkspace({
       );
       return count + progress.total - progress.completed;
     }, 0);
+  const projectFiltersActive =
+    query.trim().length > 0 || statusFilter !== "all";
 
   return (
-    <div className="projects-workspace flex min-h-full flex-col gap-4 animate-fade-in md:h-full md:min-h-0">
-      <header className="project-workspace-tabs relay-panel shrink-0 rounded-2xl border border-separator bg-surface px-3 pt-3 shadow-surface">
+    <div className="projects-workspace flex min-h-full flex-col gap-0 animate-fade-in md:h-full md:min-h-0">
+      <header className="project-workspace-tabs relay-panel shrink-0 rounded-t-2xl border border-b-0 border-separator bg-surface px-3 pt-3 shadow-surface">
         <div
           aria-label="Project workspaces"
           className="flex min-w-0 items-end gap-1"
@@ -3345,7 +3349,7 @@ export function ProjectsWorkspace({
       </header>
 
       {workspaceTab === "github" ? (
-        <div className="project-github-workspace min-h-0 flex-1 overflow-hidden">
+        <div className="project-github-workspace project-workspace-surface relay-panel min-h-0 flex-1 overflow-hidden rounded-b-2xl rounded-tr-2xl border border-separator bg-surface shadow-surface">
           <GithubRepositoryExplorer
             repositories={repositories}
             repositoryError={repositoryError}
@@ -3355,20 +3359,21 @@ export function ProjectsWorkspace({
         </div>
       ) : (
         <>
-          <div
-            className="project-resizable-layout grid min-h-0 min-w-0 flex-1 gap-4 overflow-hidden md:gap-0"
-            data-categories-collapsed={categoriesCollapsed || undefined}
-            ref={projectLayoutRef}
-            style={
-              {
-                "--project-calendar-height": `${layoutSizes.calendarHeight}px`,
-                "--project-category-width": `${categoriesCollapsed ? 64 : layoutSizes.categoryWidth}px`,
-                "--project-rail-width": `${layoutSizes.projectRailWidth}px`,
-              } as CSSProperties
-            }
-          >
+          <div className="project-workspace-surface relay-panel min-h-0 min-w-0 flex-1 overflow-hidden rounded-b-2xl rounded-tr-2xl border border-separator bg-surface shadow-surface">
+            <div
+              className="project-resizable-layout grid h-full min-h-0 min-w-0 gap-4 overflow-hidden md:gap-0"
+              data-categories-collapsed={categoriesCollapsed || undefined}
+              ref={projectLayoutRef}
+              style={
+                {
+                  "--project-calendar-height": `${layoutSizes.calendarHeight}px`,
+                  "--project-category-width": `${categoriesCollapsed ? 64 : layoutSizes.categoryWidth}px`,
+                  "--project-rail-width": `${layoutSizes.projectRailWidth}px`,
+                } as CSSProperties
+              }
+            >
             <aside
-              className="project-spine relay-panel relative flex h-80 min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:h-auto"
+              className="project-spine project-workspace-pane relative flex h-80 min-h-0 min-w-0 flex-col overflow-hidden bg-surface md:h-auto"
               data-collapsed={categoriesCollapsed || undefined}
             >
               <div className="border-b border-separator p-3">
@@ -3589,7 +3594,7 @@ export function ProjectsWorkspace({
               value={layoutSizes.categoryWidth}
             />
 
-            <section className="relay-panel flex h-[28rem] min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:h-auto">
+            <section className="project-workspace-pane flex h-[28rem] min-h-0 min-w-0 flex-col overflow-hidden bg-surface md:h-auto">
               <div className="border-b border-separator p-3">
                 <div className="flex items-center justify-between gap-2 px-1">
                   <div>
@@ -3605,37 +3610,71 @@ export function ProjectsWorkspace({
                       {visibleProjects.length === 1 ? "project" : "projects"}
                     </p>
                   </div>
-                  <MoreHorizontal className="h-4 w-4 text-muted" />
-                </div>
-                <div className="mt-3 grid gap-2">
-                  <div className="relative min-w-0">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-                    <input
-                      aria-label="Search projects"
-                      className="h-9 w-full rounded-lg border border-separator bg-surface-secondary pl-9 pr-3 text-xs outline-none placeholder:text-muted focus:border-accent"
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search projects"
-                      value={query}
-                    />
+                  <div className="flex items-center gap-1">
+                    <button
+                      aria-label="Project rail options"
+                      className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-foreground"
+                      title="Project rail options"
+                      type="button"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                    <button
+                      aria-expanded={projectFiltersExpanded}
+                      aria-label={
+                        projectFiltersExpanded
+                          ? "Hide project filters"
+                          : "Show project filters"
+                      }
+                      className={`relative grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-accent ${projectFiltersExpanded ? "bg-accent-soft text-accent" : ""}`}
+                      onClick={() =>
+                        setProjectFiltersExpanded((current) => !current)
+                      }
+                      title={
+                        projectFiltersExpanded
+                          ? "Hide filters"
+                          : "Show filters"
+                      }
+                      type="button"
+                    >
+                      <Filter className="h-4 w-4" />
+                      {projectFiltersActive ? (
+                        <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent" />
+                      ) : null}
+                    </button>
                   </div>
-                  <Select
-                    aria-label="Filter project status"
-                    className="h-9 w-full rounded-lg border border-separator bg-surface-secondary px-2.5 text-xs outline-none focus:border-accent"
-                    onChange={(event) =>
-                      setStatusFilter(
-                        event.target.value as ProjectStatus | "all",
-                      )
-                    }
-                    value={statusFilter}
-                  >
-                    <option value="all">All statuses</option>
-                    {Object.entries(statusMeta).map(([value, meta]) => (
-                      <option key={value} value={value}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </Select>
                 </div>
+                {projectFiltersExpanded ? (
+                  <div className="mt-3 grid gap-2">
+                    <div className="relative min-w-0">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+                      <input
+                        aria-label="Search projects"
+                        className="h-9 w-full rounded-lg border border-separator bg-surface-secondary pl-9 pr-3 text-xs outline-none placeholder:text-muted focus:border-accent"
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search projects"
+                        value={query}
+                      />
+                    </div>
+                    <Select
+                      aria-label="Filter project status"
+                      className="h-9 w-full rounded-lg border border-separator bg-surface-secondary px-2.5 text-xs outline-none focus:border-accent"
+                      onChange={(event) =>
+                        setStatusFilter(
+                          event.target.value as ProjectStatus | "all",
+                        )
+                      }
+                      value={statusFilter}
+                    >
+                      <option value="all">All statuses</option>
+                      {Object.entries(statusMeta).map(([value, meta]) => (
+                        <option key={value} value={value}>
+                          {meta.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                ) : null}
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-2">
                 {visibleProjects.length ? (
@@ -3783,7 +3822,7 @@ export function ProjectsWorkspace({
               value={layoutSizes.projectRailWidth}
             />
 
-            <section className="relay-panel flex min-h-[36rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:min-h-0">
+            <section className="project-workspace-pane flex min-h-[36rem] min-w-0 flex-col overflow-hidden bg-surface md:min-h-0">
               {selectedProject ? (
                 (() => {
                   const progress = projectProgress(
@@ -4241,6 +4280,7 @@ export function ProjectsWorkspace({
                 <EmptyProjects onCreate={() => setProjectForm("new")} />
               )}
             </section>
+            </div>
           </div>
 
           {projectForm ? (

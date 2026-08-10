@@ -8434,33 +8434,9 @@ function TaskMasterDetailView({
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
                 Google Tasks
               </p>
-              <Select
-                aria-label="Google task list"
-                className="mt-1 h-9 max-w-56 rounded-lg border border-separator bg-surface-secondary px-2.5 text-sm font-semibold"
-                onChange={(event) => {
-                  setSelectedTaskListId(event.target.value);
-                  setSelectedTaskId(null);
-                }}
-                value={selectedListId}
-              >
-                {taskLists.map((taskList) => {
-                  const counts = taskListCounts[taskList.id ?? "@default"] ?? {
-                    pending: 0,
-                    total: 0,
-                  };
-                  return (
-                    <option
-                      key={taskList.id ?? taskList.title}
-                      value={taskList.id ?? "@default"}
-                    >
-                      {`${taskList.title} — ${counts.pending} pending · ${counts.total} total`}
-                    </option>
-                  );
-                })}
-                {taskLists.length === 0 ? (
-                  <option value="@default">My Tasks</option>
-                ) : null}
-              </Select>
+              <h2 className="mt-1 truncate text-lg font-semibold">
+                {selectedTaskList?.title ?? "My Tasks"}
+              </h2>
               <div className="mt-1.5 flex items-center gap-3 text-[10px] text-muted">
                 <span>
                   <strong className="font-semibold text-foreground">
@@ -8751,6 +8727,11 @@ function TaskMasterDetailView({
           onClose={() => setTaskListModalOpen(false)}
           onMutate={async (body) => {
             await runGoogleTaskAction(body);
+          }}
+          onSelect={(taskListId) => {
+            setSelectedTaskListId(taskListId);
+            setSelectedTaskId(null);
+            setTaskListModalOpen(false);
           }}
           selectedTaskListId={selectedListId}
           taskListCounts={taskListCounts}
@@ -10539,12 +10520,14 @@ function taskDateValue(value?: string | null): DateValue | null {
 function GoogleTaskListManagerModal({
   onClose,
   onMutate,
+  onSelect,
   selectedTaskListId,
   taskListCounts,
   taskLists,
 }: {
   onClose: () => void;
   onMutate: (body: Record<string, unknown>) => Promise<void>;
+  onSelect: (taskListId: string) => void;
   selectedTaskListId: string;
   taskListCounts: Record<string, { pending: number; total: number }>;
   taskLists: Array<{ id?: string | null; title: string }>;
@@ -10584,7 +10567,8 @@ function GoogleTaskListManagerModal({
               <div>
                 <h3 className="text-lg font-semibold">Google task lists</h3>
                 <p className="mt-1 text-sm text-muted">
-                  Add, rename, or remove the lists stored in Google Tasks.
+                  Select a list, or add, rename, and remove lists stored in
+                  Google Tasks.
                 </p>
               </div>
               <Button
@@ -10643,38 +10627,67 @@ function GoogleTaskListManagerModal({
                     }`}
                     key={id}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface text-accent">
-                        <ListTodo className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        {editing ? (
-                          <Input
-                            aria-label={`Rename ${taskList.title}`}
-                            autoFocus
-                            className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-sm"
-                            onChange={(event) =>
-                              setEditingTitle(event.target.value)
-                            }
-                            value={editingTitle}
-                          />
-                        ) : (
-                          <p className="truncate text-sm font-semibold">
-                            {taskList.title}
-                          </p>
-                        )}
-                        <p className="mt-0.5 text-[10px] text-muted">
-                          <span className="font-semibold text-foreground">
-                            {counts.pending}
-                          </span>{" "}
-                          pending
-                          {" · "}
-                          <span className="font-semibold text-foreground">
-                            {counts.total}
-                          </span>{" "}
-                          total
-                        </p>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      {editing ? (
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface text-accent">
+                            <ListTodo className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              aria-label={`Rename ${taskList.title}`}
+                              autoFocus
+                              className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-sm"
+                              onChange={(event) =>
+                                setEditingTitle(event.target.value)
+                              }
+                              value={editingTitle}
+                            />
+                            <p className="mt-0.5 text-[10px] text-muted">
+                              <span className="font-semibold text-foreground">
+                                {counts.pending}
+                              </span>{" "}
+                              pending
+                              {" · "}
+                              <span className="font-semibold text-foreground">
+                                {counts.total}
+                              </span>{" "}
+                              total
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                          onClick={() => onSelect(id)}
+                          type="button"
+                        >
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface text-accent">
+                            <ListTodo className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold">
+                              {taskList.title}
+                            </span>
+                            <span className="mt-0.5 block text-[10px] text-muted">
+                              <span className="font-semibold text-foreground">
+                                {counts.pending}
+                              </span>{" "}
+                              pending
+                              {" · "}
+                              <span className="font-semibold text-foreground">
+                                {counts.total}
+                              </span>{" "}
+                              total
+                            </span>
+                          </span>
+                          {id === selectedTaskListId ? (
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-accent-foreground">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                          ) : null}
+                        </button>
+                      )}
                       <div className="flex shrink-0 items-center gap-1">
                         {editing ? (
                           <>
@@ -13217,7 +13230,7 @@ function formatDueDate(value?: string | null) {
 }
 
 function formatRemainingDueDays(value?: string | null) {
-  if (!value) return "∞";
+  if (!value) return "No due date";
 
   const dateOnly = value.slice(0, 10);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly);
@@ -13232,7 +13245,7 @@ function formatRemainingDueDays(value?: string | null) {
           : Number.NaN;
       })();
 
-  if (Number.isNaN(due)) return "∞";
+  if (Number.isNaN(due)) return "No due date";
   const remainingDays = Math.round((due - today) / 86_400_000);
   if (remainingDays === 0) return "Today";
   if (remainingDays === 1) return "1 day left";
