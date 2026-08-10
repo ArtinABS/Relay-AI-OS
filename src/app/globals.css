@@ -2205,6 +2205,22 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   transform: none;
 }
 
+.relay-product-shell .task-project-badge {
+  background: color-mix(
+    in oklab,
+    var(--task-project-color) 13%,
+    var(--surface-secondary)
+  );
+  border: 1px solid
+    color-mix(in oklab, var(--task-project-color) 42%, var(--separator));
+  box-shadow: inset 2px 0 0 var(--task-project-color);
+  color: color-mix(in oklab, var(--task-project-color) 72%, var(--foreground));
+}
+
+.relay-product-shell .task-project-badge svg {
+  color: var(--task-project-color);
+}
+
 @media (min-width: 64rem) {
   .relay-product-shell .task-resizable-layout {
     grid-template-columns:

@@ -246,6 +246,8 @@ type TaskCategoryAssignments = Record<string, string>;
 type TaskRepositoryAssignments = Record<string, string>;
 type TaskRichDescriptions = Record<string, TaskRichDocument>;
 
+const githubTaskProjectColor = "#7c9cff";
+
 type RelayNote = {
   id: string;
   body: string;
@@ -8071,6 +8073,10 @@ function TaskMasterDetailView({
     useTaskRichDescriptions();
   const { projectAssignments, projects, setTaskProject } =
     useTaskProjectLinks();
+  const taskProjectsById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects],
+  );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
     initialTaskKey ?? googleTaskKey(tasks[0] ?? null),
   );
@@ -8618,24 +8624,31 @@ function TaskMasterDetailView({
           size={56}
         >
           <div className="space-y-2">
-            {filteredTasks.map((task) => (
-              <TaskListCard
-                archived={archivedTaskKeys.has(googleTaskKey(task) ?? "")}
-                key={googleTaskKey(task)}
-                onArchiveToggle={() =>
-                  setTaskArchived(
-                    task,
-                    !archivedTaskKeys.has(googleTaskKey(task) ?? ""),
-                  )
-                }
-                onSelect={() => selectTask(task)}
-                selected={googleTaskKey(selectedTask) === googleTaskKey(task)}
-                task={task}
-                toggleTask={
-                  task.status === "completed" ? reopenTask : completeTask
-                }
-              />
-            ))}
+            {filteredTasks.map((task) => {
+              const taskKey = googleTaskKey(task) ?? "";
+              const projectId = task.id
+                ? (projectAssignments[task.id] ?? null)
+                : null;
+              return (
+                <TaskListCard
+                  archived={archivedTaskKeys.has(taskKey)}
+                  key={taskKey}
+                  onArchiveToggle={() =>
+                    setTaskArchived(task, !archivedTaskKeys.has(taskKey))
+                  }
+                  onSelect={() => selectTask(task)}
+                  project={
+                    projectId ? (taskProjectsById.get(projectId) ?? null) : null
+                  }
+                  repositoryFullName={repositoryAssignments[taskKey] ?? null}
+                  selected={googleTaskKey(selectedTask) === taskKey}
+                  task={task}
+                  toggleTask={
+                    task.status === "completed" ? reopenTask : completeTask
+                  }
+                />
+              );
+            })}
             {filteredTasks.length === 0 ? (
               <EmptyState
                 detail={
@@ -8841,6 +8854,8 @@ function TaskListCard({
   archived,
   onArchiveToggle,
   onSelect,
+  project,
+  repositoryFullName,
   selected,
   task,
   toggleTask,
@@ -8848,6 +8863,8 @@ function TaskListCard({
   archived: boolean;
   onArchiveToggle: () => void;
   onSelect: () => void;
+  project: RelayProject | null;
+  repositoryFullName: string | null;
   selected: boolean;
   task: GoogleTask;
   toggleTask: (task: GoogleTask) => Promise<void>;
@@ -8868,8 +8885,24 @@ function TaskListCard({
         type="button"
       >
         <span className="block min-w-0">
-          <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+          <span className="flex min-w-0 flex-wrap items-center gap-1.5 overflow-hidden">
             <PriorityTag priority={googleTaskPriority(task)} />
+            {project ? (
+              <TaskProjectBadge
+                color={project.color}
+                icon={Folder}
+                label={project.name}
+                source="Relay project"
+              />
+            ) : null}
+            {repositoryFullName ? (
+              <TaskProjectBadge
+                color={githubTaskProjectColor}
+                icon={GitBranch}
+                label={repositoryFullName}
+                source="GitHub repository"
+              />
+            ) : null}
             {completed ? (
               <Chip color="success" size="sm" variant="soft">
                 Complete
@@ -8916,6 +8949,30 @@ function TaskListCard({
         </Button>
       </span>
     </article>
+  );
+}
+
+function TaskProjectBadge({
+  color,
+  icon: Icon,
+  label,
+  source,
+}: {
+  color: string;
+  icon: LucideIcon;
+  label: string;
+  source: string;
+}) {
+  return (
+    <span
+      aria-label={`${source}: ${label}`}
+      className="task-project-badge inline-flex min-w-0 max-w-36 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-3"
+      style={{ "--task-project-color": color } as CSSProperties}
+      title={`${source}: ${label}`}
+    >
+      <Icon className="h-2.5 w-2.5 shrink-0" />
+      <span className="min-w-0 truncate">{label}</span>
+    </span>
   );
 }
 
