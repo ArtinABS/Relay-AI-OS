@@ -4,9 +4,13 @@ import { z } from "zod";
 import { getDirectGoogleTokens } from "@/lib/google/direct-session";
 import {
   completeGoogleTaskForUser,
+  createGoogleTaskListForUser,
   createGoogleTaskForUser,
+  deleteGoogleTaskListForUser,
   deleteGoogleTaskForUser,
   listGoogleTasksForUser,
+  moveGoogleTaskForUser,
+  renameGoogleTaskListForUser,
   updateGoogleTaskForUser,
 } from "@/lib/google/workspace";
 
@@ -41,6 +45,22 @@ const requestSchema = z.discriminatedUnion("action", [
     id: z.string().min(1),
     taskListId: z.string().nullable().optional(),
   }),
+  z.object({
+    action: z.literal("create-list"),
+    title: z.string().trim().min(1),
+  }),
+  z.object({
+    action: z.literal("rename-list"),
+    id: z.string().min(1),
+    title: z.string().trim().min(1),
+  }),
+  z.object({ action: z.literal("delete-list"), id: z.string().min(1) }),
+  z.object({
+    action: z.literal("move"),
+    id: z.string().min(1),
+    sourceTaskListId: z.string().min(1),
+    targetTaskListId: z.string().min(1),
+  }),
 ]);
 
 export async function GET() {
@@ -65,7 +85,9 @@ export async function GET() {
       {
         ok: false,
         reason:
-          error instanceof Error ? error.message : "Unable to read Google Tasks.",
+          error instanceof Error
+            ? error.message
+            : "Unable to read Google Tasks.",
         taskLists: [],
         tasks: [],
       },
@@ -76,7 +98,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const tokens = await getDirectGoogleTokens();
-  const parsed = requestSchema.safeParse(await request.json().catch(() => null));
+  const parsed = requestSchema.safeParse(
+    await request.json().catch(() => null),
+  );
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -115,6 +139,26 @@ export async function POST(request: Request) {
       return NextResponse.json(result, { status: result.ok ? 200 : 412 });
     }
 
+    if (parsed.data.action === "create-list") {
+      const result = await createGoogleTaskListForUser(tokens, parsed.data);
+      return NextResponse.json(result, { status: result.ok ? 201 : 412 });
+    }
+
+    if (parsed.data.action === "rename-list") {
+      const result = await renameGoogleTaskListForUser(tokens, parsed.data);
+      return NextResponse.json(result, { status: result.ok ? 200 : 412 });
+    }
+
+    if (parsed.data.action === "delete-list") {
+      const result = await deleteGoogleTaskListForUser(tokens, parsed.data);
+      return NextResponse.json(result, { status: result.ok ? 200 : 412 });
+    }
+
+    if (parsed.data.action === "move") {
+      const result = await moveGoogleTaskForUser(tokens, parsed.data);
+      return NextResponse.json(result, { status: result.ok ? 200 : 412 });
+    }
+
     const result = await deleteGoogleTaskForUser(tokens, parsed.data);
     return NextResponse.json(result, { status: result.ok ? 200 : 412 });
   } catch (error) {
@@ -122,7 +166,9 @@ export async function POST(request: Request) {
       {
         ok: false,
         reason:
-          error instanceof Error ? error.message : "Unable to update Google Tasks.",
+          error instanceof Error
+            ? error.message
+            : "Unable to update Google Tasks.",
       },
       { status: 502 },
     );

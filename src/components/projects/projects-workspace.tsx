@@ -40,6 +40,8 @@ import {
   Loader2,
   Milestone,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Palette,
   Pencil,
   Plus,
@@ -57,6 +59,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { GithubRepositoryExplorer } from "@/components/github/github-repository-explorer";
 import { Button, Input, Select } from "@/components/ui/relay-ui";
 import { RichTextEditor } from "@/components/ui/task-rich-text-editor";
 import {
@@ -107,6 +110,7 @@ export type ProjectTask = {
 };
 
 export type ProjectRepository = {
+  defaultBranch?: string;
   id: number;
   name: string;
   fullName: string;
@@ -121,10 +125,15 @@ export type ProjectRepository = {
   updatedAt?: string | null;
 };
 
-type ProjectTaskCategory = {
-  id: string;
-  name: string;
-  parentId: string | null;
+type ProjectRepositoryTask = {
+  completed?: string | null;
+  due?: string | null;
+  id?: string | null;
+  repositoryFullName?: string | null;
+  status?: string | null;
+  taskListTitle?: string | null;
+  title: string;
+  updated?: string | null;
 };
 
 type Project = {
@@ -206,8 +215,6 @@ type ProjectTab = "overview" | "roadmap" | "tasks" | "notes" | "repositories";
 
 const projectStorageKey = "relay.projects.v1";
 const projectLayoutStorageKey = "relay.project-layout.v1";
-const taskCategoryStorageKey = "relay.task-categories.v1";
-const taskCategoryAssignmentStorageKey = "relay.task-category-assignments.v1";
 const defaultProjectLayout = {
   calendarExpanded: true,
   calendarHeight: 210,
@@ -822,7 +829,7 @@ function ProjectForm({
               value={draft.name}
             />
           </label>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4">
             <label className="grid gap-1.5 text-sm font-medium">
               Status
               <Select
@@ -1042,6 +1049,7 @@ function ProjectCategoryInlineForm({
 function ProjectCategoryTreeBranch({
   addingParentId,
   categories,
+  compact = false,
   editingId,
   level = 0,
   onAdd,
@@ -1057,6 +1065,7 @@ function ProjectCategoryTreeBranch({
 }: {
   addingParentId: string | null;
   categories: ProjectCategory[];
+  compact?: boolean;
   editingId: string | null;
   level?: number;
   onAdd: (
@@ -1100,64 +1109,71 @@ function ProjectCategoryTreeBranch({
         parentPath={parentPath}
       >
         <TreeNodeTrigger
+          aria-label={compact ? category.name : undefined}
           className={
             selectedId === category.id ? "bg-accent-soft text-accent" : ""
           }
           onClick={() => onSelect(category.id)}
+          title={compact ? category.name : undefined}
         >
           <TreeExpander hasChildren={hasChildren} />
           <TreeIcon
             hasChildren={hasChildren}
             icon={<CategoryIcon className="h-4 w-4 text-accent" />}
           />
-          <TreeLabel>{category.name}</TreeLabel>
-          <span className="text-[10px] tabular-nums text-muted">{count}</span>
-          <span className="flex shrink-0 items-center gap-0.5 opacity-70 transition group-hover:opacity-100">
-            <Button
-              aria-label={`Add subcategory to ${category.name}`}
-              className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-accent-soft hover:text-accent"
-              onClick={(event) => {
-                event.stopPropagation();
-                onEditingChange(null);
-                onAddingParentChange(category.id);
-                if (!expandedIds.has(category.id)) toggleExpanded(category.id);
-              }}
-              type="button"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              aria-label={`Edit ${category.name}`}
-              className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-accent-soft hover:text-accent"
-              onClick={(event) => {
-                event.stopPropagation();
-                onAddingParentChange(null);
-                onEditingChange(category.id);
-              }}
-              type="button"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              aria-label={`Delete ${category.name}`}
-              className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-danger-soft hover:text-danger"
-              onClick={(event) => {
-                event.stopPropagation();
-                if (
-                  window.confirm(
-                    `Delete "${category.name}" and its nested categories? Projects will remain and become uncategorized.`,
-                  )
-                ) {
-                  onDelete(category.id);
-                }
-              }}
-              type="button"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </span>
+          {!compact ? <TreeLabel>{category.name}</TreeLabel> : null}
+          {!compact ? (
+            <span className="text-[10px] tabular-nums text-muted">{count}</span>
+          ) : null}
+          {!compact ? (
+            <span className="flex shrink-0 items-center gap-0.5 opacity-70 transition group-hover:opacity-100">
+              <Button
+                aria-label={`Add subcategory to ${category.name}`}
+                className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-accent-soft hover:text-accent"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onEditingChange(null);
+                  onAddingParentChange(category.id);
+                  if (!expandedIds.has(category.id))
+                    toggleExpanded(category.id);
+                }}
+                type="button"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                aria-label={`Edit ${category.name}`}
+                className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-accent-soft hover:text-accent"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAddingParentChange(null);
+                  onEditingChange(category.id);
+                }}
+                type="button"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                aria-label={`Delete ${category.name}`}
+                className="h-7 w-7 rounded-lg p-0 text-muted hover:bg-danger-soft hover:text-danger"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (
+                    window.confirm(
+                      `Delete "${category.name}" and its nested categories? Projects will remain and become uncategorized.`,
+                    )
+                  ) {
+                    onDelete(category.id);
+                  }
+                }}
+                type="button"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </span>
+          ) : null}
         </TreeNodeTrigger>
-        {editingId === category.id ? (
+        {!compact && editingId === category.id ? (
           <ProjectCategoryInlineForm
             className="mb-1"
             initialIcon={category.icon}
@@ -1172,7 +1188,7 @@ function ProjectCategoryTreeBranch({
           />
         ) : null}
         <TreeNodeContent hasChildren={hasChildren}>
-          {addingParentId === category.id ? (
+          {!compact && addingParentId === category.id ? (
             <ProjectCategoryInlineForm
               className="mb-1"
               label={`New subcategory in ${category.name}`}
@@ -1187,6 +1203,7 @@ function ProjectCategoryTreeBranch({
           <ProjectCategoryTreeBranch
             addingParentId={addingParentId}
             categories={categories}
+            compact={compact}
             editingId={editingId}
             level={level + 1}
             onAdd={onAdd}
@@ -1232,88 +1249,19 @@ function EmptyProjects({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-function readProjectTaskCategories() {
-  if (typeof window === "undefined") return [] as ProjectTaskCategory[];
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(taskCategoryStorageKey) ?? "[]",
-    ) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((item): ProjectTaskCategory[] => {
-      if (
-        !item ||
-        typeof item !== "object" ||
-        !("id" in item) ||
-        typeof item.id !== "string" ||
-        !("name" in item) ||
-        typeof item.name !== "string"
-      ) {
-        return [];
-      }
-      return [
-        {
-          id: item.id,
-          name: item.name,
-          parentId:
-            "parentId" in item && typeof item.parentId === "string"
-              ? item.parentId
-              : null,
-        },
-      ];
-    });
-  } catch {
-    return [];
-  }
-}
-
-function flattenProjectTaskCategories(
-  categories: ProjectTaskCategory[],
-  parentId: string | null = null,
-  depth = 0,
-): Array<{ category: ProjectTaskCategory; depth: number }> {
-  return categories
-    .filter((category) => category.parentId === parentId)
-    .flatMap((category) => [
-      { category, depth },
-      ...flattenProjectTaskCategories(categories, category.id, depth + 1),
-    ]);
-}
-
-function assignCreatedTaskCategory(
-  task: ProjectTask,
-  categoryId: string | null,
-) {
-  if (!categoryId || typeof window === "undefined") return;
-  try {
-    const saved = JSON.parse(
-      window.localStorage.getItem(taskCategoryAssignmentStorageKey) ?? "{}",
-    ) as Record<string, string>;
-    const taskKey = `${task.taskListId ?? "@default"}:${task.id}`;
-    window.localStorage.setItem(
-      taskCategoryAssignmentStorageKey,
-      JSON.stringify({ ...saved, [taskKey]: categoryId }),
-    );
-  } catch {
-    // The Google task is still valid if optional local category metadata fails.
-  }
-}
-
 function ProjectTaskCreationModal({
   onClose,
   onCreate,
   taskLists,
 }: {
   onClose: () => void;
-  onCreate: (
-    input: {
-      title: string;
-      notes?: string | null;
-      due?: string | null;
-      priority?: ProjectPriority;
-      columnId?: string | null;
-    },
-    categoryId: string | null,
-  ) => Promise<void>;
+  onCreate: (input: {
+    title: string;
+    notes?: string | null;
+    due?: string | null;
+    priority?: ProjectPriority;
+    columnId?: string | null;
+  }) => Promise<void>;
   taskLists: Array<{ id: string; title: string }>;
 }) {
   const [title, setTitle] = useState("");
@@ -1321,10 +1269,8 @@ function ProjectTaskCreationModal({
   const [due, setDue] = useState<string | null>(null);
   const [priority, setPriority] = useState<ProjectPriority>("medium");
   const [taskListId, setTaskListId] = useState(taskLists[0]?.id ?? "@default");
-  const [categoryId, setCategoryId] = useState("none");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const categories = useMemo(() => readProjectTaskCategories(), []);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -1332,18 +1278,15 @@ function ProjectTaskCreationModal({
     setSaving(true);
     setStatus(null);
     try {
-      await onCreate(
-        {
-          title: title.trim(),
-          notes: notes.trim() || null,
-          due: due
-            ? new Date(`${due.slice(0, 10)}T23:59:00`).toISOString()
-            : null,
-          priority,
-          columnId: taskListId || "@default",
-        },
-        categoryId === "none" ? null : categoryId,
-      );
+      await onCreate({
+        title: title.trim(),
+        notes: notes.trim() || null,
+        due: due
+          ? new Date(`${due.slice(0, 10)}T23:59:00`).toISOString()
+          : null,
+        priority,
+        columnId: taskListId || "@default",
+      });
       onClose();
     } catch (error) {
       setStatus(
@@ -1418,7 +1361,7 @@ function ProjectTaskCreationModal({
               </Select>
             </label>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4">
             <label className="grid gap-1.5 text-sm font-medium">
               Google task list
               <Select
@@ -1434,23 +1377,6 @@ function ProjectTaskCreationModal({
                   ))
                 ) : (
                   <option value="@default">Default</option>
-                )}
-              </Select>
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">
-              Category
-              <Select
-                className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
-                onChange={(event) => setCategoryId(event.target.value)}
-                value={categoryId}
-              >
-                <option value="none">No category</option>
-                {flattenProjectTaskCategories(categories).map(
-                  ({ category, depth }) => (
-                    <option key={category.id} value={category.id}>
-                      {`${"— ".repeat(depth)}${category.name}`}
-                    </option>
-                  ),
                 )}
               </Select>
             </label>
@@ -1770,9 +1696,8 @@ function TaskPanel({
       {taskModalOpen ? (
         <ProjectTaskCreationModal
           onClose={() => setTaskModalOpen(false)}
-          onCreate={async (input, categoryId) => {
+          onCreate={async (input) => {
             const createdTask = await onCreateTask(input);
-            assignCreatedTaskCategory(createdTask, categoryId);
             onStoreChange((current) => ({
               ...current,
               taskAssignments: {
@@ -2940,6 +2865,9 @@ function ProjectsWorkspaceSkeleton() {
 export function ProjectsWorkspace({
   initialProjectId,
   repositories,
+  repositoryError,
+  repositoryTasks,
+  signedInToGithub,
   taskLists,
   tasks,
   onCompleteTask,
@@ -2948,6 +2876,9 @@ export function ProjectsWorkspace({
 }: {
   initialProjectId?: string | null;
   repositories: ProjectRepository[];
+  repositoryError?: string;
+  repositoryTasks: ProjectRepositoryTask[];
+  signedInToGithub: boolean;
   taskLists: Array<{ id: string; title: string }>;
   tasks: ProjectTask[];
   onCompleteTask: (task: ProjectTask) => Promise<void>;
@@ -2961,6 +2892,8 @@ export function ProjectsWorkspace({
   onOpenTask: (task: ProjectTask) => void;
 }) {
   const [store, setStore] = useState<ProjectStore>(emptyStore);
+  const [workspaceTab, setWorkspaceTab] = useState<"relay" | "github">("relay");
+  const [categoriesCollapsed, setCategoriesCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [accountPersistence, setAccountPersistence] = useState(false);
   const [accountLabel, setAccountLabel] = useState<string | null>(null);
@@ -3344,156 +3277,179 @@ export function ProjectsWorkspace({
 
   return (
     <div className="projects-workspace flex min-h-full flex-col gap-4 animate-fade-in md:h-full md:min-h-0">
-      <header className="relay-panel shrink-0 rounded-2xl border border-separator bg-surface p-4 shadow-surface sm:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-          <div className="min-w-0 xl:w-72 xl:shrink-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">Projects</h1>
-              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-accent">
-                {store.projects.filter((project) => !project.archived).length}
-              </span>
-              {accountPersistence ? (
+      <header className="project-workspace-tabs relay-panel shrink-0 rounded-2xl border border-separator bg-surface px-3 pt-3 shadow-surface">
+        <div
+          aria-label="Project workspaces"
+          className="flex min-w-0 items-end gap-1"
+          role="tablist"
+        >
+          <button
+            aria-selected={workspaceTab === "relay"}
+            className="project-workspace-tab"
+            data-active={workspaceTab === "relay" || undefined}
+            onClick={() => setWorkspaceTab("relay")}
+            role="tab"
+            type="button"
+          >
+            <Folder className="h-4 w-4" />
+            <span>Project management</span>
+            <span className="project-workspace-tab__count">
+              {store.projects.filter((project) => !project.archived).length}
+            </span>
+          </button>
+          <button
+            aria-selected={workspaceTab === "github"}
+            className="project-workspace-tab"
+            data-active={workspaceTab === "github" || undefined}
+            onClick={() => setWorkspaceTab("github")}
+            role="tab"
+            type="button"
+          >
+            <GitBranch className="h-4 w-4" />
+            <span>GitHub projects</span>
+            <span className="project-workspace-tab__count">
+              {repositories.length}
+            </span>
+          </button>
+          <div className="ml-auto flex items-center gap-2 pb-2 pl-2">
+            {workspaceTab === "relay" ? (
+              <>
                 <span
-                  className={`text-[10px] font-medium ${saveState === "error" ? "text-danger" : "text-muted"}`}
-                  title={`Project data is synced to ${accountLabel ?? "your account"}.`}
+                  className={`hidden text-[10px] font-medium sm:inline ${saveState === "error" ? "text-danger" : accountPersistence ? "text-muted" : "text-warning"}`}
+                  title={
+                    accountPersistence
+                      ? `Project data is synced to ${accountLabel ?? "your account"}.`
+                      : "Sign in to sync project data."
+                  }
                 >
-                  {saveState === "saving"
-                    ? "Saving…"
-                    : saveState === "error"
-                      ? "Sync paused"
-                      : "Account saved"}
+                  {accountPersistence
+                    ? saveState === "saving"
+                      ? "Saving…"
+                      : saveState === "error"
+                        ? "Sync paused"
+                        : "Account saved"
+                    : "Local only"}
                 </span>
-              ) : hydrated ? (
-                <span
-                  className="text-[10px] font-medium text-warning"
-                  title="Sign in with your Relay, Google, or GitHub account to sync project data."
+                <button
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-accent px-3 text-xs font-semibold text-accent-foreground hover:bg-accent-hover"
+                  onClick={() => setProjectForm("new")}
+                  type="button"
                 >
-                  Local only
-                </span>
-              ) : null}
-            </div>
-          </div>
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <input
-              aria-label="Search projects"
-              className="h-11 w-full rounded-xl border border-separator bg-surface-secondary pl-10 pr-3 text-sm outline-none placeholder:text-muted focus:border-accent focus:ring-3 focus:ring-accent-soft"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search projects"
-              value={query}
-            />
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <Select
-              aria-label="Filter project status"
-              className="h-11 min-w-36 rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-accent"
-              onChange={(event) =>
-                setStatusFilter(event.target.value as ProjectStatus | "all")
-              }
-              value={statusFilter}
-            >
-              <option value="all">All statuses</option>
-              {Object.entries(statusMeta).map(([value, meta]) => (
-                <option key={value} value={value}>
-                  {meta.label}
-                </option>
-              ))}
-            </Select>
-            <button
-              className="inline-flex h-11 min-w-[9.5rem] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-accent px-5 text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
-              onClick={() => setProjectForm("new")}
-              type="button"
-            >
-              <Plus className="h-4 w-4" />
-              <span>New project</span>
-            </button>
+                  <Plus className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">New project</span>
+                </button>
+              </>
+            ) : null}
           </div>
         </div>
       </header>
 
-      <div
-        className="project-resizable-layout grid min-h-0 min-w-0 flex-1 gap-4 overflow-hidden md:gap-0"
-        ref={projectLayoutRef}
-        style={
-          {
-            "--project-calendar-height": `${layoutSizes.calendarHeight}px`,
-            "--project-category-width": `${layoutSizes.categoryWidth}px`,
-            "--project-rail-width": `${layoutSizes.projectRailWidth}px`,
-          } as CSSProperties
-        }
-      >
-        <aside className="project-spine relay-panel relative flex h-80 min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:h-auto">
-          <div className="border-b border-separator p-3">
-            <button
-              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${selectedCategoryId === null ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-surface-secondary hover:text-foreground"}`}
-              onClick={() => setSelectedCategoryId(null)}
-              type="button"
+      {workspaceTab === "github" ? (
+        <div className="project-github-workspace min-h-0 flex-1 overflow-hidden">
+          <GithubRepositoryExplorer
+            repositories={repositories}
+            repositoryError={repositoryError}
+            signedIn={signedInToGithub}
+            tasks={repositoryTasks}
+          />
+        </div>
+      ) : (
+        <>
+          <div
+            className="project-resizable-layout grid min-h-0 min-w-0 flex-1 gap-4 overflow-hidden md:gap-0"
+            data-categories-collapsed={categoriesCollapsed || undefined}
+            ref={projectLayoutRef}
+            style={
+              {
+                "--project-calendar-height": `${layoutSizes.calendarHeight}px`,
+                "--project-category-width": `${categoriesCollapsed ? 64 : layoutSizes.categoryWidth}px`,
+                "--project-rail-width": `${layoutSizes.projectRailWidth}px`,
+              } as CSSProperties
+            }
+          >
+            <aside
+              className="project-spine relay-panel relative flex h-80 min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:h-auto"
+              data-collapsed={categoriesCollapsed || undefined}
             >
-              <FolderOpen className="h-4 w-4" />
-              <span>All projects</span>
-              <span className="ml-auto text-[11px] tabular-nums">
-                {
-                  store.projects.filter(
-                    (project) => project.archived === showArchived,
-                  ).length
-                }
-              </span>
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <div className="mb-2 flex items-center justify-between px-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
-                Categories
-              </p>
-              <button
-                aria-label="Add category"
-                className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface-secondary hover:text-accent"
-                onClick={() => {
-                  setEditingCategoryId(null);
-                  setAddingCategoryParentId("root");
-                }}
-                type="button"
+              <div className="border-b border-separator p-3">
+                <div
+                  className={`flex items-center ${categoriesCollapsed ? "flex-col gap-1" : "gap-1"}`}
+                >
+                  <button
+                    aria-label="All projects"
+                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${selectedCategoryId === null ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-surface-secondary hover:text-foreground"}`}
+                    onClick={() => setSelectedCategoryId(null)}
+                    title={categoriesCollapsed ? "All projects" : undefined}
+                    type="button"
+                  >
+                    <FolderOpen className="h-4 w-4 shrink-0" />
+                    {!categoriesCollapsed ? <span>All projects</span> : null}
+                    {!categoriesCollapsed ? (
+                      <span className="ml-auto text-[11px] tabular-nums">
+                        {
+                          store.projects.filter(
+                            (project) => project.archived === showArchived,
+                          ).length
+                        }
+                      </span>
+                    ) : null}
+                  </button>
+                  <button
+                    aria-label={
+                      categoriesCollapsed
+                        ? "Expand project categories"
+                        : "Collapse project categories"
+                    }
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-accent"
+                    onClick={() => {
+                      setCategoriesCollapsed((current) => !current);
+                      setAddingCategoryParentId(null);
+                      setEditingCategoryId(null);
+                    }}
+                    title={
+                      categoriesCollapsed
+                        ? "Expand categories"
+                        : "Collapse categories"
+                    }
+                    type="button"
+                  >
+                    {categoriesCollapsed ? (
+                      <PanelLeftOpen className="h-4 w-4" />
+                    ) : (
+                      <PanelLeftClose className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div
+                className={`min-h-0 flex-1 overflow-y-auto ${categoriesCollapsed ? "px-1 py-3" : "p-3"}`}
               >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {addingCategoryParentId === "root" ? (
-              <ProjectCategoryInlineForm
-                className="mb-2"
-                label="New top-level category"
-                onCancel={() => setAddingCategoryParentId(null)}
-                onSave={(name, icon) => {
-                  updateStore((current) => ({
-                    ...current,
-                    categories: [
-                      ...current.categories,
-                      {
-                        id: makeId("project-category"),
-                        icon,
-                        name,
-                        parentId: null,
-                      },
-                    ],
-                  }));
-                  setAddingCategoryParentId(null);
-                }}
-              />
-            ) : null}
-            {store.categories.length ? (
-              <TreeProvider
-                defaultExpandedIds={store.categories.map(
-                  (category) => category.id,
-                )}
-                indent={22}
-                selectable={false}
-                showLines
-              >
-                <TreeView className="p-0">
-                  <ProjectCategoryTreeBranch
-                    addingParentId={addingCategoryParentId}
-                    categories={store.categories}
-                    editingId={editingCategoryId}
-                    onAdd={(name, parentId, icon) =>
+                <div className="mb-2 flex items-center justify-between px-2">
+                  {!categoriesCollapsed ? (
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                      Categories
+                    </p>
+                  ) : null}
+                  {!categoriesCollapsed ? (
+                    <button
+                      aria-label="Add category"
+                      className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface-secondary hover:text-accent"
+                      onClick={() => {
+                        setEditingCategoryId(null);
+                        setAddingCategoryParentId("root");
+                      }}
+                      type="button"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+                {addingCategoryParentId === "root" ? (
+                  <ProjectCategoryInlineForm
+                    className="mb-2"
+                    label="New top-level category"
+                    onCancel={() => setAddingCategoryParentId(null)}
+                    onSave={(name, icon) => {
                       updateStore((current) => ({
                         ...current,
                         categories: [
@@ -3502,777 +3458,873 @@ export function ProjectsWorkspace({
                             id: makeId("project-category"),
                             icon,
                             name,
-                            parentId,
+                            parentId: null,
                           },
                         ],
-                      }))
-                    }
-                    onAddingParentChange={setAddingCategoryParentId}
-                    onDelete={removeCategory}
-                    onEditingChange={setEditingCategoryId}
-                    onRename={(id, name, icon) =>
-                      updateStore((current) => ({
-                        ...current,
-                        categories: current.categories.map((category) =>
-                          category.id === id
-                            ? { ...category, icon, name }
-                            : category,
-                        ),
-                      }))
-                    }
-                    onSelect={setSelectedCategoryId}
-                    parentId={null}
-                    projects={store.projects.filter(
-                      (project) => project.archived === showArchived,
-                    )}
-                    selectedId={selectedCategoryId}
+                      }));
+                      setAddingCategoryParentId(null);
+                    }}
                   />
-                </TreeView>
-              </TreeProvider>
-            ) : (
-              <p className="rounded-lg border border-dashed border-separator px-3 py-5 text-center text-xs text-muted">
-                Add a category to start the tree.
-              </p>
-            )}
-          </div>
-          <div className="border-t border-separator p-3">
-            <button
-              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${showArchived ? "bg-surface-secondary text-foreground" : "text-muted hover:bg-surface-secondary hover:text-foreground"}`}
-              onClick={() => {
-                setShowArchived((current) => !current);
-                setSelectedCategoryId(null);
-              }}
-              type="button"
-            >
-              <Archive className="h-4 w-4" />
-              <span>{showArchived ? "Back to projects" : "Archived"}</span>
-            </button>
-            <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-secondary p-2 text-center">
-              <div>
-                <p className="text-sm font-semibold tabular-nums">
-                  {totalActive}
-                </p>
-                <p className="text-[9px] uppercase tracking-wide text-muted">
-                  Active
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold tabular-nums">
-                  {totalOpenTasks}
-                </p>
-                <p className="text-[9px] uppercase tracking-wide text-muted">
-                  Open
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold tabular-nums">
-                  {totalCompleted}
-                </p>
-                <p className="text-[9px] uppercase tracking-wide text-muted">
-                  Done
-                </p>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <ProjectResizeHandle
-          active={activeResize === "categories"}
-          ariaLabel="Resize project categories"
-          defaultValue={defaultProjectLayout.categoryWidth}
-          max={320}
-          min={170}
-          onChange={setCategoryWidth}
-          onPointerDown={(event) => startProjectResize(event, "categories")}
-          onPointerMove={moveProjectResize}
-          onPointerUp={finishProjectResize}
-          orientation="vertical"
-          value={layoutSizes.categoryWidth}
-        />
-
-        <section className="relay-panel flex h-[28rem] min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:h-auto">
-          <div className="flex items-center justify-between border-b border-separator px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">
-                {showArchived
-                  ? "Archived projects"
-                  : selectedCategoryId
-                    ? categoryPath(selectedCategoryId, store.categories)
-                    : "All projects"}
-              </h2>
-              <p className="mt-0.5 text-[11px] text-muted">
-                {visibleProjects.length}{" "}
-                {visibleProjects.length === 1 ? "project" : "projects"}
-              </p>
-            </div>
-            <MoreHorizontal className="h-4 w-4 text-muted" />
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {visibleProjects.length ? (
-              visibleProjects.map((project) => {
-                const progress = projectProgress(
-                  project.id,
-                  store.localTasks,
-                  tasks,
-                  store.taskAssignments,
-                );
-                return (
-                  <button
-                    className={`project-list-card relative mb-2 w-full overflow-hidden rounded-xl border p-3 text-left transition ${
-                      selectedProject?.id === project.id
-                        ? "bg-accent-soft shadow-surface"
-                        : "border-transparent hover:border-separator hover:bg-surface-secondary"
-                    } ${draggedProjectId === project.id ? "opacity-45" : ""} ${
-                      dragOverProjectId === project.id ? "translate-y-0.5" : ""
-                    }`}
-                    draggable
-                    key={project.id}
-                    onClick={() => {
-                      setSelectedProjectId(project.id);
-                      setTab("overview");
-                    }}
-                    onDragEnd={() => {
-                      setDraggedProjectId(null);
-                      setDragOverProjectId(null);
-                    }}
-                    onDragOver={(event: ReactDragEvent<HTMLButtonElement>) => {
-                      event.preventDefault();
-                      if (draggedProjectId && draggedProjectId !== project.id) {
-                        setDragOverProjectId(project.id);
-                      }
-                    }}
-                    onDragStart={(event: ReactDragEvent<HTMLButtonElement>) => {
-                      setDraggedProjectId(project.id);
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData("text/plain", project.id);
-                    }}
-                    onDrop={(event: ReactDragEvent<HTMLButtonElement>) => {
-                      event.preventDefault();
-                      const sourceId =
-                        event.dataTransfer.getData("text/plain") ||
-                        draggedProjectId;
-                      if (sourceId) swapProjects(sourceId, project.id);
-                      setDraggedProjectId(null);
-                      setDragOverProjectId(null);
-                    }}
-                    style={
-                      selectedProject?.id === project.id
-                        ? { borderColor: project.color }
-                        : undefined
-                    }
-                    type="button"
+                ) : null}
+                {store.categories.length ? (
+                  <TreeProvider
+                    defaultExpandedIds={store.categories.map(
+                      (category) => category.id,
+                    )}
+                    indent={categoriesCollapsed ? 10 : 22}
+                    selectable={false}
+                    showLines
                   >
-                    <span
-                      className="absolute inset-y-3 left-0 w-0.5 rounded-r-full"
-                      style={{ backgroundColor: project.color }}
-                    />
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface shadow-surface"
-                        style={{ color: project.color }}
-                      >
-                        <Folder className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="truncate text-sm font-semibold">
-                            {project.name}
-                          </h3>
-                          {project.favorite ? (
-                            <Star className="h-3 w-3 shrink-0 fill-warning text-warning" />
-                          ) : null}
-                        </div>
-                        <p className="mt-1 truncate text-[11px] text-muted">
-                          {categoryPath(project.categoryId, store.categories)}
-                        </p>
-                      </div>
-                      <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted/55 active:cursor-grabbing" />
-                    </div>
-                    <div className="mt-4 flex items-end gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center justify-between text-[10px] text-muted">
-                          <span>
-                            {progress.completed}/{progress.total} tasks
-                          </span>
-                          <span>{progress.percent}%</span>
-                        </div>
-                        <div className="h-1 overflow-hidden rounded-full bg-default">
-                          <div
-                            className="h-full rounded-full transition-[width]"
-                            style={{
-                              backgroundColor: project.color,
-                              width: `${progress.percent}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <span
-                        className={`rounded-full px-2 py-1 text-[9px] font-semibold ${statusMeta[project.status].className}`}
-                      >
-                        {statusMeta[project.status].label}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="px-5 py-12 text-center">
-                <Search className="mx-auto h-5 w-5 text-muted" />
-                <p className="mt-3 text-sm font-medium">No projects here</p>
-                <p className="mt-1 text-xs leading-5 text-muted">
-                  Try another category or status, or create a project.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <ProjectResizeHandle
-          active={activeResize === "projects"}
-          ariaLabel="Resize project rail"
-          defaultValue={defaultProjectLayout.projectRailWidth}
-          max={420}
-          min={220}
-          onChange={setProjectRailWidth}
-          onPointerDown={(event) => startProjectResize(event, "projects")}
-          onPointerMove={moveProjectResize}
-          onPointerUp={finishProjectResize}
-          orientation="vertical"
-          value={layoutSizes.projectRailWidth}
-        />
-
-        <section className="relay-panel flex min-h-[36rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:min-h-0">
-          {selectedProject ? (
-            (() => {
-              const progress = projectProgress(
-                selectedProject.id,
-                store.localTasks,
-                tasks,
-                store.taskAssignments,
-              );
-              const projectNotes = store.notes.filter(
-                (note) => note.projectId === selectedProject.id,
-              );
-              const projectRepositories =
-                store.repositoryAssignments[selectedProject.id] ?? [];
-              const projectMilestones = store.milestones.filter(
-                (milestone) => milestone.projectId === selectedProject.id,
-              );
-              const projectLocalTasks = store.localTasks.filter(
-                (task) => task.projectId === selectedProject.id,
-              );
-              const linkedProjectTasks = tasks.filter(
-                (task) => store.taskAssignments[task.id] === selectedProject.id,
-              );
-              const openProjectTasks = progress.total - progress.completed;
-              return (
-                <>
-                  <div className="shrink-0 border-b border-separator px-4 py-4 sm:px-5">
-                    <div className="flex items-start gap-4">
-                      <span
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-surface-secondary"
-                        style={{ color: selectedProject.color }}
-                      >
-                        <FolderOpen className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-lg font-semibold sm:text-xl">
-                            {selectedProject.name}
-                          </h2>
-                          <span
-                            className={`rounded-full px-2 py-1 text-[10px] font-semibold ${statusMeta[selectedProject.status].className}`}
-                          >
-                            {statusMeta[selectedProject.status].label}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted">
-                          {categoryPath(
-                            selectedProject.categoryId,
-                            store.categories,
-                          )}{" "}
-                          · Updated{" "}
-                          {relativeProjectDate(selectedProject.updatedAt)}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <button
-                          aria-expanded={layoutSizes.calendarExpanded}
-                          aria-label={
-                            layoutSizes.calendarExpanded
-                              ? "Collapse project calendar"
-                              : "Expand project calendar"
-                          }
-                          className={`relative grid h-9 w-9 place-items-center rounded-lg transition hover:bg-surface-secondary ${layoutSizes.calendarExpanded ? "text-accent" : "text-muted"}`}
-                          onClick={() =>
-                            setLayoutSizes((current) => ({
-                              ...current,
-                              calendarExpanded: !current.calendarExpanded,
-                            }))
-                          }
-                          title={
-                            layoutSizes.calendarExpanded
-                              ? "Collapse calendar"
-                              : "Expand calendar"
-                          }
-                          type="button"
-                        >
-                          <CalendarDays className="h-4 w-4" />
-                          <ChevronDown
-                            className={`absolute bottom-1 right-1 h-2.5 w-2.5 transition-transform ${layoutSizes.calendarExpanded ? "" : "-rotate-90"}`}
-                          />
-                        </button>
-                        <button
-                          aria-label={
-                            selectedProject.favorite
-                              ? "Remove from favorites"
-                              : "Add to favorites"
-                          }
-                          className={`grid h-9 w-9 place-items-center rounded-lg transition hover:bg-surface-secondary ${selectedProject.favorite ? "text-warning" : "text-muted"}`}
-                          onClick={() =>
-                            updateStore((current) => ({
-                              ...current,
-                              projects: current.projects.map((project) =>
-                                project.id === selectedProject.id
-                                  ? {
-                                      ...project,
-                                      favorite: !project.favorite,
-                                      updatedAt: new Date().toISOString(),
-                                    }
-                                  : project,
-                              ),
-                            }))
-                          }
-                          type="button"
-                        >
-                          <Star
-                            className={`h-4 w-4 ${selectedProject.favorite ? "fill-current" : ""}`}
-                          />
-                        </button>
-                        <button
-                          aria-label="Edit project"
-                          className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-foreground"
-                          onClick={() => setProjectForm("edit")}
-                          type="button"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          aria-label={
-                            selectedProject.archived
-                              ? "Restore project"
-                              : "Archive project"
-                          }
-                          className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-foreground"
-                          onClick={() =>
-                            updateStore((current) => ({
-                              ...current,
-                              projects: current.projects.map((project) =>
-                                project.id === selectedProject.id
-                                  ? {
-                                      ...project,
-                                      archived: !project.archived,
-                                      updatedAt: new Date().toISOString(),
-                                    }
-                                  : project,
-                              ),
-                            }))
-                          }
-                          type="button"
-                        >
-                          {selectedProject.archived ? (
-                            <ArchiveRestore className="h-4 w-4" />
-                          ) : (
-                            <Archive className="h-4 w-4" />
-                          )}
-                        </button>
-                        <button
-                          aria-label="Delete project"
-                          className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger"
-                          onClick={() => setDeleteProject(selectedProject)}
-                          type="button"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className="project-detail-stack grid min-h-0 min-w-0 flex-1 md:gap-0"
-                    data-calendar-collapsed={
-                      !layoutSizes.calendarExpanded || undefined
-                    }
-                  >
-                    <Tabs
-                      className="flex min-h-0 flex-col overflow-hidden"
-                      onSelectionChange={(key) => setTab(key as ProjectTab)}
-                      selectedKey={tab}
-                    >
-                      <Tabs.ListContainer className="project-tabs-list-container shrink-0 rounded-none border-b border-separator bg-surface">
-                        <Tabs.List
-                          aria-label={`${selectedProject.name} sections`}
-                          className={projectTabsListClassName}
-                        >
-                          <Tabs.Tab id="overview">
-                            Overview
-                            <Tabs.Indicator />
-                          </Tabs.Tab>
-                          <Tabs.Tab id="roadmap">
-                            Roadmap
-                            <span className="project-tab-badge">
-                              {projectMilestones.length}
-                            </span>
-                            <Tabs.Indicator />
-                          </Tabs.Tab>
-                          <Tabs.Tab id="tasks">
-                            Tasks
-                            <span className="project-tab-badge">
-                              {progress.total}
-                            </span>
-                            <Tabs.Indicator />
-                          </Tabs.Tab>
-                          <Tabs.Tab id="notes">
-                            Notes
-                            <span className="project-tab-badge">
-                              {projectNotes.length}
-                            </span>
-                            <Tabs.Indicator />
-                          </Tabs.Tab>
-                          <Tabs.Tab id="repositories">
-                            Repositories
-                            <span className="project-tab-badge">
-                              {projectRepositories.length}
-                            </span>
-                            <Tabs.Indicator />
-                          </Tabs.Tab>
-                        </Tabs.List>
-                      </Tabs.ListContainer>
-                      <Tabs.Panel
-                        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
-                        id="overview"
-                      >
-                        <div className="grid gap-5">
-                          <div className="grid gap-3 sm:grid-cols-3">
-                            <div className="rounded-xl border border-separator p-4">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted">
-                                  Progress
-                                </span>
-                                <CheckCircle2 className="h-4 w-4 text-success" />
-                              </div>
-                              <p className="mt-3 text-2xl font-semibold tabular-nums">
-                                {progress.percent}%
-                              </p>
-                              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-default">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{
-                                    backgroundColor: selectedProject.color,
-                                    width: `${progress.percent}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <div className="rounded-xl border border-separator p-4">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted">
-                                  Open tasks
-                                </span>
-                                <ClipboardList className="h-4 w-4 text-accent" />
-                              </div>
-                              <p className="mt-3 text-2xl font-semibold tabular-nums">
-                                {openProjectTasks}
-                              </p>
-                              <p className="mt-2 text-[11px] text-muted">
-                                {progress.completed} completed
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-separator p-4">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted">
-                                  Due date
-                                </span>
-                                <CalendarDays className="h-4 w-4 text-warning" />
-                              </div>
-                              <p className="mt-3 text-sm font-semibold">
-                                {formatProjectDate(selectedProject.dueDate)}
-                              </p>
-                              <p className="mt-2 text-[11px] capitalize text-muted">
-                                {selectedProject.priority} priority
-                              </p>
-                            </div>
-                          </div>
-                          <ProjectMilestoneSummary
-                            milestones={projectMilestones}
-                            onOpenRoadmap={() => setTab("roadmap")}
-                            project={selectedProject}
-                          />
-                          <div className="grid gap-4 xl:grid-cols-2">
-                            <section className="rounded-xl border border-separator p-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h3 className="text-sm font-semibold">
-                                    Next actions
-                                  </h3>
-                                  <p className="mt-0.5 text-[11px] text-muted">
-                                    What moves this project now
-                                  </p>
-                                </div>
-                                <button
-                                  className="text-xs font-semibold text-accent hover:underline"
-                                  onClick={() => setTab("tasks")}
-                                  type="button"
-                                >
-                                  View tasks
-                                </button>
-                              </div>
-                              <div className="mt-4 grid gap-2">
-                                {[
-                                  ...store.localTasks.filter(
-                                    (task) =>
-                                      task.projectId === selectedProject.id,
-                                  ),
-                                  ...tasks.filter(
-                                    (task) =>
-                                      store.taskAssignments[task.id] ===
-                                      selectedProject.id,
-                                  ),
-                                ]
-                                  .filter((task) => !task.completed)
-                                  .slice(0, 4)
-                                  .map((task) => (
-                                    <div
-                                      className="flex items-center gap-2.5 rounded-lg bg-surface-secondary px-3 py-2.5"
-                                      key={task.id}
-                                    >
-                                      <Circle className="h-3.5 w-3.5 shrink-0 text-accent" />
-                                      <p className="min-w-0 flex-1 truncate text-xs font-medium">
-                                        {task.title}
-                                      </p>
-                                    </div>
-                                  ))}
-                                {openProjectTasks === 0 ? (
-                                  <div className="rounded-lg border border-dashed border-separator px-3 py-6 text-center text-xs text-muted">
-                                    No open tasks
-                                  </div>
-                                ) : null}
-                              </div>
-                            </section>
-                            <section className="rounded-xl border border-separator p-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h3 className="text-sm font-semibold">
-                                    Recent notes
-                                  </h3>
-                                  <p className="mt-0.5 text-[11px] text-muted">
-                                    Context worth keeping close
-                                  </p>
-                                </div>
-                                <button
-                                  className="text-xs font-semibold text-accent hover:underline"
-                                  onClick={() => setTab("notes")}
-                                  type="button"
-                                >
-                                  View notes
-                                </button>
-                              </div>
-                              <div className="mt-4 grid gap-2">
-                                {projectNotes
-                                  .sort(
-                                    (left, right) =>
-                                      new Date(right.updatedAt).getTime() -
-                                      new Date(left.updatedAt).getTime(),
-                                  )
-                                  .slice(0, 3)
-                                  .map((note) => (
-                                    <div
-                                      className="rounded-lg bg-surface-secondary px-3 py-2.5"
-                                      key={note.id}
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">
-                                          {noteSectionMeta[note.section].label}
-                                        </p>
-                                        <span className="text-[9px] text-muted">
-                                          {relativeProjectDate(note.updatedAt)}
-                                        </span>
-                                      </div>
-                                      <p className="mt-1 line-clamp-2 text-xs leading-5">
-                                        {note.body}
-                                      </p>
-                                    </div>
-                                  ))}
-                                {projectNotes.length === 0 ? (
-                                  <div className="rounded-lg border border-dashed border-separator px-3 py-6 text-center text-xs text-muted">
-                                    No notes captured yet
-                                  </div>
-                                ) : null}
-                              </div>
-                            </section>
-                          </div>
-                        </div>
-                      </Tabs.Panel>
-                      <Tabs.Panel
-                        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
-                        id="roadmap"
-                      >
-                        <ProjectRoadmapPanel
-                          onStoreChange={updateStore}
-                          project={selectedProject}
-                          store={store}
-                        />
-                      </Tabs.Panel>
-                      <Tabs.Panel
-                        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
-                        id="tasks"
-                      >
-                        <TaskPanel
-                          onCompleteLinkedTask={onCompleteTask}
-                          onCreateTask={onCreateTask}
-                          onOpenLinkedTask={onOpenTask}
-                          onStoreChange={updateStore}
-                          project={selectedProject}
-                          store={store}
-                          taskLists={taskLists}
-                          tasks={tasks}
-                        />
-                      </Tabs.Panel>
-                      <Tabs.Panel
-                        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
-                        id="notes"
-                      >
-                        <NotesPanel
-                          onStoreChange={updateStore}
-                          project={selectedProject}
-                          store={store}
-                        />
-                      </Tabs.Panel>
-                      <Tabs.Panel
-                        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
-                        id="repositories"
-                      >
-                        <RepositoryPanel
-                          onStoreChange={updateStore}
-                          project={selectedProject}
-                          repositories={repositories}
-                          store={store}
-                        />
-                      </Tabs.Panel>
-                    </Tabs>
-                    {layoutSizes.calendarExpanded ? (
-                      <ProjectResizeHandle
-                        active={activeResize === "calendar"}
-                        ariaLabel="Resize project details and calendar"
-                        defaultValue={defaultProjectLayout.calendarHeight}
-                        max={400}
-                        min={170}
-                        onChange={setCalendarHeight}
-                        onPointerDown={(event) =>
-                          startProjectResize(event, "calendar")
+                    <TreeView className="p-0">
+                      <ProjectCategoryTreeBranch
+                        addingParentId={addingCategoryParentId}
+                        categories={store.categories}
+                        compact={categoriesCollapsed}
+                        editingId={editingCategoryId}
+                        onAdd={(name, parentId, icon) =>
+                          updateStore((current) => ({
+                            ...current,
+                            categories: [
+                              ...current.categories,
+                              {
+                                id: makeId("project-category"),
+                                icon,
+                                name,
+                                parentId,
+                              },
+                            ],
+                          }))
                         }
-                        onPointerMove={moveProjectResize}
-                        onPointerUp={finishProjectResize}
-                        orientation="horizontal"
-                        value={layoutSizes.calendarHeight}
+                        onAddingParentChange={setAddingCategoryParentId}
+                        onDelete={removeCategory}
+                        onEditingChange={setEditingCategoryId}
+                        onRename={(id, name, icon) =>
+                          updateStore((current) => ({
+                            ...current,
+                            categories: current.categories.map((category) =>
+                              category.id === id
+                                ? { ...category, icon, name }
+                                : category,
+                            ),
+                          }))
+                        }
+                        onSelect={setSelectedCategoryId}
+                        parentId={null}
+                        projects={store.projects.filter(
+                          (project) => project.archived === showArchived,
+                        )}
+                        selectedId={selectedCategoryId}
                       />
-                    ) : null}
-                    {layoutSizes.calendarExpanded ? (
-                      <ProjectMiniCalendar
-                        key={`${selectedProject.id}-calendar`}
-                        localTasks={projectLocalTasks}
-                        onOpenTask={onOpenTask}
-                        project={selectedProject}
-                        tasks={linkedProjectTasks}
-                      />
-                    ) : null}
+                    </TreeView>
+                  </TreeProvider>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-separator px-3 py-5 text-center text-xs text-muted">
+                    Add a category to start the tree.
+                  </p>
+                )}
+              </div>
+              <div
+                className={`border-t border-separator ${categoriesCollapsed ? "p-2" : "p-3"}`}
+              >
+                <button
+                  aria-label={
+                    showArchived ? "Back to projects" : "Archived projects"
+                  }
+                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${showArchived ? "bg-surface-secondary text-foreground" : "text-muted hover:bg-surface-secondary hover:text-foreground"}`}
+                  onClick={() => {
+                    setShowArchived((current) => !current);
+                    setSelectedCategoryId(null);
+                  }}
+                  type="button"
+                >
+                  <Archive className="h-4 w-4" />
+                  {!categoriesCollapsed ? (
+                    <span>
+                      {showArchived ? "Back to projects" : "Archived"}
+                    </span>
+                  ) : null}
+                </button>
+                {!categoriesCollapsed ? (
+                  <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-secondary p-2 text-center">
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">
+                        {totalActive}
+                      </p>
+                      <p className="text-[9px] uppercase tracking-wide text-muted">
+                        Active
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">
+                        {totalOpenTasks}
+                      </p>
+                      <p className="text-[9px] uppercase tracking-wide text-muted">
+                        Open
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">
+                        {totalCompleted}
+                      </p>
+                      <p className="text-[9px] uppercase tracking-wide text-muted">
+                        Done
+                      </p>
+                    </div>
                   </div>
-                </>
-              );
-            })()
-          ) : (
-            <EmptyProjects onCreate={() => setProjectForm("new")} />
-          )}
-        </section>
-      </div>
+                ) : null}
+              </div>
+            </aside>
 
-      {projectForm ? (
-        <ProjectForm
-          categories={store.categories}
-          initial={
-            projectForm === "edit" ? (selectedProject ?? undefined) : undefined
-          }
-          onClose={() => setProjectForm(null)}
-          onSave={saveProject}
-        />
-      ) : null}
-      {deleteProject ? (
-        <ModalShell
-          onClose={() => setDeleteProject(null)}
-          title="Delete project"
-        >
-          <div className="flex items-start gap-4">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-danger-soft text-danger">
-              <Trash2 className="h-5 w-5" />
-            </span>
-            <div>
-              <h2 className="text-xl font-semibold">
-                Delete {deleteProject.name}?
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                This removes its project tasks and notes. Linked Relay tasks
-                will stay in Tasks.
-              </p>
-            </div>
+            <ProjectResizeHandle
+              active={activeResize === "categories"}
+              ariaLabel="Resize project categories"
+              defaultValue={defaultProjectLayout.categoryWidth}
+              max={320}
+              min={170}
+              onChange={setCategoryWidth}
+              onPointerDown={(event) => startProjectResize(event, "categories")}
+              onPointerMove={moveProjectResize}
+              onPointerUp={finishProjectResize}
+              orientation="vertical"
+              value={layoutSizes.categoryWidth}
+            />
+
+            <section className="relay-panel flex h-[28rem] min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:h-auto">
+              <div className="border-b border-separator p-3">
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <div>
+                    <h2 className="text-sm font-semibold">
+                      {showArchived
+                        ? "Archived projects"
+                        : selectedCategoryId
+                          ? categoryPath(selectedCategoryId, store.categories)
+                          : "All projects"}
+                    </h2>
+                    <p className="mt-0.5 text-[11px] text-muted">
+                      {visibleProjects.length}{" "}
+                      {visibleProjects.length === 1 ? "project" : "projects"}
+                    </p>
+                  </div>
+                  <MoreHorizontal className="h-4 w-4 text-muted" />
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <div className="relative min-w-0">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+                    <input
+                      aria-label="Search projects"
+                      className="h-9 w-full rounded-lg border border-separator bg-surface-secondary pl-9 pr-3 text-xs outline-none placeholder:text-muted focus:border-accent"
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Search projects"
+                      value={query}
+                    />
+                  </div>
+                  <Select
+                    aria-label="Filter project status"
+                    className="h-9 w-full rounded-lg border border-separator bg-surface-secondary px-2.5 text-xs outline-none focus:border-accent"
+                    onChange={(event) =>
+                      setStatusFilter(
+                        event.target.value as ProjectStatus | "all",
+                      )
+                    }
+                    value={statusFilter}
+                  >
+                    <option value="all">All statuses</option>
+                    {Object.entries(statusMeta).map(([value, meta]) => (
+                      <option key={value} value={value}>
+                        {meta.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                {visibleProjects.length ? (
+                  visibleProjects.map((project) => {
+                    const progress = projectProgress(
+                      project.id,
+                      store.localTasks,
+                      tasks,
+                      store.taskAssignments,
+                    );
+                    return (
+                      <button
+                        className={`project-list-card relative mb-2 w-full overflow-hidden rounded-xl border p-3 text-left transition ${
+                          selectedProject?.id === project.id
+                            ? "bg-accent-soft shadow-surface"
+                            : "border-transparent hover:border-separator hover:bg-surface-secondary"
+                        } ${draggedProjectId === project.id ? "opacity-45" : ""} ${
+                          dragOverProjectId === project.id
+                            ? "translate-y-0.5"
+                            : ""
+                        }`}
+                        draggable
+                        key={project.id}
+                        onClick={() => {
+                          setSelectedProjectId(project.id);
+                          setTab("overview");
+                        }}
+                        onDragEnd={() => {
+                          setDraggedProjectId(null);
+                          setDragOverProjectId(null);
+                        }}
+                        onDragOver={(
+                          event: ReactDragEvent<HTMLButtonElement>,
+                        ) => {
+                          event.preventDefault();
+                          if (
+                            draggedProjectId &&
+                            draggedProjectId !== project.id
+                          ) {
+                            setDragOverProjectId(project.id);
+                          }
+                        }}
+                        onDragStart={(
+                          event: ReactDragEvent<HTMLButtonElement>,
+                        ) => {
+                          setDraggedProjectId(project.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", project.id);
+                        }}
+                        onDrop={(event: ReactDragEvent<HTMLButtonElement>) => {
+                          event.preventDefault();
+                          const sourceId =
+                            event.dataTransfer.getData("text/plain") ||
+                            draggedProjectId;
+                          if (sourceId) swapProjects(sourceId, project.id);
+                          setDraggedProjectId(null);
+                          setDragOverProjectId(null);
+                        }}
+                        style={
+                          selectedProject?.id === project.id
+                            ? { borderColor: project.color }
+                            : undefined
+                        }
+                        type="button"
+                      >
+                        <span
+                          className="absolute inset-y-3 left-0 w-0.5 rounded-r-full"
+                          style={{ backgroundColor: project.color }}
+                        />
+                        <div className="flex items-start gap-3">
+                          <span
+                            className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface shadow-surface"
+                            style={{ color: project.color }}
+                          >
+                            <Folder className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="truncate text-sm font-semibold">
+                                {project.name}
+                              </h3>
+                              {project.favorite ? (
+                                <Star className="h-3 w-3 shrink-0 fill-warning text-warning" />
+                              ) : null}
+                            </div>
+                            <p className="mt-1 truncate text-[11px] text-muted">
+                              {categoryPath(
+                                project.categoryId,
+                                store.categories,
+                              )}
+                            </p>
+                          </div>
+                          <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted/55 active:cursor-grabbing" />
+                        </div>
+                        <div className="mt-4 flex items-end gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex items-center justify-between text-[10px] text-muted">
+                              <span>
+                                {progress.completed}/{progress.total} tasks
+                              </span>
+                              <span>{progress.percent}%</span>
+                            </div>
+                            <div className="h-1 overflow-hidden rounded-full bg-default">
+                              <div
+                                className="h-full rounded-full transition-[width]"
+                                style={{
+                                  backgroundColor: project.color,
+                                  width: `${progress.percent}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <span
+                            className={`rounded-full px-2 py-1 text-[9px] font-semibold ${statusMeta[project.status].className}`}
+                          >
+                            {statusMeta[project.status].label}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="px-5 py-12 text-center">
+                    <Search className="mx-auto h-5 w-5 text-muted" />
+                    <p className="mt-3 text-sm font-medium">No projects here</p>
+                    <p className="mt-1 text-xs leading-5 text-muted">
+                      Try another category or status, or create a project.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <ProjectResizeHandle
+              active={activeResize === "projects"}
+              ariaLabel="Resize project rail"
+              defaultValue={defaultProjectLayout.projectRailWidth}
+              max={420}
+              min={220}
+              onChange={setProjectRailWidth}
+              onPointerDown={(event) => startProjectResize(event, "projects")}
+              onPointerMove={moveProjectResize}
+              onPointerUp={finishProjectResize}
+              orientation="vertical"
+              value={layoutSizes.projectRailWidth}
+            />
+
+            <section className="relay-panel flex min-h-[36rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-separator bg-surface shadow-surface md:min-h-0">
+              {selectedProject ? (
+                (() => {
+                  const progress = projectProgress(
+                    selectedProject.id,
+                    store.localTasks,
+                    tasks,
+                    store.taskAssignments,
+                  );
+                  const projectNotes = store.notes.filter(
+                    (note) => note.projectId === selectedProject.id,
+                  );
+                  const projectRepositories =
+                    store.repositoryAssignments[selectedProject.id] ?? [];
+                  const projectMilestones = store.milestones.filter(
+                    (milestone) => milestone.projectId === selectedProject.id,
+                  );
+                  const projectLocalTasks = store.localTasks.filter(
+                    (task) => task.projectId === selectedProject.id,
+                  );
+                  const linkedProjectTasks = tasks.filter(
+                    (task) =>
+                      store.taskAssignments[task.id] === selectedProject.id,
+                  );
+                  const openProjectTasks = progress.total - progress.completed;
+                  return (
+                    <>
+                      <div className="shrink-0 border-b border-separator px-4 py-4 sm:px-5">
+                        <div className="flex items-start gap-4">
+                          <span
+                            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-surface-secondary"
+                            style={{ color: selectedProject.color }}
+                          >
+                            <FolderOpen className="h-5 w-5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="text-lg font-semibold sm:text-xl">
+                                {selectedProject.name}
+                              </h2>
+                              <span
+                                className={`rounded-full px-2 py-1 text-[10px] font-semibold ${statusMeta[selectedProject.status].className}`}
+                              >
+                                {statusMeta[selectedProject.status].label}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted">
+                              {categoryPath(
+                                selectedProject.categoryId,
+                                store.categories,
+                              )}{" "}
+                              · Updated{" "}
+                              {relativeProjectDate(selectedProject.updatedAt)}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 gap-1">
+                            <button
+                              aria-expanded={layoutSizes.calendarExpanded}
+                              aria-label={
+                                layoutSizes.calendarExpanded
+                                  ? "Collapse project calendar"
+                                  : "Expand project calendar"
+                              }
+                              className={`relative grid h-9 w-9 place-items-center rounded-lg transition hover:bg-surface-secondary ${layoutSizes.calendarExpanded ? "text-accent" : "text-muted"}`}
+                              onClick={() =>
+                                setLayoutSizes((current) => ({
+                                  ...current,
+                                  calendarExpanded: !current.calendarExpanded,
+                                }))
+                              }
+                              title={
+                                layoutSizes.calendarExpanded
+                                  ? "Collapse calendar"
+                                  : "Expand calendar"
+                              }
+                              type="button"
+                            >
+                              <CalendarDays className="h-4 w-4" />
+                              <ChevronDown
+                                className={`absolute bottom-1 right-1 h-2.5 w-2.5 transition-transform ${layoutSizes.calendarExpanded ? "" : "-rotate-90"}`}
+                              />
+                            </button>
+                            <button
+                              aria-label={
+                                selectedProject.favorite
+                                  ? "Remove from favorites"
+                                  : "Add to favorites"
+                              }
+                              className={`grid h-9 w-9 place-items-center rounded-lg transition hover:bg-surface-secondary ${selectedProject.favorite ? "text-warning" : "text-muted"}`}
+                              onClick={() =>
+                                updateStore((current) => ({
+                                  ...current,
+                                  projects: current.projects.map((project) =>
+                                    project.id === selectedProject.id
+                                      ? {
+                                          ...project,
+                                          favorite: !project.favorite,
+                                          updatedAt: new Date().toISOString(),
+                                        }
+                                      : project,
+                                  ),
+                                }))
+                              }
+                              type="button"
+                            >
+                              <Star
+                                className={`h-4 w-4 ${selectedProject.favorite ? "fill-current" : ""}`}
+                              />
+                            </button>
+                            <button
+                              aria-label="Edit project"
+                              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-foreground"
+                              onClick={() => setProjectForm("edit")}
+                              type="button"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              aria-label={
+                                selectedProject.archived
+                                  ? "Restore project"
+                                  : "Archive project"
+                              }
+                              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-foreground"
+                              onClick={() =>
+                                updateStore((current) => ({
+                                  ...current,
+                                  projects: current.projects.map((project) =>
+                                    project.id === selectedProject.id
+                                      ? {
+                                          ...project,
+                                          archived: !project.archived,
+                                          updatedAt: new Date().toISOString(),
+                                        }
+                                      : project,
+                                  ),
+                                }))
+                              }
+                              type="button"
+                            >
+                              {selectedProject.archived ? (
+                                <ArchiveRestore className="h-4 w-4" />
+                              ) : (
+                                <Archive className="h-4 w-4" />
+                              )}
+                            </button>
+                            <button
+                              aria-label="Delete project"
+                              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger"
+                              onClick={() => setDeleteProject(selectedProject)}
+                              type="button"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        className="project-detail-stack grid min-h-0 min-w-0 flex-1 md:gap-0"
+                        data-calendar-collapsed={
+                          !layoutSizes.calendarExpanded || undefined
+                        }
+                      >
+                        <Tabs
+                          className="flex min-h-0 flex-col overflow-hidden"
+                          onSelectionChange={(key) => setTab(key as ProjectTab)}
+                          selectedKey={tab}
+                        >
+                          <Tabs.ListContainer className="project-tabs-list-container shrink-0 rounded-none border-b border-separator bg-surface">
+                            <Tabs.List
+                              aria-label={`${selectedProject.name} sections`}
+                              className={projectTabsListClassName}
+                            >
+                              <Tabs.Tab id="overview">
+                                Overview
+                                <Tabs.Indicator />
+                              </Tabs.Tab>
+                              <Tabs.Tab id="roadmap">
+                                Roadmap
+                                <span className="project-tab-badge">
+                                  {projectMilestones.length}
+                                </span>
+                                <Tabs.Indicator />
+                              </Tabs.Tab>
+                              <Tabs.Tab id="tasks">
+                                Tasks
+                                <span className="project-tab-badge">
+                                  {progress.total}
+                                </span>
+                                <Tabs.Indicator />
+                              </Tabs.Tab>
+                              <Tabs.Tab id="notes">
+                                Notes
+                                <span className="project-tab-badge">
+                                  {projectNotes.length}
+                                </span>
+                                <Tabs.Indicator />
+                              </Tabs.Tab>
+                              <Tabs.Tab id="repositories">
+                                Repositories
+                                <span className="project-tab-badge">
+                                  {projectRepositories.length}
+                                </span>
+                                <Tabs.Indicator />
+                              </Tabs.Tab>
+                            </Tabs.List>
+                          </Tabs.ListContainer>
+                          <Tabs.Panel
+                            className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
+                            id="overview"
+                          >
+                            <div className="grid gap-5">
+                              <div className="grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-xl border border-separator p-4">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-muted">
+                                      Progress
+                                    </span>
+                                    <CheckCircle2 className="h-4 w-4 text-success" />
+                                  </div>
+                                  <p className="mt-3 text-2xl font-semibold tabular-nums">
+                                    {progress.percent}%
+                                  </p>
+                                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-default">
+                                    <div
+                                      className="h-full rounded-full"
+                                      style={{
+                                        backgroundColor: selectedProject.color,
+                                        width: `${progress.percent}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="rounded-xl border border-separator p-4">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-muted">
+                                      Open tasks
+                                    </span>
+                                    <ClipboardList className="h-4 w-4 text-accent" />
+                                  </div>
+                                  <p className="mt-3 text-2xl font-semibold tabular-nums">
+                                    {openProjectTasks}
+                                  </p>
+                                  <p className="mt-2 text-[11px] text-muted">
+                                    {progress.completed} completed
+                                  </p>
+                                </div>
+                                <div className="rounded-xl border border-separator p-4">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-muted">
+                                      Due date
+                                    </span>
+                                    <CalendarDays className="h-4 w-4 text-warning" />
+                                  </div>
+                                  <p className="mt-3 text-sm font-semibold">
+                                    {formatProjectDate(selectedProject.dueDate)}
+                                  </p>
+                                  <p className="mt-2 text-[11px] capitalize text-muted">
+                                    {selectedProject.priority} priority
+                                  </p>
+                                </div>
+                              </div>
+                              <ProjectMilestoneSummary
+                                milestones={projectMilestones}
+                                onOpenRoadmap={() => setTab("roadmap")}
+                                project={selectedProject}
+                              />
+                              <div className="grid gap-4 xl:grid-cols-2">
+                                <section className="rounded-xl border border-separator p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <h3 className="text-sm font-semibold">
+                                        Next actions
+                                      </h3>
+                                      <p className="mt-0.5 text-[11px] text-muted">
+                                        What moves this project now
+                                      </p>
+                                    </div>
+                                    <button
+                                      className="text-xs font-semibold text-accent hover:underline"
+                                      onClick={() => setTab("tasks")}
+                                      type="button"
+                                    >
+                                      View tasks
+                                    </button>
+                                  </div>
+                                  <div className="mt-4 grid gap-2">
+                                    {[
+                                      ...store.localTasks.filter(
+                                        (task) =>
+                                          task.projectId === selectedProject.id,
+                                      ),
+                                      ...tasks.filter(
+                                        (task) =>
+                                          store.taskAssignments[task.id] ===
+                                          selectedProject.id,
+                                      ),
+                                    ]
+                                      .filter((task) => !task.completed)
+                                      .slice(0, 4)
+                                      .map((task) => (
+                                        <div
+                                          className="flex items-center gap-2.5 rounded-lg bg-surface-secondary px-3 py-2.5"
+                                          key={task.id}
+                                        >
+                                          <Circle className="h-3.5 w-3.5 shrink-0 text-accent" />
+                                          <p className="min-w-0 flex-1 truncate text-xs font-medium">
+                                            {task.title}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    {openProjectTasks === 0 ? (
+                                      <div className="rounded-lg border border-dashed border-separator px-3 py-6 text-center text-xs text-muted">
+                                        No open tasks
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </section>
+                                <section className="rounded-xl border border-separator p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <h3 className="text-sm font-semibold">
+                                        Recent notes
+                                      </h3>
+                                      <p className="mt-0.5 text-[11px] text-muted">
+                                        Context worth keeping close
+                                      </p>
+                                    </div>
+                                    <button
+                                      className="text-xs font-semibold text-accent hover:underline"
+                                      onClick={() => setTab("notes")}
+                                      type="button"
+                                    >
+                                      View notes
+                                    </button>
+                                  </div>
+                                  <div className="mt-4 grid gap-2">
+                                    {projectNotes
+                                      .sort(
+                                        (left, right) =>
+                                          new Date(right.updatedAt).getTime() -
+                                          new Date(left.updatedAt).getTime(),
+                                      )
+                                      .slice(0, 3)
+                                      .map((note) => (
+                                        <div
+                                          className="rounded-lg bg-surface-secondary px-3 py-2.5"
+                                          key={note.id}
+                                        >
+                                          <div className="flex items-center justify-between gap-2">
+                                            <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">
+                                              {
+                                                noteSectionMeta[note.section]
+                                                  .label
+                                              }
+                                            </p>
+                                            <span className="text-[9px] text-muted">
+                                              {relativeProjectDate(
+                                                note.updatedAt,
+                                              )}
+                                            </span>
+                                          </div>
+                                          <p className="mt-1 line-clamp-2 text-xs leading-5">
+                                            {note.body}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    {projectNotes.length === 0 ? (
+                                      <div className="rounded-lg border border-dashed border-separator px-3 py-6 text-center text-xs text-muted">
+                                        No notes captured yet
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </section>
+                              </div>
+                            </div>
+                          </Tabs.Panel>
+                          <Tabs.Panel
+                            className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
+                            id="roadmap"
+                          >
+                            <ProjectRoadmapPanel
+                              onStoreChange={updateStore}
+                              project={selectedProject}
+                              store={store}
+                            />
+                          </Tabs.Panel>
+                          <Tabs.Panel
+                            className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
+                            id="tasks"
+                          >
+                            <TaskPanel
+                              onCompleteLinkedTask={onCompleteTask}
+                              onCreateTask={onCreateTask}
+                              onOpenLinkedTask={onOpenTask}
+                              onStoreChange={updateStore}
+                              project={selectedProject}
+                              store={store}
+                              taskLists={taskLists}
+                              tasks={tasks}
+                            />
+                          </Tabs.Panel>
+                          <Tabs.Panel
+                            className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
+                            id="notes"
+                          >
+                            <NotesPanel
+                              onStoreChange={updateStore}
+                              project={selectedProject}
+                              store={store}
+                            />
+                          </Tabs.Panel>
+                          <Tabs.Panel
+                            className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5"
+                            id="repositories"
+                          >
+                            <RepositoryPanel
+                              onStoreChange={updateStore}
+                              project={selectedProject}
+                              repositories={repositories}
+                              store={store}
+                            />
+                          </Tabs.Panel>
+                        </Tabs>
+                        {layoutSizes.calendarExpanded ? (
+                          <ProjectResizeHandle
+                            active={activeResize === "calendar"}
+                            ariaLabel="Resize project details and calendar"
+                            defaultValue={defaultProjectLayout.calendarHeight}
+                            max={400}
+                            min={170}
+                            onChange={setCalendarHeight}
+                            onPointerDown={(event) =>
+                              startProjectResize(event, "calendar")
+                            }
+                            onPointerMove={moveProjectResize}
+                            onPointerUp={finishProjectResize}
+                            orientation="horizontal"
+                            value={layoutSizes.calendarHeight}
+                          />
+                        ) : null}
+                        {layoutSizes.calendarExpanded ? (
+                          <ProjectMiniCalendar
+                            key={`${selectedProject.id}-calendar`}
+                            localTasks={projectLocalTasks}
+                            onOpenTask={onOpenTask}
+                            project={selectedProject}
+                            tasks={linkedProjectTasks}
+                          />
+                        ) : null}
+                      </div>
+                    </>
+                  );
+                })()
+              ) : (
+                <EmptyProjects onCreate={() => setProjectForm("new")} />
+              )}
+            </section>
           </div>
-          <div className="mt-7 flex justify-end gap-2">
-            <button
-              className="h-10 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-surface-secondary"
-              onClick={() => setDeleteProject(null)}
-              type="button"
+
+          {projectForm ? (
+            <ProjectForm
+              categories={store.categories}
+              initial={
+                projectForm === "edit"
+                  ? (selectedProject ?? undefined)
+                  : undefined
+              }
+              onClose={() => setProjectForm(null)}
+              onSave={saveProject}
+            />
+          ) : null}
+          {deleteProject ? (
+            <ModalShell
+              onClose={() => setDeleteProject(null)}
+              title="Delete project"
             >
-              Cancel
-            </button>
-            <button
-              className="h-10 rounded-xl bg-danger px-4 text-sm font-semibold text-danger-foreground hover:opacity-90"
-              onClick={() => {
-                const id = deleteProject.id;
-                updateStore((current) => {
-                  const repositoryAssignments = {
-                    ...current.repositoryAssignments,
-                  };
-                  delete repositoryAssignments[id];
-                  return {
-                    ...current,
-                    projects: current.projects.filter(
-                      (project) => project.id !== id,
-                    ),
-                    notes: current.notes.filter(
-                      (note) => note.projectId !== id,
-                    ),
-                    localTasks: current.localTasks.filter(
-                      (task) => task.projectId !== id,
-                    ),
-                    milestones: current.milestones.filter(
-                      (milestone) => milestone.projectId !== id,
-                    ),
-                    taskAssignments: Object.fromEntries(
-                      Object.entries(current.taskAssignments).filter(
-                        ([, projectId]) => projectId !== id,
-                      ),
-                    ),
-                    repositoryAssignments,
-                  };
-                });
-                setDeleteProject(null);
-                setSelectedProjectId(null);
-              }}
-              type="button"
-            >
-              Delete project
-            </button>
-          </div>
-        </ModalShell>
-      ) : null}
+              <div className="flex items-start gap-4">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-danger-soft text-danger">
+                  <Trash2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-semibold">
+                    Delete {deleteProject.name}?
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    This removes its project tasks and notes. Linked Relay tasks
+                    will stay in Tasks.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-7 flex justify-end gap-2">
+                <button
+                  className="h-10 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-surface-secondary"
+                  onClick={() => setDeleteProject(null)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="h-10 rounded-xl bg-danger px-4 text-sm font-semibold text-danger-foreground hover:opacity-90"
+                  onClick={() => {
+                    const id = deleteProject.id;
+                    updateStore((current) => {
+                      const repositoryAssignments = {
+                        ...current.repositoryAssignments,
+                      };
+                      delete repositoryAssignments[id];
+                      return {
+                        ...current,
+                        projects: current.projects.filter(
+                          (project) => project.id !== id,
+                        ),
+                        notes: current.notes.filter(
+                          (note) => note.projectId !== id,
+                        ),
+                        localTasks: current.localTasks.filter(
+                          (task) => task.projectId !== id,
+                        ),
+                        milestones: current.milestones.filter(
+                          (milestone) => milestone.projectId !== id,
+                        ),
+                        taskAssignments: Object.fromEntries(
+                          Object.entries(current.taskAssignments).filter(
+                            ([, projectId]) => projectId !== id,
+                          ),
+                        ),
+                        repositoryAssignments,
+                      };
+                    });
+                    setDeleteProject(null);
+                    setSelectedProjectId(null);
+                  }}
+                  type="button"
+                >
+                  Delete project
+                </button>
+              </div>
+            </ModalShell>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

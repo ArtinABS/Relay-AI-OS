@@ -953,19 +953,89 @@ export async function listGoogleTaskListsForUser(tokens: GoogleTokenSet) {
   }
 
   const auth = createGoogleOAuthClient(tokens);
-  const response = await googleServices.tasks().tasklists.list({
-    auth,
-    maxResults: 20,
-  });
+  const taskLists: Array<{ id?: string | null; title: string }> = [];
+  let pageToken: string | undefined;
+
+  do {
+    const response = await googleServices.tasks().tasklists.list({
+      auth,
+      maxResults: 100,
+      pageToken,
+    });
+    taskLists.push(
+      ...(response.data.items?.map((taskList) => ({
+        id: taskList.id,
+        title: taskList.title ?? "Untitled task list",
+      })) ?? []),
+    );
+    pageToken = response.data.nextPageToken ?? undefined;
+  } while (pageToken);
 
   return {
     ok: true,
-    taskLists:
-      response.data.items?.map((taskList) => ({
-        id: taskList.id,
-        title: taskList.title ?? "Untitled task list",
-      })) ?? [],
+    taskLists,
   };
+}
+
+export async function createGoogleTaskListForUser(
+  tokens: GoogleTokenSet,
+  input: { title: string },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return { ok: false, reason: "Google Tasks is not connected." };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.tasks().tasklists.insert({
+    auth,
+    requestBody: { title: input.title },
+  });
+  return {
+    ok: true,
+    taskList: {
+      id: response.data.id,
+      title: response.data.title ?? input.title,
+    },
+  };
+}
+
+export async function renameGoogleTaskListForUser(
+  tokens: GoogleTokenSet,
+  input: { id: string; title: string },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return { ok: false, reason: "Google Tasks is not connected." };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const response = await googleServices.tasks().tasklists.patch({
+    auth,
+    tasklist: input.id,
+    requestBody: { title: input.title },
+  });
+  return {
+    ok: true,
+    taskList: {
+      id: response.data.id,
+      title: response.data.title ?? input.title,
+    },
+  };
+}
+
+export async function deleteGoogleTaskListForUser(
+  tokens: GoogleTokenSet,
+  input: { id: string },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return { ok: false, reason: "Google Tasks is not connected." };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  await googleServices.tasks().tasklists.delete({
+    auth,
+    tasklist: input.id,
+  });
+  return { ok: true, id: input.id };
 }
 
 async function resolveGoogleTaskListId(
@@ -998,34 +1068,38 @@ export async function listGoogleTasksForUser(
   const taskListsResult = await listGoogleTaskListsForUser(tokens);
   const taskLists = taskListsResult.ok ? taskListsResult.taskLists : [];
   const listsToRead =
-    taskLists.length > 0
-      ? taskLists.slice(0, 5)
-      : [{ id: "@default", title: "Default" }];
+    taskLists.length > 0 ? taskLists : [{ id: "@default", title: "Default" }];
 
   const taskGroups = await Promise.all(
     listsToRead.map(async (taskList) => {
-      const response = await googleServices.tasks().tasks.list({
-        auth,
-        tasklist: taskList.id ?? "@default",
-        maxResults,
-        showCompleted: true,
-        showDeleted: false,
-        showHidden: false,
-      });
-
-      return (
-        response.data.items?.map((task) => ({
-          id: task.id,
-          title: task.title ?? "Untitled task",
-          notes: task.notes ?? null,
-          due: task.due ?? null,
-          status: task.status ?? null,
-          completed: task.completed ?? null,
-          updated: task.updated ?? null,
-          taskListId: taskList.id ?? null,
-          taskListTitle: taskList.title,
-        })) ?? []
-      );
+      const tasks = [];
+      let pageToken: string | undefined;
+      do {
+        const response = await googleServices.tasks().tasks.list({
+          auth,
+          tasklist: taskList.id ?? "@default",
+          maxResults: Math.min(Math.max(maxResults, 1), 100),
+          pageToken,
+          showCompleted: true,
+          showDeleted: false,
+          showHidden: true,
+        });
+        tasks.push(
+          ...(response.data.items?.map((task) => ({
+            id: task.id,
+            title: task.title ?? "Untitled task",
+            notes: task.notes ?? null,
+            due: task.due ?? null,
+            status: task.status ?? null,
+            completed: task.completed ?? null,
+            updated: task.updated ?? null,
+            taskListId: taskList.id ?? null,
+            taskListTitle: taskList.title,
+          })) ?? []),
+        );
+        pageToken = response.data.nextPageToken ?? undefined;
+      } while (pageToken);
+      return tasks;
     }),
   );
 
@@ -1180,6 +1254,71 @@ export async function deleteGoogleTaskForUser(
   });
 
   return { ok: true, id: task.id, taskListId: tasklist };
+}
+
+export async function moveGoogleTaskForUser(
+  tokens: GoogleTokenSet,
+  input: { id: string; sourceTaskListId: string; targetTaskListId: string },
+) {
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    return { ok: false, reason: "Google Tasks is not connected." };
+  }
+  if (input.sourceTaskListId === input.targetTaskListId) {
+    return { ok: true, id: input.id, taskListId: input.targetTaskListId };
+  }
+
+  const auth = createGoogleOAuthClient(tokens);
+  const tasksService = googleServices.tasks().tasks;
+  const current = await tasksService.get({
+    auth,
+    task: input.id,
+    tasklist: input.sourceTaskListId,
+  });
+  const created = await tasksService.insert({
+    auth,
+    tasklist: input.targetTaskListId,
+    requestBody: {
+      completed: current.data.completed ?? undefined,
+      due: current.data.due ?? undefined,
+      notes: current.data.notes ?? undefined,
+      status: current.data.status ?? undefined,
+      title: current.data.title ?? "Untitled task",
+    },
+  });
+
+  try {
+    await tasksService.delete({
+      auth,
+      task: input.id,
+      tasklist: input.sourceTaskListId,
+    });
+  } catch (error) {
+    if (created.data.id) {
+      await tasksService
+        .delete({
+          auth,
+          task: created.data.id,
+          tasklist: input.targetTaskListId,
+        })
+        .catch(() => undefined);
+    }
+    throw error;
+  }
+
+  return {
+    ok: true,
+    previousId: input.id,
+    task: {
+      id: created.data.id,
+      title: created.data.title ?? current.data.title ?? "Untitled task",
+      notes: created.data.notes ?? null,
+      due: created.data.due ?? null,
+      status: created.data.status ?? null,
+      completed: created.data.completed ?? null,
+      updated: created.data.updated ?? null,
+      taskListId: input.targetTaskListId,
+    },
+  };
 }
 
 function getGmailHeader(

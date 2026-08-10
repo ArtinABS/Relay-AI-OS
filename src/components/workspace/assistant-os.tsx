@@ -34,7 +34,6 @@ import { useAui, useAuiState, type ThreadMessage } from "@assistant-ui/react";
 import { convertFileListToFileUIParts, type FileUIPart } from "ai";
 import { RelayAssistantRuntimeProvider } from "@/components/assistant-ui/relay-runtime";
 import { RelayThread } from "@/components/assistant-ui/relay-thread";
-import { GithubRepositoryExplorer } from "@/components/github/github-repository-explorer";
 import { ProjectsWorkspace } from "@/components/projects/projects-workspace";
 import { Button, Input, Select, TextArea } from "@/components/ui/relay-ui";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
@@ -102,6 +101,7 @@ import {
   Flag,
   FileSpreadsheet,
   FileText,
+  Folder,
   FolderTree,
   FolderOpen,
   GitBranch,
@@ -160,7 +160,6 @@ type ViewId =
   | "tasks"
   | "projects"
   | "files"
-  | "github"
   | "profile"
   | "settings";
 
@@ -206,7 +205,6 @@ type GoogleTaskInput = {
   due: string | null;
   priority: GoogleTaskPriority;
   taskListId: string | null;
-  categoryId: string | null;
   repositoryFullName?: string | null;
   richDescription?: TaskRichDocument | null;
 };
@@ -541,9 +539,8 @@ const primaryNavItems: NavItem[] = [
   { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "tasks", label: "Tasks", icon: ListTodo },
-  { id: "projects", label: "Projects", icon: FolderTree },
-  { id: "files", label: "Files", icon: FolderOpen },
-  { id: "github", label: "GitHub", icon: GitBranch },
+  { id: "projects", label: "Projects", icon: Folder },
+  { id: "files", label: "Files", icon: FolderTree },
 ];
 
 const sidebarNavGroups: Array<{ label: string; items: NavItem[] }> = [
@@ -2381,6 +2378,9 @@ function WorkspaceExperience({
                   setActiveView("tasks");
                 }}
                 repositories={briefing?.githubRepositories?.repositories ?? []}
+                repositoryError={briefing?.githubRepositories?.reason}
+                repositoryTasks={repositoryLinkedTasks}
+                signedInToGithub={signedInToGithub}
                 taskLists={taskColumns}
                 tasks={tasks}
               />
@@ -2388,15 +2388,6 @@ function WorkspaceExperience({
 
             {activeView === "files" ? (
               <FilesWorkspaceView briefing={briefing} />
-            ) : null}
-
-            {activeView === "github" ? (
-              <GithubRepositoryExplorer
-                repositories={briefing?.githubRepositories?.repositories ?? []}
-                repositoryError={briefing?.githubRepositories?.reason}
-                signedIn={signedInToGithub}
-                tasks={repositoryLinkedTasks}
-              />
             ) : null}
 
             {activeView === "profile" ? (
@@ -8055,15 +8046,10 @@ function TaskMasterDetailView({
 }) {
   const googleTasks = briefing?.googleTasks;
   const tasks = useMemo(() => googleTasks?.tasks ?? [], [googleTasks?.tasks]);
-  const taskLists = googleTasks?.taskLists ?? [];
-  const {
-    assignments,
-    categories,
-    addCategory,
-    deleteCategory,
-    renameCategory,
-    setTaskCategory,
-  } = useTaskCategories();
+  const taskLists = useMemo(
+    () => googleTasks?.taskLists ?? [],
+    [googleTasks?.taskLists],
+  );
   const {
     archivedTaskKeys,
     archiveTask: archiveTaskLocally,
@@ -8091,7 +8077,10 @@ function TaskMasterDetailView({
     startY: number;
   } | null>(null);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [taskListModalOpen, setTaskListModalOpen] = useState(false);
+  const [selectedTaskListId, setSelectedTaskListId] = useState(
+    initialTaskKey?.split(":")[0] ?? taskLists[0]?.id ?? "@default",
+  );
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     "all" | "pending" | "done" | "archived"
@@ -8102,13 +8091,42 @@ function TaskMasterDetailView({
   const [dueFilter, setDueFilter] = useState<
     "all" | "overdue" | "today" | "week" | "none"
   >("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const selectedTaskList =
+    taskLists.find((taskList) => taskList.id === selectedTaskListId) ??
+    taskLists[0] ??
+    null;
+  const selectedListId = selectedTaskList?.id ?? "@default";
+  const taskListCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        taskLists.map((taskList) => {
+          const listTasks = tasks.filter(
+            (task) => task.taskListId === taskList.id,
+          );
+          return [
+            taskList.id ?? "@default",
+            {
+              pending: listTasks.filter((task) => task.status !== "completed")
+                .length,
+              total: listTasks.length,
+            },
+          ];
+        }),
+      ) as Record<string, { pending: number; total: number }>,
+    [taskLists, tasks],
+  );
   const orderedTasks = useMemo(() => {
     const open = sortGoogleTasksByUrgency(
-      tasks.filter((task) => task.status !== "completed"),
+      tasks.filter(
+        (task) =>
+          task.taskListId === selectedListId && task.status !== "completed",
+      ),
     );
     const completed = tasks
-      .filter((task) => task.status === "completed")
+      .filter(
+        (task) =>
+          task.taskListId === selectedListId && task.status === "completed",
+      )
       .sort(
         (left, right) =>
           new Date(right.completed ?? right.updated ?? 0).getTime() -
@@ -8116,17 +8134,7 @@ function TaskMasterDetailView({
       );
 
     return [...open, ...completed];
-  }, [tasks]);
-  const categoryFilterIds = useMemo(
-    () =>
-      categoryFilter === "all"
-        ? null
-        : new Set([
-            categoryFilter,
-            ...taskCategoryDescendantIds(categories, categoryFilter),
-          ]),
-    [categories, categoryFilter],
-  );
+  }, [selectedListId, tasks]);
   const filteredTasks = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -8162,33 +8170,15 @@ function TaskMasterDetailView({
         return false;
       }
       if (dueFilter === "none" && dueDate) return false;
-      if (categoryFilterIds) {
-        const assignedCategory = taskKey ? assignments[taskKey] : null;
-        if (!assignedCategory || !categoryFilterIds.has(assignedCategory)) {
-          return false;
-        }
-      }
-
       return true;
     });
-  }, [
-    archivedTaskKeys,
-    assignments,
-    categoryFilterIds,
-    dueFilter,
-    orderedTasks,
-    priorityFilter,
-    statusFilter,
-  ]);
+  }, [archivedTaskKeys, dueFilter, orderedTasks, priorityFilter, statusFilter]);
   const selectedTask =
     filteredTasks.find((task) => googleTaskKey(task) === selectedTaskId) ??
     filteredTasks[0] ??
     null;
   const filtersActive =
-    statusFilter !== "all" ||
-    priorityFilter !== "all" ||
-    dueFilter !== "all" ||
-    categoryFilter !== "all";
+    statusFilter !== "all" || priorityFilter !== "all" || dueFilter !== "all";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -8294,6 +8284,7 @@ function TaskMasterDetailView({
       ok?: boolean;
       reason?: string;
       task?: GoogleTask;
+      taskList?: { id?: string | null; title: string };
     };
 
     if (!response.ok || !data.ok) {
@@ -8316,7 +8307,6 @@ function TaskMasterDetailView({
     const createdTask = result.task ?? null;
     const createdTaskKey = googleTaskKey(createdTask);
     if (createdTaskKey) {
-      setTaskCategory(createdTaskKey, input.categoryId);
       setTaskRepository(createdTaskKey, input.repositoryFullName ?? null);
       if (input.richDescription) {
         setRichDescription(createdTaskKey, input.richDescription);
@@ -8336,10 +8326,44 @@ function TaskMasterDetailView({
       due: input.due,
       priority: input.priority,
     });
-    const taskKey = googleTaskKey(task);
-    if (taskKey) {
-      setTaskCategory(taskKey, input.categoryId);
-      setTaskRepository(taskKey, input.repositoryFullName ?? null);
+    const previousTaskKey = googleTaskKey(task);
+    const targetTaskListId = input.taskListId ?? task.taskListId ?? "@default";
+    if (task.taskListId && targetTaskListId !== task.taskListId) {
+      const wasArchived = previousTaskKey
+        ? archivedTaskKeys.has(previousTaskKey)
+        : false;
+      const moveResult = await runGoogleTaskAction({
+        action: "move",
+        id: task.id,
+        sourceTaskListId: task.taskListId,
+        targetTaskListId,
+      });
+      const movedTaskKey = googleTaskKey(moveResult.task ?? null);
+      if (previousTaskKey && movedTaskKey) {
+        setTaskRepository(previousTaskKey, null);
+        setTaskRepository(
+          movedTaskKey,
+          input.repositoryFullName ??
+            repositoryAssignments[previousTaskKey] ??
+            null,
+        );
+        const richDescription =
+          input.richDescription ?? richDescriptions[previousTaskKey];
+        if (richDescription) setRichDescription(movedTaskKey, richDescription);
+        deleteRichDescription(previousTaskKey);
+        forgetTaskArchive(previousTaskKey);
+        if (wasArchived) archiveTaskLocally(movedTaskKey);
+        setSelectedTaskListId(targetTaskListId);
+        setSelectedTaskId(movedTaskKey);
+      }
+      return;
+    }
+
+    if (previousTaskKey) {
+      setTaskRepository(previousTaskKey, input.repositoryFullName ?? null);
+      if (input.richDescription) {
+        setRichDescription(previousTaskKey, input.richDescription);
+      }
     }
   }
 
@@ -8372,7 +8396,6 @@ function TaskMasterDetailView({
     const taskKey = googleTaskKey(task);
     if (taskKey) {
       forgetTaskArchive(taskKey);
-      setTaskCategory(taskKey, null);
       setTaskRepository(taskKey, null);
       deleteRichDescription(taskKey);
     }
@@ -8411,25 +8434,63 @@ function TaskMasterDetailView({
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
                 Google Tasks
               </p>
-              <h2 className="mt-1 text-lg font-semibold">My tasks</h2>
-              <p className="mt-1 text-xs text-muted">
-                {tasks.filter((task) => task.status !== "completed").length}{" "}
-                open ·{" "}
-                {tasks.filter((task) => task.status === "completed").length}{" "}
-                complete
-              </p>
+              <Select
+                aria-label="Google task list"
+                className="mt-1 h-9 max-w-56 rounded-lg border border-separator bg-surface-secondary px-2.5 text-sm font-semibold"
+                onChange={(event) => {
+                  setSelectedTaskListId(event.target.value);
+                  setSelectedTaskId(null);
+                }}
+                value={selectedListId}
+              >
+                {taskLists.map((taskList) => {
+                  const counts = taskListCounts[taskList.id ?? "@default"] ?? {
+                    pending: 0,
+                    total: 0,
+                  };
+                  return (
+                    <option
+                      key={taskList.id ?? taskList.title}
+                      value={taskList.id ?? "@default"}
+                    >
+                      {`${taskList.title} — ${counts.pending} pending · ${counts.total} total`}
+                    </option>
+                  );
+                })}
+                {taskLists.length === 0 ? (
+                  <option value="@default">My Tasks</option>
+                ) : null}
+              </Select>
+              <div className="mt-1.5 flex items-center gap-3 text-[10px] text-muted">
+                <span>
+                  <strong className="font-semibold text-foreground">
+                    {taskListCounts[selectedListId]?.pending ?? 0}
+                  </strong>{" "}
+                  pending
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="h-1 w-1 rounded-full bg-accent"
+                />
+                <span>
+                  <strong className="font-semibold text-foreground">
+                    {taskListCounts[selectedListId]?.total ?? 0}
+                  </strong>{" "}
+                  total
+                </span>
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <Tooltip>
                 <Button
-                  aria-label="Manage task categories"
+                  aria-label="Manage Google task lists"
                   className={iconButtonClass}
-                  onClick={() => setCategoryModalOpen(true)}
+                  onClick={() => setTaskListModalOpen(true)}
                   type="button"
                 >
-                  <FolderTree className="h-4 w-4" />
+                  <ListTodo className="h-4 w-4" />
                 </Button>
-                <Tooltip.Content>Manage categories</Tooltip.Content>
+                <Tooltip.Content>Manage task lists</Tooltip.Content>
               </Tooltip>
               <Tooltip>
                 <Button
@@ -8485,7 +8546,6 @@ function TaskMasterDetailView({
                       setStatusFilter("all");
                       setPriorityFilter("all");
                       setDueFilter("all");
-                      setCategoryFilter("all");
                     }}
                     type="button"
                     variant="ghost"
@@ -8551,21 +8611,6 @@ function TaskMasterDetailView({
                   <option value="week">Next 7 days</option>
                   <option value="none">No due date</option>
                 </Select>
-                <Select
-                  aria-label="Filter tasks by category"
-                  className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-xs"
-                  onChange={(event) => setCategoryFilter(event.target.value)}
-                  value={categoryFilter}
-                >
-                  <option value="all">All categories</option>
-                  {flattenTaskCategories(categories).map(
-                    ({ category, depth }) => (
-                      <option key={category.id} value={category.id}>
-                        {`${"— ".repeat(depth)}${category.name}`}
-                      </option>
-                    ),
-                  )}
-                </Select>
               </div>
             </Disclosure.Body>
           </Disclosure.Content>
@@ -8581,10 +8626,6 @@ function TaskMasterDetailView({
             {filteredTasks.map((task) => (
               <TaskListCard
                 archived={archivedTaskKeys.has(googleTaskKey(task) ?? "")}
-                categoryPath={taskCategoryPath(
-                  categories,
-                  assignments[googleTaskKey(task) ?? ""],
-                )}
                 key={googleTaskKey(task)}
                 onArchiveToggle={() =>
                   setTaskArchived(
@@ -8643,12 +8684,6 @@ function TaskMasterDetailView({
               ? archivedTaskKeys.has(googleTaskKey(selectedTask) ?? "")
               : false
           }
-          categories={categories}
-          categoryId={
-            selectedTask
-              ? (assignments[googleTaskKey(selectedTask) ?? ""] ?? null)
-              : null
-          }
           deleteTask={deleteTask}
           editing={
             Boolean(selectedTask) &&
@@ -8665,6 +8700,7 @@ function TaskMasterDetailView({
           onSave={updateTask}
           onShowDueDate={showTaskDueDate}
           repositories={repositories}
+          taskLists={taskLists}
           repositoryFullName={
             selectedTask
               ? (repositoryAssignments[googleTaskKey(selectedTask) ?? ""] ??
@@ -8676,11 +8712,6 @@ function TaskMasterDetailView({
               ? (richDescriptions[googleTaskKey(selectedTask) ?? ""] ?? null)
               : null
           }
-          setRichDescription={(document) => {
-            if (!selectedTask) return;
-            const taskKey = googleTaskKey(selectedTask);
-            if (taskKey) setRichDescription(taskKey, document);
-          }}
           task={selectedTask}
           toggleTask={
             selectedTask?.status === "completed" ? reopenTask : completeTask
@@ -8703,25 +8734,27 @@ function TaskMasterDetailView({
           key={`${googleTaskKey(selectedTask) ?? "task-calendar"}-${calendarFocusRequest}`}
           onSelectTask={selectTask}
           selectedTask={selectedTask}
-          tasks={tasks}
+          tasks={tasks.filter((task) => task.taskListId === selectedListId)}
         />
       </div>
 
       {taskModalOpen ? (
         <GoogleTaskCreationModal
-          categories={categories}
+          initialTaskListId={selectedListId}
           onCreate={createTask}
           onClose={() => setTaskModalOpen(false)}
           taskLists={taskLists}
         />
       ) : null}
-      {categoryModalOpen ? (
-        <TaskCategoryManagerModal
-          addCategory={addCategory}
-          categories={categories}
-          deleteCategory={deleteCategory}
-          onClose={() => setCategoryModalOpen(false)}
-          renameCategory={renameCategory}
+      {taskListModalOpen ? (
+        <GoogleTaskListManagerModal
+          onClose={() => setTaskListModalOpen(false)}
+          onMutate={async (body) => {
+            await runGoogleTaskAction(body);
+          }}
+          selectedTaskListId={selectedListId}
+          taskListCounts={taskListCounts}
+          taskLists={taskLists}
         />
       ) : null}
     </div>
@@ -8798,7 +8831,6 @@ function TaskResizeHandle({
 
 function TaskListCard({
   archived,
-  categoryPath,
   onArchiveToggle,
   onSelect,
   selected,
@@ -8806,7 +8838,6 @@ function TaskListCard({
   toggleTask,
 }: {
   archived: boolean;
-  categoryPath: TaskCategory[];
   onArchiveToggle: () => void;
   onSelect: () => void;
   selected: boolean;
@@ -8835,9 +8866,6 @@ function TaskListCard({
               <Chip color="success" size="sm" variant="soft">
                 Complete
               </Chip>
-            ) : null}
-            {categoryPath.length > 0 ? (
-              <TaskCategoryBadge categories={categoryPath} />
             ) : null}
           </span>
           <span
@@ -8954,8 +8982,6 @@ function TaskCompletionButton({
 
 function TaskDetailPanel({
   archived,
-  categories,
-  categoryId,
   deleteTask,
   editing,
   onEditingChange,
@@ -8965,13 +8991,11 @@ function TaskDetailPanel({
   repositories,
   repositoryFullName,
   richDescription,
-  setRichDescription,
   task,
+  taskLists,
   toggleTask,
 }: {
   archived: boolean;
-  categories: TaskCategory[];
-  categoryId: string | null;
   deleteTask: (task: GoogleTask) => Promise<void>;
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
@@ -8981,8 +9005,8 @@ function TaskDetailPanel({
   repositories: GithubRepository[];
   repositoryFullName: string | null;
   richDescription: TaskRichDocument | null;
-  setRichDescription: (document: TaskRichDocument) => void;
   task: GoogleTask | null;
+  taskLists: Array<{ id?: string | null; title: string }>;
   toggleTask: (task: GoogleTask) => Promise<void>;
 }) {
   const [title, setTitle] = useState(task?.title ?? "");
@@ -8991,7 +9015,9 @@ function TaskDetailPanel({
     googleTaskEditablePriority(task),
   );
   const [due, setDue] = useState<DateValue | null>(taskDateValue(task?.due));
-  const [draftCategoryId, setDraftCategoryId] = useState(categoryId ?? "none");
+  const [draftTaskListId, setDraftTaskListId] = useState(
+    task?.taskListId ?? "@default",
+  );
   const [draftRepositoryFullName, setDraftRepositoryFullName] = useState(
     repositoryFullName ?? "none",
   );
@@ -9006,7 +9032,7 @@ function TaskDetailPanel({
     setNotes(googleTaskNotes(nextTask?.notes));
     setPriority(googleTaskEditablePriority(nextTask));
     setDue(taskDateValue(nextTask?.due));
-    setDraftCategoryId(categoryId ?? "none");
+    setDraftTaskListId(nextTask?.taskListId ?? "@default");
     setDraftRepositoryFullName(repositoryFullName ?? "none");
     setDraftRichDescription(richDescription);
     setStatus(null);
@@ -9036,14 +9062,11 @@ function TaskDetailPanel({
         notes: notes.trim() || null,
         due: due ? new Date(`${due.toString()}T23:59:00`).toISOString() : null,
         priority,
-        taskListId: activeTask.taskListId ?? null,
-        categoryId: draftCategoryId === "none" ? null : draftCategoryId,
+        taskListId: draftTaskListId,
         repositoryFullName:
           draftRepositoryFullName === "none" ? null : draftRepositoryFullName,
+        richDescription: draftRichDescription,
       });
-      if (draftRichDescription) {
-        setRichDescription(draftRichDescription);
-      }
       onEditingChange(false);
     } catch (error) {
       setStatus(
@@ -9186,16 +9209,26 @@ function TaskDetailPanel({
                   <option value="high">High</option>
                 </Select>
               </label>
-              <div className="grid gap-1.5">
+              <label className="grid gap-1.5">
                 <span className="text-xs font-semibold uppercase text-muted">
-                  Category
+                  Google task list
                 </span>
-                <TaskCategoryTreePicker
-                  categories={categories}
-                  onChange={setDraftCategoryId}
-                  value={draftCategoryId}
-                />
-              </div>
+                <Select
+                  aria-label="Move task to Google task list"
+                  className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) => setDraftTaskListId(event.target.value)}
+                  value={draftTaskListId}
+                >
+                  {taskLists.map((taskList) => (
+                    <option
+                      key={taskList.id ?? taskList.title}
+                      value={taskList.id ?? "@default"}
+                    >
+                      {taskList.title}
+                    </option>
+                  ))}
+                </Select>
+              </label>
               <label className="grid gap-1.5">
                 <span className="text-xs font-semibold uppercase text-muted">
                   GitHub repository
@@ -9272,11 +9305,6 @@ function TaskDetailPanel({
               <Chip size="sm" variant="secondary">
                 {task.taskListTitle ?? "Google Tasks"}
               </Chip>
-              {categoryId ? (
-                <TaskCategoryBadge
-                  categories={taskCategoryPath(categories, categoryId)}
-                />
-              ) : null}
               {repositoryFullName ? (
                 <Chip size="sm" variant="secondary">
                   <GitBranch className="h-3 w-3" />
@@ -9302,7 +9330,7 @@ function TaskDetailPanel({
             </div>
 
             <div className="-mx-1 overflow-x-auto px-1 pb-1">
-              <div className="grid min-w-[620px] grid-cols-4 gap-3">
+              <div className="grid min-w-[480px] grid-cols-3 gap-3">
                 <TaskDetailDatum
                   actionLabel={
                     task.due ? "Show due date in mini calendar" : undefined
@@ -9311,17 +9339,6 @@ function TaskDetailPanel({
                   label="Due date"
                   onAction={task.due ? () => onShowDueDate(task) : undefined}
                   value={task.due ? formatDueDate(task.due) : "No due date"}
-                />
-                <TaskDetailDatum
-                  icon={FolderTree}
-                  label="Category"
-                  value={
-                    categoryId
-                      ? taskCategoryPath(categories, categoryId)
-                          .map((category) => category.name)
-                          .join(" / ")
-                      : "No category"
-                  }
                 />
                 <TaskDetailDatum
                   icon={CheckCircle2}
@@ -10519,13 +10536,243 @@ function taskDateValue(value?: string | null): DateValue | null {
   }
 }
 
+function GoogleTaskListManagerModal({
+  onClose,
+  onMutate,
+  selectedTaskListId,
+  taskListCounts,
+  taskLists,
+}: {
+  onClose: () => void;
+  onMutate: (body: Record<string, unknown>) => Promise<void>;
+  selectedTaskListId: string;
+  taskListCounts: Record<string, { pending: number; total: number }>;
+  taskLists: Array<{ id?: string | null; title: string }>;
+}) {
+  const [newTitle, setNewTitle] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function mutate(body: Record<string, unknown>, busyKey: string) {
+    setBusyId(busyKey);
+    setStatus(null);
+    try {
+      await onMutate(body);
+      setNewTitle("");
+      setEditingId(null);
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Task list could not be updated.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <Modal isOpen onOpenChange={(open) => !open && onClose()}>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container placement="center">
+          <Modal.Dialog
+            className={`${panelClass} w-full max-w-xl animate-slide-up p-5`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">Google task lists</h3>
+                <p className="mt-1 text-sm text-muted">
+                  Add, rename, or remove the lists stored in Google Tasks.
+                </p>
+              </div>
+              <Button
+                className={iconButtonClass}
+                onClick={onClose}
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <form
+              className="mt-5 flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (newTitle.trim()) {
+                  void mutate(
+                    { action: "create-list", title: newTitle.trim() },
+                    "create",
+                  );
+                }
+              }}
+            >
+              <Input
+                aria-label="New task list name"
+                className="h-10 min-w-0 flex-1 rounded-xl border border-separator bg-surface-secondary px-3 text-sm"
+                onChange={(event) => setNewTitle(event.target.value)}
+                placeholder="New list name"
+                value={newTitle}
+              />
+              <Button
+                className={primaryButtonClass}
+                disabled={!newTitle.trim() || busyId === "create"}
+                type="submit"
+              >
+                {busyId === "create" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Add list
+              </Button>
+            </form>
+
+            <div className="mt-4 max-h-[22rem] space-y-2 overflow-y-auto pr-1">
+              {taskLists.map((taskList) => {
+                const id = taskList.id ?? "@default";
+                const counts = taskListCounts[id] ?? { pending: 0, total: 0 };
+                const editing = editingId === id;
+                return (
+                  <div
+                    className={`rounded-xl border p-3 ${
+                      id === selectedTaskListId
+                        ? "border-accent bg-accent-soft"
+                        : "border-separator bg-surface-secondary"
+                    }`}
+                    key={id}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface text-accent">
+                        <ListTodo className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        {editing ? (
+                          <Input
+                            aria-label={`Rename ${taskList.title}`}
+                            autoFocus
+                            className="h-9 w-full rounded-lg border border-separator bg-surface px-2.5 text-sm"
+                            onChange={(event) =>
+                              setEditingTitle(event.target.value)
+                            }
+                            value={editingTitle}
+                          />
+                        ) : (
+                          <p className="truncate text-sm font-semibold">
+                            {taskList.title}
+                          </p>
+                        )}
+                        <p className="mt-0.5 text-[10px] text-muted">
+                          <span className="font-semibold text-foreground">
+                            {counts.pending}
+                          </span>{" "}
+                          pending
+                          {" · "}
+                          <span className="font-semibold text-foreground">
+                            {counts.total}
+                          </span>{" "}
+                          total
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {editing ? (
+                          <>
+                            <Button
+                              aria-label={`Save ${taskList.title}`}
+                              className="h-8 w-8 rounded-lg p-0"
+                              disabled={!editingTitle.trim() || busyId === id}
+                              onClick={() =>
+                                void mutate(
+                                  {
+                                    action: "rename-list",
+                                    id,
+                                    title: editingTitle.trim(),
+                                  },
+                                  id,
+                                )
+                              }
+                              type="button"
+                              variant="ghost"
+                            >
+                              {busyId === id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              aria-label="Cancel rename"
+                              className="h-8 w-8 rounded-lg p-0"
+                              onClick={() => setEditingId(null)}
+                              type="button"
+                              variant="ghost"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              aria-label={`Rename ${taskList.title}`}
+                              className="h-8 w-8 rounded-lg p-0"
+                              onClick={() => {
+                                setEditingId(id);
+                                setEditingTitle(taskList.title);
+                              }}
+                              type="button"
+                              variant="ghost"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              aria-label={`Delete ${taskList.title}`}
+                              className="h-8 w-8 rounded-lg p-0 text-muted hover:bg-danger-soft hover:text-danger"
+                              disabled={taskLists.length <= 1 || busyId === id}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Delete “${taskList.title}” and all ${counts.total} tasks in it? This cannot be undone.`,
+                                  )
+                                ) {
+                                  void mutate(
+                                    { action: "delete-list", id },
+                                    id,
+                                  );
+                                }
+                              }}
+                              type="button"
+                              variant="ghost"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {status ? (
+              <p className="mt-4 rounded-xl bg-danger-soft px-3 py-2 text-sm text-danger">
+                {status}
+              </p>
+            ) : null}
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
 function GoogleTaskCreationModal({
-  categories,
+  initialTaskListId,
   onClose,
   onCreate,
   taskLists,
 }: {
-  categories: TaskCategory[];
+  initialTaskListId: string;
   onClose: () => void;
   onCreate: (input: GoogleTaskInput) => Promise<void>;
   taskLists: Array<{ id?: string | null; title: string }>;
@@ -10536,8 +10783,7 @@ function GoogleTaskCreationModal({
     useState<TaskRichDocument | null>(null);
   const [due, setDue] = useState<DateValue | null>(null);
   const [priority, setPriority] = useState<GoogleTaskPriority>("medium");
-  const [taskListId, setTaskListId] = useState(taskLists[0]?.id ?? "@default");
-  const [categoryId, setCategoryId] = useState("none");
+  const [taskListId, setTaskListId] = useState(initialTaskListId);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -10552,7 +10798,6 @@ function GoogleTaskCreationModal({
         due: due ? new Date(`${due.toString()}T23:59:00`).toISOString() : null,
         priority,
         taskListId: taskListId || "@default",
-        categoryId: categoryId === "none" ? null : categoryId,
         richDescription,
       });
       onClose();
@@ -10656,26 +10901,6 @@ function GoogleTaskCreationModal({
                     ))
                   ) : (
                     <option value="@default">Default</option>
-                  )}
-                </Select>
-              </label>
-              <label className="grid gap-1.5">
-                <span className="text-xs font-semibold uppercase text-muted">
-                  Category
-                </span>
-                <Select
-                  aria-label="Task category"
-                  className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
-                  onChange={(event) => setCategoryId(event.target.value)}
-                  value={categoryId}
-                >
-                  <option value="none">No category</option>
-                  {flattenTaskCategories(categories).map(
-                    ({ category, depth }) => (
-                      <option key={category.id} value={category.id}>
-                        {`${"— ".repeat(depth)}${category.name}`}
-                      </option>
-                    ),
                   )}
                 </Select>
               </label>

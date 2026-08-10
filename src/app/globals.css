@@ -1343,6 +1343,80 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   overflow: hidden;
 }
 
+.relay-product-shell .project-workspace-tabs {
+  overflow: visible;
+}
+
+.relay-product-shell
+  .project-github-workspace
+  > .github-workspace-grid {
+  height: 100%;
+  min-height: 0;
+}
+
+.relay-product-shell .project-workspace-tab {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.8rem 0.8rem 0 0;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 650;
+  gap: 0.5rem;
+  height: 2.7rem;
+  padding: 0 1rem;
+  position: relative;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.relay-product-shell .project-workspace-tab:hover {
+  background: var(--surface-secondary);
+  color: var(--foreground);
+}
+
+.relay-product-shell .project-workspace-tab[data-active="true"] {
+  background: var(--surface-secondary);
+  color: var(--foreground);
+  z-index: 1;
+}
+
+.relay-product-shell .project-workspace-tab[data-active="true"]::before,
+.relay-product-shell .project-workspace-tab[data-active="true"]::after {
+  bottom: 0;
+  content: "";
+  height: 0.9rem;
+  pointer-events: none;
+  position: absolute;
+  width: 0.9rem;
+}
+
+.relay-product-shell .project-workspace-tab[data-active="true"]::before {
+  border-bottom-right-radius: 0.9rem;
+  box-shadow: 0.35rem 0.35rem 0 var(--surface-secondary);
+  left: -0.9rem;
+}
+
+.relay-product-shell .project-workspace-tab[data-active="true"]::after {
+  border-bottom-left-radius: 0.9rem;
+  box-shadow: -0.35rem 0.35rem 0 var(--surface-secondary);
+  right: -0.9rem;
+}
+
+.relay-product-shell .project-workspace-tab__count {
+  align-items: center;
+  background: color-mix(in oklab, var(--muted) 14%, transparent);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.58rem;
+  height: 1rem;
+  justify-content: center;
+  min-width: 1rem;
+  padding-inline: 0.25rem;
+}
+
 /* The project spine is a quiet visual map: a live route through categories. */
 .relay-product-shell .project-spine::after {
   background: linear-gradient(
@@ -1734,6 +1808,14 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
       clamp(220px, min(var(--project-rail-width, 270px), 30%), 420px)
       0.75rem
       minmax(320px, 1fr);
+  }
+
+  .relay-product-shell
+    .project-resizable-layout[data-categories-collapsed="true"] {
+    grid-template-columns:
+      64px 0.75rem
+      clamp(220px, min(var(--project-rail-width, 270px), 30%), 420px)
+      0.75rem minmax(320px, 1fr);
   }
 
   .relay-product-shell .project-detail-stack {
