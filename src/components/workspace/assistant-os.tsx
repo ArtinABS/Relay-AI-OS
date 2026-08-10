@@ -2298,7 +2298,7 @@ function WorkspaceExperience({
                 : activeView === "calendar"
                   ? "relay-page workspace-view-transition relay-page--calendar p-3 sm:p-4 xl:p-5"
                   : activeView === "projects"
-                    ? "relay-page workspace-view-transition relay-page--projects p-3 sm:p-4 xl:p-5"
+                    ? "relay-page workspace-view-transition relay-page--projects p-0"
                     : activeView === "files"
                       ? "relay-page workspace-view-transition relay-page--files p-3 sm:p-4 xl:p-5"
                       : "relay-page workspace-view-transition min-h-full p-4 sm:p-6 xl:p-8"

@@ -60,7 +60,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GithubRepositoryExplorer } from "@/components/github/github-repository-explorer";
+import {
+  defaultGithubWorkspaceLayout,
+  GithubRepositoryExplorer,
+} from "@/components/github/github-repository-explorer";
 import { Button, Input, Select } from "@/components/ui/relay-ui";
 import { RichTextEditor } from "@/components/ui/task-rich-text-editor";
 import {
@@ -2916,6 +2919,9 @@ export function ProjectsWorkspace({
   );
   const [query, setQuery] = useState("");
   const [projectFiltersExpanded, setProjectFiltersExpanded] = useState(false);
+  const [githubLayout, setGithubLayout] = useState(
+    defaultGithubWorkspaceLayout,
+  );
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">(
     "all",
   );
@@ -3398,8 +3404,10 @@ export function ProjectsWorkspace({
           role="tabpanel"
         >
           <GithubRepositoryExplorer
+            githubLayout={githubLayout}
             repositories={repositories}
             repositoryError={repositoryError}
+            setGithubLayout={setGithubLayout}
             signedIn={signedInToGithub}
             tasks={repositoryTasks}
           />

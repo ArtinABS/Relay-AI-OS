@@ -1346,12 +1346,12 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 .relay-product-shell .project-workspace-tabs {
   --project-tab-panel: color-mix(
     in oklab,
-    var(--surface) 88%,
-    var(--background)
+    var(--surface) 72%,
+    var(--surface-secondary)
   );
   --project-tab-strip: color-mix(
     in oklab,
-    var(--surface-secondary) 72%,
+    var(--surface-secondary) 84%,
     var(--background)
   );
   background: var(--project-tab-strip);
@@ -1363,8 +1363,8 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 .relay-product-shell .project-workspace-panel {
   --project-tab-panel: color-mix(
     in oklab,
-    var(--surface) 88%,
-    var(--background)
+    var(--surface) 72%,
+    var(--surface-secondary)
   );
   background: var(--project-tab-panel);
   margin-top: -1px;
@@ -1375,6 +1375,38 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 .relay-product-shell .project-github-workspace > .github-workspace-grid {
   height: 100%;
   min-height: 0;
+}
+
+.relay-product-shell
+  .github-workspace-grid
+  > .github-workspace-divider::before {
+  background: var(--separator);
+  bottom: 0;
+  content: "";
+  left: 50%;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  transition: background-color 160ms ease;
+  width: 1px;
+}
+
+.relay-product-shell
+  .github-workspace-grid
+  > .github-workspace-divider:is(
+    :hover,
+    :focus-visible,
+    [data-resizing]
+  )::before {
+  background: color-mix(in oklab, var(--accent) 58%, var(--separator));
+}
+
+@media (max-width: 79.99rem) {
+  .relay-product-shell
+    .github-workspace-grid
+    > .github-workspace-section:not(:last-of-type) {
+    border-bottom: 1px solid var(--separator);
+  }
 }
 
 .relay-product-shell .project-workspace-tab {
@@ -1885,6 +1917,17 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 
   .relay-product-shell .project-detail-stack[data-calendar-collapsed="true"] {
     grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 80rem) {
+  .relay-product-shell .github-workspace-grid {
+    grid-template-columns:
+      minmax(0, var(--github-repository-width, 15%))
+      0.75rem
+      minmax(0, 1fr)
+      0.75rem
+      minmax(0, var(--github-task-width, 15%));
   }
 }
 

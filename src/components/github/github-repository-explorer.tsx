@@ -31,7 +31,18 @@ import {
   SquareTerminal,
   UserRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 
 import {
   TreeExpander,
@@ -140,8 +151,11 @@ type GithubBranch = {
 
 type GithubPanelTab = "overview" | "directory" | "commits" | "pullRequests";
 
-const panelClass =
-  "relay-panel min-w-0 rounded-2xl border border-separator bg-surface shadow-surface transition duration-200 ease-out";
+export const defaultGithubWorkspaceLayout = {
+  repositories: 15,
+  tasks: 15,
+};
+export type GithubWorkspaceLayout = typeof defaultGithubWorkspaceLayout;
 
 const githubTabsListClassName = [
   "m-3 min-w-max rounded-xl border border-accent/10 bg-accent-soft/30 p-1",
@@ -944,14 +958,81 @@ function EmptyPanel({
   );
 }
 
+type GithubResizeAxis = "repositories" | "tasks";
+
+function GithubResizeHandle({
+  active,
+  axis,
+  onChange,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  value,
+}: {
+  active: boolean;
+  axis: GithubResizeAxis;
+  onChange: (value: number) => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  value: number;
+}) {
+  const label =
+    axis === "repositories"
+      ? "Resize repository rail"
+      : "Resize linked tasks rail";
+
+  function resizeWithKeyboard(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const step = event.shiftKey ? 4 : 1;
+    const direction = axis === "repositories" ? 1 : -1;
+    let nextValue: number | null = null;
+
+    if (event.key === "ArrowLeft") nextValue = value - step * direction;
+    if (event.key === "ArrowRight") nextValue = value + step * direction;
+    if (event.key === "Home") nextValue = 10;
+    if (event.key === "End") nextValue = 30;
+    if (nextValue === null) return;
+
+    event.preventDefault();
+    onChange(nextValue);
+  }
+
+  return (
+    <div
+      aria-label={label}
+      aria-orientation="vertical"
+      aria-valuemax={30}
+      aria-valuemin={10}
+      aria-valuenow={Math.round(value)}
+      aria-valuetext={`${Math.round(value)} percent`}
+      className="github-workspace-divider task-resize-handle task-resize-handle--vertical hidden xl:block"
+      data-resizing={active || undefined}
+      onDoubleClick={() => onChange(15)}
+      onKeyDown={resizeWithKeyboard}
+      onLostPointerCapture={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      role="separator"
+      tabIndex={0}
+      title={`${label}. Drag, use arrow keys, or double-click to reset.`}
+    />
+  );
+}
+
 export function GithubRepositoryExplorer({
+  githubLayout,
   repositories,
   repositoryError,
+  setGithubLayout,
   signedIn,
   tasks,
 }: {
+  githubLayout: GithubWorkspaceLayout;
   repositories: Repository[];
   repositoryError?: string;
+  setGithubLayout: Dispatch<SetStateAction<GithubWorkspaceLayout>>;
   signedIn: boolean;
   tasks: RepositoryTask[];
 }) {
@@ -986,6 +1067,17 @@ export function GithubRepositoryExplorer({
   const [pullRequests, setPullRequests] = useState<GithubPullRequest[]>([]);
   const [loadingPullRequests, setLoadingPullRequests] = useState(false);
   const [pullRequestError, setPullRequestError] = useState<string | null>(null);
+  const [activeResize, setActiveResize] = useState<GithubResizeAxis | null>(
+    null,
+  );
+  const githubLayoutRef = useRef<HTMLDivElement>(null);
+  const githubResizeRef = useRef<{
+    axis: GithubResizeAxis;
+    pointerId: number;
+    startRepositories: number;
+    startTasks: number;
+    startX: number;
+  } | null>(null);
   const selectedRepo =
     repositories.find((repo) => repo.fullName === selectedRepoName) ??
     repositories[0] ??
@@ -1042,6 +1134,75 @@ export function GithubRepositoryExplorer({
       .map(([id, value]) => ({ id, ...value }))
       .sort((left, right) => right.count - left.count);
   }, [commits]);
+
+  useEffect(
+    () => () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    },
+    [],
+  );
+
+  function setRepositoryRailWidth(nextWidth: number) {
+    setGithubLayout((current) => ({
+      ...current,
+      repositories: Math.min(
+        30,
+        Math.max(10, Math.min(nextWidth, 50 - current.tasks)),
+      ),
+    }));
+  }
+
+  function setTaskRailWidth(nextWidth: number) {
+    setGithubLayout((current) => ({
+      ...current,
+      tasks: Math.min(
+        30,
+        Math.max(10, Math.min(nextWidth, 50 - current.repositories)),
+      ),
+    }));
+  }
+
+  function startGithubResize(
+    event: ReactPointerEvent<HTMLDivElement>,
+    axis: GithubResizeAxis,
+  ) {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    githubResizeRef.current = {
+      axis,
+      pointerId: event.pointerId,
+      startRepositories: githubLayout.repositories,
+      startTasks: githubLayout.tasks,
+      startX: event.clientX,
+    };
+    setActiveResize(axis);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }
+
+  function moveGithubResize(event: ReactPointerEvent<HTMLDivElement>) {
+    const resize = githubResizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+    const width = githubLayoutRef.current?.getBoundingClientRect().width ?? 1200;
+    const delta = ((event.clientX - resize.startX) / width) * 100;
+
+    if (resize.axis === "repositories") {
+      setRepositoryRailWidth(resize.startRepositories + delta);
+      return;
+    }
+    setTaskRailWidth(resize.startTasks - delta);
+  }
+
+  function finishGithubResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    githubResizeRef.current = null;
+    setActiveResize(null);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }
 
   function selectRepository(fullName: string) {
     const nextRepository = repositories.find(
@@ -1344,11 +1505,18 @@ export function GithubRepositoryExplorer({
       : null;
 
   return (
-    <div className="github-workspace-grid grid min-h-[calc(100dvh-2rem)] gap-4 sm:min-h-[calc(100dvh-3rem)] lg:h-[calc(100dvh-3rem)] lg:min-h-0 xl:h-[calc(100dvh-4rem)] xl:grid-cols-[288px_minmax(360px,1fr)_340px]">
-      <section
-        className={`${panelClass} flex min-h-[360px] flex-col overflow-hidden lg:min-h-0`}
-      >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-separator bg-surface p-4">
+    <div
+      className="github-workspace-grid grid h-full min-h-0 gap-0 overflow-y-auto xl:overflow-hidden"
+      ref={githubLayoutRef}
+      style={
+        {
+          "--github-repository-width": `${githubLayout.repositories}%`,
+          "--github-task-width": `${githubLayout.tasks}%`,
+        } as CSSProperties
+      }
+    >
+      <section className="github-workspace-section flex min-h-[360px] flex-col overflow-hidden xl:min-h-0">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-separator p-4">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
               GitHub
@@ -1424,9 +1592,17 @@ export function GithubRepositoryExplorer({
         </ScrollShadow>
       </section>
 
-      <section
-        className={`${panelClass} flex min-h-[480px] flex-col overflow-hidden lg:min-h-0`}
-      >
+      <GithubResizeHandle
+        active={activeResize === "repositories"}
+        axis="repositories"
+        onChange={setRepositoryRailWidth}
+        onPointerDown={(event) => startGithubResize(event, "repositories")}
+        onPointerMove={moveGithubResize}
+        onPointerUp={finishGithubResize}
+        value={githubLayout.repositories}
+      />
+
+      <section className="github-workspace-section flex min-h-[480px] flex-col overflow-hidden xl:min-h-0">
         <div className="shrink-0 border-b border-separator p-4 pb-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1468,7 +1644,7 @@ export function GithubRepositoryExplorer({
           onSelectionChange={(key) => setActiveTab(key as GithubPanelTab)}
           selectedKey={activeTab}
         >
-          <Tabs.ListContainer className="github-tabs-list-container shrink-0 rounded-none border-b border-separator bg-surface">
+          <Tabs.ListContainer className="github-tabs-list-container shrink-0 rounded-none border-b border-separator bg-transparent">
             <Tabs.List
               aria-label="Repository sections"
               className={githubTabsListClassName}
@@ -1974,9 +2150,17 @@ export function GithubRepositoryExplorer({
         </Tabs>
       </section>
 
-      <section
-        className={`${panelClass} flex min-h-[360px] flex-col overflow-hidden lg:min-h-0`}
-      >
+      <GithubResizeHandle
+        active={activeResize === "tasks"}
+        axis="tasks"
+        onChange={setTaskRailWidth}
+        onPointerDown={(event) => startGithubResize(event, "tasks")}
+        onPointerMove={moveGithubResize}
+        onPointerUp={finishGithubResize}
+        value={githubLayout.tasks}
+      />
+
+      <section className="github-workspace-section flex min-h-[360px] flex-col overflow-hidden xl:min-h-0">
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-separator p-4">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
