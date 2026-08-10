@@ -1326,6 +1326,13 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   max-width: none;
 }
 
+.relay-product-shell .relay-page--dashboard {
+  margin-inline: 0;
+  max-width: none;
+  min-height: 100%;
+  width: 100%;
+}
+
 .relay-product-shell .relay-page--calendar {
   height: 100%;
   min-height: 0;
@@ -3529,6 +3536,153 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   border-color: var(--separator);
   box-shadow: var(--surface-shadow);
   transform: none;
+}
+
+.relay-product-shell .relay-dashboard {
+  --dashboard-glass: rgba(249, 253, 255, 0.66);
+  --dashboard-glass-soft: rgba(242, 250, 253, 0.54);
+  --dashboard-glass-inset: rgba(255, 255, 255, 0.42);
+  --dashboard-glass-border: rgba(255, 255, 255, 0.72);
+  --dashboard-glass-shadow:
+    0 18px 52px rgba(11, 61, 78, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  --dashboard-control-glass: rgba(247, 253, 255, 0.62);
+}
+
+.relay-product-shell[data-theme="dark"] .relay-dashboard {
+  --dashboard-glass: rgba(6, 20, 29, 0.6);
+  --dashboard-glass-soft: rgba(8, 27, 38, 0.5);
+  --dashboard-glass-inset: rgba(12, 35, 47, 0.46);
+  --dashboard-glass-border: rgba(133, 225, 242, 0.16);
+  --dashboard-glass-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(206, 246, 252, 0.08);
+  --dashboard-control-glass: rgba(8, 28, 38, 0.62);
+}
+
+.relay-product-shell .dashboard-grainient {
+  background:
+    radial-gradient(circle at 18% 12%, #f2fcfe, transparent 42%),
+    linear-gradient(135deg, #c7d4e9, #83d7e7);
+}
+
+.relay-product-shell[data-theme="dark"] .dashboard-grainient {
+  background:
+    radial-gradient(circle at 18% 12%, #0a6176, transparent 38%),
+    linear-gradient(135deg, #020a10, #082d46);
+}
+
+.relay-product-shell .dashboard-grainient canvas {
+  filter: saturate(0.96);
+}
+
+.relay-product-shell .dashboard-grainient-scrim {
+  background:
+    radial-gradient(
+      circle at 78% 4%,
+      color-mix(in oklab, white 20%, transparent),
+      transparent 34rem
+    ),
+    linear-gradient(180deg, rgba(248, 253, 255, 0.05), rgba(234, 246, 250, 0.2));
+}
+
+.relay-product-shell[data-theme="dark"] .dashboard-grainient-scrim {
+  background:
+    radial-gradient(
+      circle at 78% 4%,
+      color-mix(in oklab, var(--accent) 8%, transparent),
+      transparent 34rem
+    ),
+    linear-gradient(180deg, rgba(1, 7, 11, 0.08), rgba(1, 7, 11, 0.3));
+}
+
+.relay-product-shell
+  .relay-dashboard
+  :is(.dashboard-glass, .dashboard-command-bar, .dashboard-section-header) {
+  -webkit-backdrop-filter: blur(22px) saturate(148%);
+  backdrop-filter: blur(22px) saturate(148%);
+  background: var(--dashboard-glass);
+  border-color: var(--dashboard-glass-border);
+  box-shadow: var(--dashboard-glass-shadow);
+}
+
+.relay-product-shell .relay-dashboard .dashboard-glass-soft {
+  -webkit-backdrop-filter: blur(16px) saturate(138%);
+  backdrop-filter: blur(16px) saturate(138%);
+  background: var(--dashboard-glass-soft);
+}
+
+.relay-product-shell .relay-dashboard .dashboard-glass-inset {
+  -webkit-backdrop-filter: blur(13px) saturate(132%);
+  backdrop-filter: blur(13px) saturate(132%);
+  background: var(--dashboard-glass-inset);
+  border-color: color-mix(
+    in oklab,
+    var(--dashboard-glass-border) 74%,
+    var(--separator)
+  );
+}
+
+.relay-product-shell .relay-dashboard .week-day-card[data-today] {
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--accent) 15%, transparent),
+      transparent 64%
+    ),
+    var(--dashboard-glass-soft);
+  border-color: var(--accent);
+}
+
+.relay-product-shell .relay-dashboard .week-day-card:hover {
+  box-shadow:
+    0 20px 50px color-mix(in oklab, var(--accent) 12%, transparent),
+    inset 0 1px 0 color-mix(in oklab, white 34%, transparent);
+}
+
+.relay-product-shell .relay-dashboard .interactive-control {
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  background: var(--dashboard-control-glass);
+  border-color: var(--dashboard-glass-border);
+}
+
+.relay-product-shell .relay-dashboard .interactive-control:hover {
+  background: color-mix(
+    in oklab,
+    var(--accent) 10%,
+    var(--dashboard-control-glass)
+  );
+  border-color: color-mix(
+    in oklab,
+    var(--accent) 34%,
+    var(--dashboard-glass-border)
+  );
+}
+
+.relay-product-shell .relay-dashboard .relay-panel.dashboard-glass:hover {
+  border-color: var(--dashboard-glass-border);
+  box-shadow: var(--dashboard-glass-shadow);
+}
+
+.relay-product-shell .relay-dashboard .dashboard-row.is-selected,
+.relay-product-shell .relay-dashboard .dashboard-task-row:hover,
+.relay-product-shell .relay-dashboard .dashboard-project-row:hover {
+  background: color-mix(in oklab, var(--accent) 11%, transparent);
+}
+
+.relay-product-shell .relay-dashboard .dashboard-task-row.is-completing {
+  background: color-mix(in oklab, var(--success) 12%, transparent);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .relay-product-shell
+    .relay-dashboard
+    :is(.dashboard-glass, .dashboard-command-bar, .dashboard-section-header) {
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+  }
+
+  .relay-product-shell .relay-dashboard .dashboard-glass-soft {
+    background: color-mix(in oklab, var(--surface-secondary) 90%, transparent);
+  }
 }
 
 .relay-product-shell .file-browser-row:hover {

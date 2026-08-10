@@ -81,6 +81,7 @@ import {
   type Project as RelayProject,
   type ProjectRecord,
 } from "@/lib/projects/model";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import {
   Activity,
@@ -601,6 +602,10 @@ const panelClass =
   "relay-panel min-w-0 rounded-2xl border border-separator bg-surface shadow-surface transition duration-200 ease-out";
 const softPanelClass =
   "relay-soft-panel min-w-0 rounded-xl border border-separator bg-surface-secondary transition duration-200 ease-out";
+const Grainient = dynamic(() => import("@/components/ui/grainient"), {
+  loading: () => <div className="h-full w-full" />,
+  ssr: false,
+});
 const iconButtonClass =
   "interactive-control inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-separator bg-surface-secondary text-muted transition hover:border-border-secondary hover:bg-accent-soft hover:text-accent";
 const primaryButtonClass =
@@ -2306,15 +2311,17 @@ function WorkspaceExperience({
           <div
             key={activeView}
             className={
-              activeView === "chat"
-                ? "relay-page workspace-view-transition relay-page--chat h-full min-h-0 p-0"
-                : activeView === "calendar"
-                  ? "relay-page workspace-view-transition relay-page--calendar p-3 sm:p-4 xl:p-5"
-                  : activeView === "projects"
-                    ? "relay-page workspace-view-transition relay-page--projects p-0"
-                    : activeView === "files"
-                      ? "relay-page workspace-view-transition relay-page--files p-3 sm:p-4 xl:p-5"
-                      : "relay-page workspace-view-transition min-h-full p-4 sm:p-6 xl:p-8"
+              activeView === "dashboard"
+                ? "relay-page workspace-view-transition relay-page--dashboard min-h-full p-0"
+                : activeView === "chat"
+                  ? "relay-page workspace-view-transition relay-page--chat h-full min-h-0 p-0"
+                  : activeView === "calendar"
+                    ? "relay-page workspace-view-transition relay-page--calendar p-3 sm:p-4 xl:p-5"
+                    : activeView === "projects"
+                      ? "relay-page workspace-view-transition relay-page--projects p-0"
+                      : activeView === "files"
+                        ? "relay-page workspace-view-transition relay-page--files p-3 sm:p-4 xl:p-5"
+                        : "relay-page workspace-view-transition min-h-full p-4 sm:p-6 xl:p-8"
             }
           >
             {activeView === "dashboard" ? (
@@ -2329,6 +2336,7 @@ function WorkspaceExperience({
                 openTasks={openTasks}
                 runPrompt={runPrompt}
                 tasks={tasks}
+                theme={theme}
               />
             ) : null}
 
@@ -3045,6 +3053,7 @@ function DashboardView({
   openTasks,
   runPrompt,
   tasks,
+  theme,
 }: {
   briefing: Briefing | null;
   completeTask: (task: RelayTask) => Promise<void>;
@@ -3053,6 +3062,7 @@ function DashboardView({
   openTasks: RelayTask[];
   runPrompt: (prompt: string) => void;
   tasks: RelayTask[];
+  theme: ThemeMode;
 }) {
   const [projectData, setProjectData] = useState<DashboardProjectData>(
     emptyDashboardProjectData,
@@ -3088,64 +3098,99 @@ function DashboardView({
   const activeProjects = projectData.projects.filter(
     (project) => !project.archived && project.status === "active",
   );
+  const grainientColors =
+    theme === "dark"
+      ? { color1: "#0A6176", color2: "#082D46", color3: "#020A10" }
+      : { color1: "#F2FCFE", color2: "#83D7E7", color3: "#C7D4E9" };
 
   return (
-    <div className="relay-dashboard space-y-7 animate-fade-in">
-      <WeeklyCommandCalendar
-        briefing={briefing}
-        completeTask={completeTask}
-        notes={notes}
-        openTasks={openTasks}
-        runPrompt={runPrompt}
+    <div className="relay-dashboard relative isolate min-h-full overflow-hidden animate-fade-in">
+      <div className="dashboard-grainient pointer-events-none absolute inset-0 -z-20">
+        <Grainient
+          {...grainientColors}
+          blendAngle={-18}
+          blendSoftness={0.18}
+          colorBalance={theme === "dark" ? -0.06 : 0.04}
+          contrast={theme === "dark" ? 1.18 : 0.96}
+          gamma={theme === "dark" ? 0.96 : 1.04}
+          grainAmount={theme === "dark" ? 0.065 : 0.045}
+          grainAnimated={false}
+          grainScale={2.4}
+          noiseScale={1.65}
+          rotationAmount={260}
+          saturation={theme === "dark" ? 1.02 : 0.82}
+          timeSpeed={0.16}
+          warpAmplitude={58}
+          warpFrequency={3.6}
+          warpSpeed={0.7}
+          warpStrength={0.8}
+          zoom={0.86}
+        />
+      </div>
+      <div
+        aria-hidden="true"
+        className="dashboard-grainient-scrim pointer-events-none absolute inset-0 -z-10"
       />
 
-      {!briefing ? <DashboardSkeleton /> : null}
-
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(340px,0.72fr)_minmax(340px,0.72fr)]">
-        <InboxHighlights briefing={briefing} runPrompt={runPrompt} />
-        <TaskSnapshot
+      <div className="dashboard-content mx-auto max-w-[1760px] space-y-7 p-4 sm:p-6 xl:p-8">
+        <WeeklyCommandCalendar
+          briefing={briefing}
           completeTask={completeTask}
+          notes={notes}
           openTasks={openTasks}
           runPrompt={runPrompt}
-          tasks={tasks}
         />
-        <DashboardProjectsPanel
-          categories={projectData.categories}
-          onOpenProject={onOpenProject}
-          projects={activeProjects}
-        />
-      </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ControlMetric
-          icon={CalendarDays}
-          label="Schedule"
-          value={
-            briefing?.calendar.ok ? `${briefing.calendar.events.length}` : "Off"
-          }
-          detail="upcoming events"
-        />
-        <ControlMetric
-          icon={ListTodo}
-          label="Tasks"
-          value={`${openTasks.length}`}
-          detail={`${tasks.length - openTasks.length} completed`}
-        />
-        <ControlMetric
-          icon={Mail}
-          label="Inbox"
-          value={
-            briefing?.gmail?.ok ? `${briefing.gmail.messages.length}` : "Off"
-          }
-          detail="recent messages"
-        />
-        <ControlMetric
-          icon={FolderTree}
-          label="Projects"
-          value={`${activeProjects.length}`}
-          detail="active projects"
-        />
-      </section>
+        {!briefing ? <DashboardSkeleton /> : null}
+
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(340px,0.72fr)_minmax(340px,0.72fr)]">
+          <InboxHighlights briefing={briefing} runPrompt={runPrompt} />
+          <TaskSnapshot
+            completeTask={completeTask}
+            openTasks={openTasks}
+            runPrompt={runPrompt}
+            tasks={tasks}
+          />
+          <DashboardProjectsPanel
+            categories={projectData.categories}
+            onOpenProject={onOpenProject}
+            projects={activeProjects}
+          />
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <ControlMetric
+            icon={CalendarDays}
+            label="Schedule"
+            value={
+              briefing?.calendar.ok
+                ? `${briefing.calendar.events.length}`
+                : "Off"
+            }
+            detail="upcoming events"
+          />
+          <ControlMetric
+            icon={ListTodo}
+            label="Tasks"
+            value={`${openTasks.length}`}
+            detail={`${tasks.length - openTasks.length} completed`}
+          />
+          <ControlMetric
+            icon={Mail}
+            label="Inbox"
+            value={
+              briefing?.gmail?.ok ? `${briefing.gmail.messages.length}` : "Off"
+            }
+            detail="recent messages"
+          />
+          <ControlMetric
+            icon={FolderTree}
+            label="Projects"
+            value={`${activeProjects.length}`}
+            detail="active projects"
+          />
+        </section>
+      </div>
     </div>
   );
 }
@@ -3155,7 +3200,7 @@ function DashboardSkeleton() {
     <section className="grid gap-5 md:grid-cols-3">
       {["Focus", "Timeline", "Inbox"].map((item) => (
         <Surface
-          className={`${softPanelClass} p-5`}
+          className={`${softPanelClass} dashboard-glass dashboard-glass-soft p-5`}
           key={item}
           variant="secondary"
         >
@@ -3198,7 +3243,7 @@ function WeeklyCommandCalendar({
 
   return (
     <section className="overflow-visible">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="dashboard-command-bar mb-5 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-end sm:justify-between sm:p-5">
         <div>
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-separator bg-surface-secondary px-3 py-1 text-xs font-semibold uppercase text-muted">
             <span className="pulse-dot" />
@@ -3262,11 +3307,12 @@ function WeeklyCommandCalendar({
                 aria-expanded={inspectorActive}
                 aria-haspopup="dialog"
                 aria-label={`View ${taskCount} task${taskCount === 1 ? "" : "s"} and ${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"} for ${dayLabel}`}
-                className={`relay-content-card week-day-card !h-52 w-full overflow-hidden rounded-2xl border-2 p-3.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-accent ${
+                className={`relay-content-card dashboard-glass dashboard-glass-soft week-day-card !h-52 w-full overflow-hidden rounded-2xl border-2 p-3.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-accent ${
                   isToday
                     ? "border-[var(--accent)] bg-accent-soft shadow-[0_14px_32px_color-mix(in_oklab,var(--accent)_14%,transparent)]"
                     : "border-separator bg-surface-secondary"
                 }`}
+                data-today={isToday || undefined}
                 onClick={() => setActiveInspectorDay(dayKey)}
                 type="button"
               >
@@ -3279,7 +3325,7 @@ function WeeklyCommandCalendar({
                 <span className="mt-2 block text-xs font-semibold uppercase tracking-wide text-muted">
                   {day.toLocaleDateString(undefined, { month: "short" })}
                 </span>
-                <div className="mt-auto grid grid-cols-2 divide-x divide-separator overflow-hidden rounded-xl border border-separator bg-surface shadow-sm">
+                <div className="dashboard-glass-inset mt-auto grid grid-cols-2 divide-x divide-separator overflow-hidden rounded-xl border border-separator shadow-sm">
                   <span className="grid min-w-0 gap-1.5 px-2.5 py-2.5">
                     <span className="text-2xl font-bold leading-none tracking-tight text-accent tabular-nums">
                       {taskCount}
@@ -3540,7 +3586,7 @@ function TaskSnapshot({
   }
 
   return (
-    <section className={`${panelClass} overflow-hidden`}>
+    <section className={`${panelClass} dashboard-glass overflow-hidden`}>
       <div className="flex items-start justify-between gap-3 border-b border-separator p-4">
         <div>
           <h2 className="text-lg font-semibold">Task snapshot</h2>
@@ -3639,7 +3685,7 @@ function DashboardProjectsPanel({
   projects: DashboardProject[];
 }) {
   return (
-    <section className={`${panelClass} overflow-hidden`}>
+    <section className={`${panelClass} dashboard-glass overflow-hidden`}>
       <div className="flex items-start justify-between gap-3 border-b border-separator p-4">
         <div>
           <h2 className="text-lg font-semibold">Active projects</h2>
@@ -3731,7 +3777,7 @@ function InboxHighlights({
         onAction={() => runPrompt("Summarize my inbox activity")}
         title="Inbox highlights"
       />
-      <div className={`${panelClass} overflow-hidden`}>
+      <div className={`${panelClass} dashboard-glass overflow-hidden`}>
         {items.length > 0 ? (
           <div className="grid min-h-80 xl:grid-cols-[minmax(0,1fr)_280px]">
             <div className="divide-y divide-separator">
@@ -3762,7 +3808,7 @@ function InboxHighlights({
                 </div>
               ))}
             </div>
-            <div className="border-t border-separator bg-surface-secondary p-4 xl:border-l xl:border-t-0">
+            <div className="dashboard-glass-inset border-t border-separator p-4 xl:border-l xl:border-t-0">
               {selected ? (
                 <div className="animate-fade-in">
                   <p className="text-xs font-semibold uppercase text-muted">
@@ -3814,7 +3860,7 @@ function ControlMetric({
   value: string;
 }) {
   return (
-    <Card className="border border-separator bg-surface p-0 shadow-surface">
+    <Card className="dashboard-glass border border-separator bg-surface p-0 shadow-surface">
       <Card.Content className="p-4">
         <div className="mb-5 flex items-center justify-between">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -3844,7 +3890,7 @@ function SectionHeader({
   title: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="dashboard-section-header flex items-center justify-between gap-4 rounded-xl border p-3">
       <div className="flex items-center gap-3">
         <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent-soft text-accent">
           <Icon className="h-4 w-4" />
