@@ -1452,6 +1452,10 @@ function TaskPanel({
   const [linking, setLinking] = useState(false);
   const [linkQuery, setLinkQuery] = useState("");
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
+  const [celebratingTaskId, setCelebratingTaskId] = useState<string | null>(
+    null,
+  );
+  const celebrationTimerRef = useRef<number | null>(null);
   const localTasks = store.localTasks.filter(
     (task) => task.projectId === project.id,
   );
@@ -1463,6 +1467,26 @@ function TaskPanel({
       !store.taskAssignments[task.id] &&
       task.title.toLowerCase().includes(linkQuery.trim().toLowerCase()),
   );
+
+  useEffect(
+    () => () => {
+      if (celebrationTimerRef.current) {
+        window.clearTimeout(celebrationTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  function celebrateCompletion(taskId: string) {
+    if (celebrationTimerRef.current) {
+      window.clearTimeout(celebrationTimerRef.current);
+    }
+    setCelebratingTaskId(taskId);
+    celebrationTimerRef.current = window.setTimeout(() => {
+      setCelebratingTaskId(null);
+      celebrationTimerRef.current = null;
+    }, 680);
+  }
 
   return (
     <div className="grid gap-4">
@@ -1501,8 +1525,12 @@ function TaskPanel({
                     ? `Mark ${task.title} incomplete`
                     : `Complete ${task.title}`
                 }
-                className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${task.completed ? "border-success bg-success text-success-foreground" : "border-border text-transparent hover:border-accent hover:text-accent"}`}
-                onClick={() =>
+                className={`project-task-completion grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${task.completed ? "border-success bg-success text-success-foreground" : "border-border text-transparent hover:border-accent hover:text-accent"}`}
+                data-celebrating={
+                  celebratingTaskId === task.id ? "true" : undefined
+                }
+                onClick={() => {
+                  if (!task.completed) celebrateCompletion(task.id);
                   onStoreChange((current) => ({
                     ...current,
                     localTasks: current.localTasks.map((item) =>
@@ -1510,8 +1538,8 @@ function TaskPanel({
                         ? { ...item, completed: !item.completed }
                         : item,
                     ),
-                  }))
-                }
+                  }));
+                }}
                 type="button"
               >
                 <Check className="h-3.5 w-3.5" />
@@ -1552,9 +1580,13 @@ function TaskPanel({
                     ? `${task.title} is complete`
                     : `Complete ${task.title}`
                 }
-                className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${task.completed ? "border-success bg-success text-success-foreground" : "border-border hover:border-accent"}`}
+                className={`project-task-completion grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${task.completed ? "border-success bg-success text-success-foreground" : "border-border hover:border-accent"}`}
+                data-celebrating={
+                  celebratingTaskId === task.id ? "true" : undefined
+                }
                 disabled={task.completed || busyTaskId === task.id}
                 onClick={async () => {
+                  celebrateCompletion(task.id);
                   setBusyTaskId(task.id);
                   try {
                     await onCompleteLinkedTask(task);
@@ -1564,7 +1596,7 @@ function TaskPanel({
                 }}
                 type="button"
               >
-                {task.completed ? (
+                {task.completed || busyTaskId === task.id ? (
                   <Check className="h-3.5 w-3.5" />
                 ) : (
                   <Circle className="h-3 w-3 text-transparent" />
@@ -3313,7 +3345,9 @@ export function ProjectsWorkspace({
     window.requestAnimationFrame(() => {
       document
         .getElementById(
-          nextTab === "relay" ? "project-management-tab" : "github-projects-tab",
+          nextTab === "relay"
+            ? "project-management-tab"
+            : "github-projects-tab",
         )
         ?.focus();
     });
@@ -3456,31 +3490,6 @@ export function ProjectsWorkspace({
                       </span>
                     ) : null}
                   </button>
-                  <button
-                    aria-label={
-                      categoriesCollapsed
-                        ? "Expand project categories"
-                        : "Collapse project categories"
-                    }
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-accent"
-                    onClick={() => {
-                      setCategoriesCollapsed((current) => !current);
-                      setAddingCategoryParentId(null);
-                      setEditingCategoryId(null);
-                    }}
-                    title={
-                      categoriesCollapsed
-                        ? "Expand categories"
-                        : "Collapse categories"
-                    }
-                    type="button"
-                  >
-                    {categoriesCollapsed ? (
-                      <PanelLeftOpen className="h-4 w-4" />
-                    ) : (
-                      <PanelLeftClose className="h-4 w-4" />
-                    )}
-                  </button>
                 </div>
               </div>
               <div
@@ -3588,52 +3597,83 @@ export function ProjectsWorkspace({
               <div
                 className={`border-t border-separator ${categoriesCollapsed ? "p-2" : "p-3"}`}
               >
-                <button
-                  aria-label={
-                    showArchived ? "Back to projects" : "Archived projects"
-                  }
-                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${showArchived ? "bg-surface-secondary text-foreground" : "text-muted hover:bg-surface-secondary hover:text-foreground"}`}
-                  onClick={() => {
-                    setShowArchived((current) => !current);
-                    setSelectedCategoryId(null);
-                  }}
-                  type="button"
-                >
-                  <Archive className="h-4 w-4" />
-                  {!categoriesCollapsed ? (
-                    <span>
-                      {showArchived ? "Back to projects" : "Archived"}
-                    </span>
-                  ) : null}
-                </button>
-                {!categoriesCollapsed ? (
-                  <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-secondary p-2 text-center">
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">
-                        {totalActive}
-                      </p>
-                      <p className="text-[9px] uppercase tracking-wide text-muted">
-                        Active
-                      </p>
+                {categoriesCollapsed ? (
+                  <button
+                    aria-label="Expand project categories"
+                    className="grid h-9 w-full place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-accent"
+                    onClick={() => {
+                      setCategoriesCollapsed(false);
+                      setAddingCategoryParentId(null);
+                      setEditingCategoryId(null);
+                    }}
+                    title="Expand categories"
+                    type="button"
+                  >
+                    <PanelLeftOpen className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <button
+                        aria-label={
+                          showArchived
+                            ? "Back to projects"
+                            : "Archived projects"
+                        }
+                        className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${showArchived ? "bg-surface-secondary text-foreground" : "text-muted hover:bg-surface-secondary hover:text-foreground"}`}
+                        onClick={() => {
+                          setShowArchived((current) => !current);
+                          setSelectedCategoryId(null);
+                        }}
+                        type="button"
+                      >
+                        <Archive className="h-4 w-4 shrink-0" />
+                        <span>
+                          {showArchived ? "Back to projects" : "Archived"}
+                        </span>
+                      </button>
+                      <button
+                        aria-label="Collapse project categories"
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-secondary hover:text-accent"
+                        onClick={() => {
+                          setCategoriesCollapsed(true);
+                          setAddingCategoryParentId(null);
+                          setEditingCategoryId(null);
+                        }}
+                        title="Collapse categories"
+                        type="button"
+                      >
+                        <PanelLeftClose className="h-4 w-4" />
+                      </button>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">
-                        {totalOpenTasks}
-                      </p>
-                      <p className="text-[9px] uppercase tracking-wide text-muted">
-                        Open
-                      </p>
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-secondary p-2 text-center">
+                      <div>
+                        <p className="text-sm font-semibold tabular-nums">
+                          {totalActive}
+                        </p>
+                        <p className="text-[9px] uppercase tracking-wide text-muted">
+                          Active
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold tabular-nums">
+                          {totalOpenTasks}
+                        </p>
+                        <p className="text-[9px] uppercase tracking-wide text-muted">
+                          Open
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold tabular-nums">
+                          {totalCompleted}
+                        </p>
+                        <p className="text-[9px] uppercase tracking-wide text-muted">
+                          Done
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">
-                        {totalCompleted}
-                      </p>
-                      <p className="text-[9px] uppercase tracking-wide text-muted">
-                        Done
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
+                  </>
+                )}
               </div>
             </aside>
 
@@ -3688,15 +3728,16 @@ export function ProjectsWorkspace({
                         setProjectFiltersExpanded((current) => !current)
                       }
                       title={
-                        projectFiltersExpanded
-                          ? "Hide filters"
-                          : "Show filters"
+                        projectFiltersExpanded ? "Hide filters" : "Show filters"
                       }
                       type="button"
                     >
                       <Filter className="h-4 w-4" />
                       {projectFiltersActive ? (
-                        <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent" />
+                        <span
+                          aria-hidden="true"
+                          className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent"
+                        />
                       ) : null}
                     </button>
                   </div>

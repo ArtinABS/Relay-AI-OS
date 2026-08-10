@@ -1339,8 +1339,45 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 
 .relay-product-shell .relay-page--projects {
   height: 100%;
+  margin-inline: 0;
+  max-width: none;
   min-height: 0;
   overflow: hidden;
+  width: 100%;
+}
+
+.relay-product-shell .project-task-completion {
+  isolation: isolate;
+  overflow: visible;
+  position: relative;
+}
+
+.relay-product-shell .project-task-completion::after {
+  border: 2px solid color-mix(in oklab, var(--success) 76%, transparent);
+  border-radius: 999px;
+  content: "";
+  inset: -0.2rem;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.relay-product-shell .project-task-completion[data-celebrating="true"] {
+  animation: project-task-complete-pop 680ms
+    cubic-bezier(0.18, 0.89, 0.32, 1.35) both;
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--success-foreground);
+}
+
+.relay-product-shell .project-task-completion[data-celebrating="true"]::after {
+  animation: project-task-complete-ring 680ms ease-out both;
+}
+
+.relay-product-shell .project-task-completion[data-celebrating="true"] svg {
+  animation: project-task-check-draw 480ms cubic-bezier(0.2, 0.8, 0.2, 1) 70ms
+    both;
 }
 
 .relay-product-shell .project-workspace-tabs {
@@ -3731,6 +3768,56 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes project-task-complete-pop {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 34%, transparent);
+    transform: scale(0.84);
+  }
+
+  36% {
+    box-shadow: 0 0 0 0.38rem
+      color-mix(in oklab, var(--success) 14%, transparent);
+    transform: scale(1.24) rotate(-8deg);
+  }
+
+  62% {
+    transform: scale(0.94) rotate(3deg);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes project-task-complete-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.72);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.85);
+  }
+}
+
+@keyframes project-task-check-draw {
+  0% {
+    opacity: 0;
+    stroke-dasharray: 18;
+    stroke-dashoffset: 18;
+    transform: scale(0.55);
+  }
+
+  100% {
+    opacity: 1;
+    stroke-dasharray: 18;
+    stroke-dashoffset: 0;
+    transform: scale(1);
   }
 }
 

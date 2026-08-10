@@ -71,6 +71,16 @@ import {
   relayMessageText,
   type RelayChatMessage,
 } from "@/lib/ai/relay-chat";
+import {
+  applyBrowserProjectRecord,
+  readBrowserProjectRecord,
+} from "@/lib/projects/client";
+import {
+  projectRecordSchema,
+  projectRecordUpdatedEvent,
+  type Project as RelayProject,
+  type ProjectRecord,
+} from "@/lib/projects/model";
 import Image from "next/image";
 import {
   Activity,
@@ -205,6 +215,7 @@ type GoogleTaskInput = {
   due: string | null;
   priority: GoogleTaskPriority;
   taskListId: string | null;
+  projectId: string | null;
   repositoryFullName?: string | null;
   richDescription?: TaskRichDocument | null;
 };
@@ -8058,6 +8069,8 @@ function TaskMasterDetailView({
   } = useTaskArchive();
   const { deleteRichDescription, richDescriptions, setRichDescription } =
     useTaskRichDescriptions();
+  const { projectAssignments, projects, setTaskProject } =
+    useTaskProjectLinks();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
     initialTaskKey ?? googleTaskKey(tasks[0] ?? null),
   );
@@ -8308,6 +8321,9 @@ function TaskMasterDetailView({
     const createdTaskKey = googleTaskKey(createdTask);
     if (createdTaskKey) {
       setTaskRepository(createdTaskKey, input.repositoryFullName ?? null);
+      if (createdTask?.id) {
+        await setTaskProject(createdTask.id, input.projectId);
+      }
       if (input.richDescription) {
         setRichDescription(createdTaskKey, input.richDescription);
       }
@@ -8356,6 +8372,7 @@ function TaskMasterDetailView({
         setSelectedTaskListId(targetTaskListId);
         setSelectedTaskId(movedTaskKey);
       }
+      await setTaskProject(task.id, input.projectId);
       return;
     }
 
@@ -8365,6 +8382,7 @@ function TaskMasterDetailView({
         setRichDescription(previousTaskKey, input.richDescription);
       }
     }
+    await setTaskProject(task.id, input.projectId);
   }
 
   async function completeTask(task: GoogleTask) {
@@ -8399,6 +8417,7 @@ function TaskMasterDetailView({
       setTaskRepository(taskKey, null);
       deleteRichDescription(taskKey);
     }
+    await setTaskProject(task.id, null);
     setEditingTaskId(null);
   }
 
@@ -8675,6 +8694,12 @@ function TaskMasterDetailView({
           }
           onSave={updateTask}
           onShowDueDate={showTaskDueDate}
+          projectId={
+            selectedTask?.id
+              ? (projectAssignments[selectedTask.id] ?? null)
+              : null
+          }
+          projects={projects}
           repositories={repositories}
           taskLists={taskLists}
           repositoryFullName={
@@ -8719,6 +8744,8 @@ function TaskMasterDetailView({
           initialTaskListId={selectedListId}
           onCreate={createTask}
           onClose={() => setTaskModalOpen(false)}
+          projects={projects}
+          repositories={repositories}
           taskLists={taskLists}
         />
       ) : null}
@@ -8917,10 +8944,12 @@ function TaskCategoryBadge({ categories }: { categories: TaskCategory[] }) {
 
 function TaskCompletionButton({
   compact = false,
+  disabled = false,
   task,
   toggleTask,
 }: {
   compact?: boolean;
+  disabled?: boolean;
   task: GoogleTask;
   toggleTask: (task: GoogleTask) => Promise<void>;
 }) {
@@ -8928,7 +8957,7 @@ function TaskCompletionButton({
   const completed = task.status === "completed";
 
   async function toggleCompletion() {
-    if (busy) return;
+    if (busy || disabled) return;
     setBusy(true);
     try {
       await toggleTask(task);
@@ -8946,8 +8975,15 @@ function TaskCompletionButton({
           ? "border-[var(--success)] bg-[var(--success)] text-white hover:bg-[var(--success)] hover:text-white hover:brightness-110"
           : "border-separator bg-surface-secondary text-[var(--success)] hover:border-[var(--success)] hover:bg-[var(--success-soft)] hover:text-[var(--success)]"
       }`}
+      disabled={busy || disabled}
       onClick={() => void toggleCompletion()}
-      title={completed ? "Undo task completion" : "Mark task done"}
+      title={
+        disabled
+          ? "Finish editing before changing completion"
+          : completed
+            ? "Undo task completion"
+            : "Mark task done"
+      }
       type="button"
     >
       {busy ? (
@@ -8969,6 +9005,8 @@ function TaskDetailPanel({
   onSave,
   onShowDueDate,
   onToggleArchive,
+  projectId,
+  projects,
   repositories,
   repositoryFullName,
   richDescription,
@@ -8983,6 +9021,8 @@ function TaskDetailPanel({
   onSave: (task: GoogleTask, input: GoogleTaskInput) => Promise<void>;
   onShowDueDate: (task: GoogleTask) => void;
   onToggleArchive: (archived: boolean) => void;
+  projectId: string | null;
+  projects: RelayProject[];
   repositories: GithubRepository[];
   repositoryFullName: string | null;
   richDescription: TaskRichDocument | null;
@@ -9002,6 +9042,7 @@ function TaskDetailPanel({
   const [draftRepositoryFullName, setDraftRepositoryFullName] = useState(
     repositoryFullName ?? "none",
   );
+  const [draftProjectId, setDraftProjectId] = useState(projectId ?? "none");
   const [draftRichDescription, setDraftRichDescription] =
     useState<TaskRichDocument | null>(richDescription);
   const [deleting, setDeleting] = useState(false);
@@ -9015,6 +9056,7 @@ function TaskDetailPanel({
     setDue(taskDateValue(nextTask?.due));
     setDraftTaskListId(nextTask?.taskListId ?? "@default");
     setDraftRepositoryFullName(repositoryFullName ?? "none");
+    setDraftProjectId(projectId ?? "none");
     setDraftRichDescription(richDescription);
     setStatus(null);
   }
@@ -9044,6 +9086,7 @@ function TaskDetailPanel({
         due: due ? new Date(`${due.toString()}T23:59:00`).toISOString() : null,
         priority,
         taskListId: draftTaskListId,
+        projectId: draftProjectId === "none" ? null : draftProjectId,
         repositoryFullName:
           draftRepositoryFullName === "none" ? null : draftRepositoryFullName,
         richDescription: draftRichDescription,
@@ -9095,7 +9138,34 @@ function TaskDetailPanel({
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          {!editing ? (
+          {editing ? (
+            <>
+              <Button
+                className={primaryButtonClass}
+                disabled={!title.trim() || saving}
+                onClick={() => void save()}
+                type="button"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Save changes
+              </Button>
+              <Button
+                className={secondaryButtonClass}
+                disabled={saving}
+                onClick={() => {
+                  resetDraft(task);
+                  onEditingChange(false);
+                }}
+                type="button"
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
             <Button
               className={secondaryButtonClass}
               onClick={() => {
@@ -9107,7 +9177,7 @@ function TaskDetailPanel({
               <FileText className="h-4 w-4" />
               Edit
             </Button>
-          ) : null}
+          )}
           {!editing ? (
             <>
               <Button
@@ -9139,7 +9209,11 @@ function TaskDetailPanel({
               </Button>
             </>
           ) : null}
-          <TaskCompletionButton task={task} toggleTask={toggleTask} />
+          <TaskCompletionButton
+            disabled={editing}
+            task={task}
+            toggleTask={toggleTask}
+          />
         </div>
       </div>
 
@@ -9212,6 +9286,28 @@ function TaskDetailPanel({
               </label>
               <label className="grid gap-1.5">
                 <span className="text-xs font-semibold uppercase text-muted">
+                  Relay project
+                </span>
+                <Select
+                  aria-label="Linked Relay project"
+                  className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                  onChange={(event) => setDraftProjectId(event.target.value)}
+                  value={draftProjectId}
+                >
+                  <option value="none">No project</option>
+                  {projectId &&
+                  !projects.some((project) => project.id === projectId) ? (
+                    <option value={projectId}>Unavailable project</option>
+                  ) : null}
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-muted">
                   GitHub repository
                 </span>
                 <Select
@@ -9245,32 +9341,6 @@ function TaskDetailPanel({
                 {status}
               </p>
             ) : null}
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button
-                className={primaryButtonClass}
-                disabled={!title.trim() || saving}
-                onClick={() => void save()}
-                type="button"
-              >
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
-                Save changes
-              </Button>
-              <Button
-                className={secondaryButtonClass}
-                onClick={() => {
-                  resetDraft(task);
-                  onEditingChange(false);
-                }}
-                type="button"
-              >
-                Cancel
-              </Button>
-            </div>
           </div>
         ) : (
           <div className="space-y-6">
@@ -9286,6 +9356,13 @@ function TaskDetailPanel({
               <Chip size="sm" variant="secondary">
                 {task.taskListTitle ?? "Google Tasks"}
               </Chip>
+              {projectId ? (
+                <Chip size="sm" variant="secondary">
+                  <Folder className="h-3 w-3" />
+                  {projects.find((project) => project.id === projectId)?.name ??
+                    "Unavailable project"}
+                </Chip>
+              ) : null}
               {repositoryFullName ? (
                 <Chip size="sm" variant="secondary">
                   <GitBranch className="h-3 w-3" />
@@ -10209,6 +10286,95 @@ function useTaskRepositoryAssignments() {
   return { repositoryAssignments, setTaskRepository };
 }
 
+function useTaskProjectLinks() {
+  const [projectRecord, setProjectRecord] = useState<ProjectRecord | null>(
+    null,
+  );
+  const projectRecordRef = useRef<ProjectRecord | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadProjects() {
+      let nextRecord = readBrowserProjectRecord() ?? null;
+
+      try {
+        const response = await fetch("/api/projects", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as {
+          account?: unknown;
+          record?: unknown;
+        };
+        const parsed = projectRecordSchema.safeParse(data.record);
+        if (response.ok && data.account && parsed.success) {
+          nextRecord = parsed.data;
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.warn("Project links are using local data.", error);
+        }
+      }
+
+      if (controller.signal.aborted) return;
+      projectRecordRef.current = nextRecord;
+      setProjectRecord(nextRecord);
+    }
+
+    function applyProjectUpdate(event: Event) {
+      const parsed = projectRecordSchema.safeParse(
+        (event as CustomEvent<unknown>).detail,
+      );
+      if (!parsed.success) return;
+      projectRecordRef.current = parsed.data;
+      setProjectRecord(parsed.data);
+    }
+
+    void loadProjects();
+    window.addEventListener(projectRecordUpdatedEvent, applyProjectUpdate);
+    return () => {
+      controller.abort();
+      window.removeEventListener(projectRecordUpdatedEvent, applyProjectUpdate);
+    };
+  }, []);
+
+  async function setTaskProject(taskId: string, projectId: string | null) {
+    const current = projectRecordRef.current;
+    if (!current) return;
+
+    const taskAssignments = { ...current.store.taskAssignments };
+    if (projectId) taskAssignments[taskId] = projectId;
+    else delete taskAssignments[taskId];
+    const nextRecord = projectRecordSchema.parse({
+      ...current,
+      store: { ...current.store, taskAssignments },
+    });
+
+    projectRecordRef.current = nextRecord;
+    setProjectRecord(nextRecord);
+    applyBrowserProjectRecord(nextRecord);
+
+    try {
+      await fetch("/api/projects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextRecord),
+      });
+    } catch (error) {
+      console.warn("Project link account sync is unavailable.", error);
+    }
+  }
+
+  return {
+    projectAssignments: projectRecord?.store.taskAssignments ?? {},
+    projects:
+      projectRecord?.store.projects.filter((project) => !project.archived) ??
+      [],
+    setTaskProject,
+  };
+}
+
 function readStoredTaskCategories() {
   if (typeof window === "undefined") return defaultTaskCategories;
   try {
@@ -10783,11 +10949,15 @@ function GoogleTaskCreationModal({
   initialTaskListId,
   onClose,
   onCreate,
+  projects,
+  repositories,
   taskLists,
 }: {
   initialTaskListId: string;
   onClose: () => void;
   onCreate: (input: GoogleTaskInput) => Promise<void>;
+  projects: RelayProject[];
+  repositories: GithubRepository[];
   taskLists: Array<{ id?: string | null; title: string }>;
 }) {
   const [title, setTitle] = useState("");
@@ -10797,6 +10967,8 @@ function GoogleTaskCreationModal({
   const [due, setDue] = useState<DateValue | null>(null);
   const [priority, setPriority] = useState<GoogleTaskPriority>("medium");
   const [taskListId, setTaskListId] = useState(initialTaskListId);
+  const [projectId, setProjectId] = useState("none");
+  const [repositoryFullName, setRepositoryFullName] = useState("none");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -10811,6 +10983,9 @@ function GoogleTaskCreationModal({
         due: due ? new Date(`${due.toString()}T23:59:00`).toISOString() : null,
         priority,
         taskListId: taskListId || "@default",
+        projectId: projectId === "none" ? null : projectId,
+        repositoryFullName:
+          repositoryFullName === "none" ? null : repositoryFullName,
         richDescription,
       });
       onClose();
@@ -10917,6 +11092,47 @@ function GoogleTaskCreationModal({
                   )}
                 </Select>
               </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-semibold uppercase text-muted">
+                    Relay project
+                  </span>
+                  <Select
+                    aria-label="Link to Relay project"
+                    className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) => setProjectId(event.target.value)}
+                    value={projectId}
+                  >
+                    <option value="none">No project</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-semibold uppercase text-muted">
+                    GitHub repository
+                  </span>
+                  <Select
+                    aria-label="Link to GitHub repository"
+                    className="h-11 w-full rounded-xl border border-separator bg-surface-secondary px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    onChange={(event) =>
+                      setRepositoryFullName(event.target.value)
+                    }
+                    value={repositoryFullName}
+                  >
+                    <option value="none">No repository</option>
+                    {repositories.map((repository) => (
+                      <option key={repository.id} value={repository.fullName}>
+                        {repository.fullName}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              </div>
             </div>
 
             {status ? (
