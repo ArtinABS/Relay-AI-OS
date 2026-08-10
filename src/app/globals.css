@@ -1344,19 +1344,29 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 }
 
 .relay-product-shell .project-workspace-tabs {
+  --project-tab-panel: color-mix(
+    in oklab,
+    var(--surface) 88%,
+    var(--background)
+  );
+  --project-tab-strip: color-mix(
+    in oklab,
+    var(--surface-secondary) 72%,
+    var(--background)
+  );
+  background: var(--project-tab-strip);
   overflow: visible;
   position: relative;
   z-index: 2;
 }
 
-.relay-product-shell .project-workspace-tabs.relay-panel:hover,
-.relay-product-shell .project-workspace-surface.relay-panel:hover {
-  border-color: var(--separator);
-  box-shadow: var(--surface-shadow);
-  transform: none;
-}
-
-.relay-product-shell .project-workspace-surface {
+.relay-product-shell .project-workspace-panel {
+  --project-tab-panel: color-mix(
+    in oklab,
+    var(--surface) 88%,
+    var(--background)
+  );
+  background: var(--project-tab-panel);
   margin-top: -1px;
   position: relative;
   z-index: 1;
@@ -1371,27 +1381,33 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 0.8rem 0.8rem 0 0;
+  border-radius: 0.75rem 0.75rem 0 0;
   color: var(--muted);
   display: inline-flex;
   font-size: 0.78rem;
   font-weight: 650;
   gap: 0.5rem;
-  height: 2.7rem;
-  padding: 0 1rem;
+  height: 2.65rem;
+  padding: 0 1.15rem;
   position: relative;
   transition:
     background-color 160ms ease,
-    color 160ms ease;
+    color 160ms ease,
+    opacity 160ms ease;
 }
 
 .relay-product-shell .project-workspace-tab:hover {
-  background: var(--surface-secondary);
+  background: color-mix(in oklab, var(--surface-secondary) 62%, transparent);
   color: var(--foreground);
 }
 
+.relay-product-shell .project-workspace-tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -3px;
+}
+
 .relay-product-shell .project-workspace-tab[data-active="true"] {
-  background: var(--surface);
+  background: var(--project-tab-panel);
   color: var(--foreground);
   z-index: 1;
 }
@@ -1408,13 +1424,13 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 
 .relay-product-shell .project-workspace-tab[data-active="true"]::before {
   border-bottom-right-radius: 0.9rem;
-  box-shadow: 0.35rem 0.35rem 0 var(--surface);
+  box-shadow: 0.35rem 0.35rem 0 var(--project-tab-panel);
   left: -0.9rem;
 }
 
 .relay-product-shell .project-workspace-tab[data-active="true"]::after {
   border-bottom-left-radius: 0.9rem;
-  box-shadow: -0.35rem 0.35rem 0 var(--surface);
+  box-shadow: -0.35rem 0.35rem 0 var(--project-tab-panel);
   right: -0.9rem;
 }
 
@@ -1460,8 +1476,28 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   animation: fade-in 180ms ease-out both;
 }
 
-.relay-product-shell .project-resizable-layout > .task-resize-handle--vertical {
-  border-inline: 1px solid var(--separator);
+.relay-product-shell
+  .project-resizable-layout
+  > .task-resize-handle--vertical::before {
+  background: var(--separator);
+  bottom: 0;
+  content: "";
+  left: 50%;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  transition: background-color 160ms ease;
+  width: 1px;
+}
+
+.relay-product-shell
+  .project-resizable-layout
+  > .task-resize-handle--vertical:is(
+    :hover,
+    :focus-visible,
+    [data-resizing]
+  )::before {
+  background: color-mix(in oklab, var(--accent) 58%, var(--separator));
 }
 
 @media (max-width: 47.99rem) {
@@ -1826,19 +1862,19 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
 @media (min-width: 48rem) {
   .relay-product-shell .project-resizable-layout {
     grid-template-columns:
-      clamp(170px, min(var(--project-category-width, 210px), 24%), 320px)
+      minmax(0, var(--project-category-width, 20%))
       0.75rem
-      clamp(220px, min(var(--project-rail-width, 270px), 30%), 420px)
+      minmax(0, var(--project-rail-width, 20%))
       0.75rem
-      minmax(320px, 1fr);
+      minmax(0, 1fr);
   }
 
   .relay-product-shell
     .project-resizable-layout[data-categories-collapsed="true"] {
     grid-template-columns:
       64px 0.75rem
-      clamp(220px, min(var(--project-rail-width, 270px), 30%), 420px)
-      0.75rem minmax(320px, 1fr);
+      minmax(0, var(--project-rail-width, 20%))
+      0.75rem minmax(0, 1fr);
   }
 
   .relay-product-shell .project-detail-stack {
@@ -1850,10 +1886,6 @@ html[data-magicui-theme-vt="active"]::view-transition-new(root) {
   .relay-product-shell .project-detail-stack[data-calendar-collapsed="true"] {
     grid-template-rows: minmax(0, 1fr);
   }
-}
-
-.relay-product-shell .project-resizable-layout .relay-panel:hover {
-  transform: none;
 }
 
 .relay-product-shell .calendar-page,

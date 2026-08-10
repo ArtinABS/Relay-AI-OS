@@ -222,6 +222,11 @@ const defaultProjectLayout = {
   categoryWidth: 210,
   projectRailWidth: 270,
 };
+
+function projectColumnShare(value: number, defaultValue: number) {
+  return (value / defaultValue) * 20;
+}
+
 const projectColors = [
   "#20c8e8",
   "#14b8a6",
@@ -2838,14 +2843,16 @@ function ProjectsWorkspaceSkeleton() {
     <div
       aria-label="Loading projects and account metadata"
       aria-live="polite"
-      className="projects-workspace project-workspace-loading flex min-h-full flex-col gap-4 md:h-full md:min-h-0"
+      className="projects-workspace project-workspace-loading flex min-h-full flex-col md:h-full md:min-h-0"
       role="status"
     >
-      <div className="relay-panel h-20 shrink-0 animate-pulse rounded-2xl border border-separator bg-surface" />
-      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[210px_270px_minmax(0,1fr)]">
-        <div className="relay-panel animate-pulse rounded-2xl border border-separator bg-surface" />
-        <div className="relay-panel animate-pulse rounded-2xl border border-separator bg-surface" />
-        <div className="relay-panel overflow-hidden rounded-2xl border border-separator bg-surface p-5">
+      <div className="project-workspace-tabs h-14 shrink-0 animate-pulse" />
+      <div className="project-workspace-panel grid min-h-0 flex-1 md:grid-cols-[20fr_1px_20fr_1px_60fr]">
+        <div className="animate-pulse" />
+        <div className="bg-separator" />
+        <div className="animate-pulse" />
+        <div className="bg-separator" />
+        <div className="overflow-hidden p-5">
           <div className="h-10 w-48 animate-pulse rounded-xl bg-surface-secondary" />
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {[0, 1, 2].map((item) => (
@@ -3171,30 +3178,21 @@ export function ProjectsWorkspace({
     const height = rect?.height ?? 720;
     return {
       maxCalendarHeight: Math.max(210, Math.min(400, height - 330)),
-      maxCategoryWidth: Math.max(
-        170,
-        Math.min(320, width - layoutSizes.projectRailWidth - 344),
-      ),
-      maxProjectRailWidth: Math.max(
-        220,
-        Math.min(420, width - layoutSizes.categoryWidth - 344),
-      ),
+      width,
     };
   }
 
   function setCategoryWidth(nextWidth: number) {
-    const { maxCategoryWidth } = projectLayoutBounds();
     setLayoutSizes((current) => ({
       ...current,
-      categoryWidth: Math.min(maxCategoryWidth, Math.max(170, nextWidth)),
+      categoryWidth: Math.min(320, Math.max(170, nextWidth)),
     }));
   }
 
   function setProjectRailWidth(nextWidth: number) {
-    const { maxProjectRailWidth } = projectLayoutBounds();
     setLayoutSizes((current) => ({
       ...current,
-      projectRailWidth: Math.min(maxProjectRailWidth, Math.max(220, nextWidth)),
+      projectRailWidth: Math.min(420, Math.max(220, nextWidth)),
     }));
   }
 
@@ -3231,15 +3229,21 @@ export function ProjectsWorkspace({
     const resize = resizeStateRef.current;
     if (!resize || resize.pointerId !== event.pointerId) return;
     if (resize.axis === "categories") {
-      setCategoryWidth(
-        resize.startCategoryWidth + event.clientX - resize.startX,
-      );
+      const { width } = projectLayoutBounds();
+      const virtualDelta =
+        ((event.clientX - resize.startX) / width) *
+        defaultProjectLayout.categoryWidth *
+        5;
+      setCategoryWidth(resize.startCategoryWidth + virtualDelta);
       return;
     }
     if (resize.axis === "projects") {
-      setProjectRailWidth(
-        resize.startProjectRailWidth + event.clientX - resize.startX,
-      );
+      const { width } = projectLayoutBounds();
+      const virtualDelta =
+        ((event.clientX - resize.startX) / width) *
+        defaultProjectLayout.projectRailWidth *
+        5;
+      setProjectRailWidth(resize.startProjectRailWidth + virtualDelta);
       return;
     }
     setCalendarHeight(
@@ -3278,21 +3282,55 @@ export function ProjectsWorkspace({
     }, 0);
   const projectFiltersActive =
     query.trim().length > 0 || statusFilter !== "all";
+  const categoryColumnShare = projectColumnShare(
+    layoutSizes.categoryWidth,
+    defaultProjectLayout.categoryWidth,
+  );
+  const projectRailColumnShare = projectColumnShare(
+    layoutSizes.projectRailWidth,
+    defaultProjectLayout.projectRailWidth,
+  );
+
+  function handleWorkspaceTabKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) {
+    let nextTab: "relay" | "github" | null = null;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      nextTab = workspaceTab === "relay" ? "github" : "relay";
+    }
+    if (event.key === "Home") nextTab = "relay";
+    if (event.key === "End") nextTab = "github";
+    if (!nextTab) return;
+
+    event.preventDefault();
+    setWorkspaceTab(nextTab);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(
+          nextTab === "relay" ? "project-management-tab" : "github-projects-tab",
+        )
+        ?.focus();
+    });
+  }
 
   return (
     <div className="projects-workspace flex min-h-full flex-col gap-0 animate-fade-in md:h-full md:min-h-0">
-      <header className="project-workspace-tabs relay-panel shrink-0 rounded-t-2xl border border-b-0 border-separator bg-surface px-3 pt-3 shadow-surface">
+      <header className="project-workspace-tabs shrink-0 px-3 pt-2">
         <div
           aria-label="Project workspaces"
           className="flex min-w-0 items-end gap-1"
           role="tablist"
         >
           <button
+            aria-controls="project-management-panel"
             aria-selected={workspaceTab === "relay"}
             className="project-workspace-tab"
             data-active={workspaceTab === "relay" || undefined}
+            id="project-management-tab"
             onClick={() => setWorkspaceTab("relay")}
+            onKeyDown={handleWorkspaceTabKeyDown}
             role="tab"
+            tabIndex={workspaceTab === "relay" ? 0 : -1}
             type="button"
           >
             <Folder className="h-4 w-4" />
@@ -3302,11 +3340,15 @@ export function ProjectsWorkspace({
             </span>
           </button>
           <button
+            aria-controls="github-projects-panel"
             aria-selected={workspaceTab === "github"}
             className="project-workspace-tab"
             data-active={workspaceTab === "github" || undefined}
+            id="github-projects-tab"
             onClick={() => setWorkspaceTab("github")}
+            onKeyDown={handleWorkspaceTabKeyDown}
             role="tab"
+            tabIndex={workspaceTab === "github" ? 0 : -1}
             type="button"
           >
             <GitBranch className="h-4 w-4" />
@@ -3349,7 +3391,12 @@ export function ProjectsWorkspace({
       </header>
 
       {workspaceTab === "github" ? (
-        <div className="project-github-workspace project-workspace-surface relay-panel min-h-0 flex-1 overflow-hidden rounded-b-2xl rounded-tr-2xl border border-separator bg-surface shadow-surface">
+        <div
+          aria-labelledby="github-projects-tab"
+          className="project-github-workspace project-workspace-panel min-h-0 flex-1 overflow-hidden"
+          id="github-projects-panel"
+          role="tabpanel"
+        >
           <GithubRepositoryExplorer
             repositories={repositories}
             repositoryError={repositoryError}
@@ -3359,21 +3406,23 @@ export function ProjectsWorkspace({
         </div>
       ) : (
         <>
-          <div className="project-workspace-surface relay-panel min-h-0 min-w-0 flex-1 overflow-hidden rounded-b-2xl rounded-tr-2xl border border-separator bg-surface shadow-surface">
-            <div
-              className="project-resizable-layout grid h-full min-h-0 min-w-0 gap-4 overflow-hidden md:gap-0"
-              data-categories-collapsed={categoriesCollapsed || undefined}
-              ref={projectLayoutRef}
-              style={
-                {
-                  "--project-calendar-height": `${layoutSizes.calendarHeight}px`,
-                  "--project-category-width": `${categoriesCollapsed ? 64 : layoutSizes.categoryWidth}px`,
-                  "--project-rail-width": `${layoutSizes.projectRailWidth}px`,
-                } as CSSProperties
-              }
-            >
+          <div
+            aria-labelledby="project-management-tab"
+            className="project-workspace-panel project-resizable-layout grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden"
+            data-categories-collapsed={categoriesCollapsed || undefined}
+            id="project-management-panel"
+            ref={projectLayoutRef}
+            role="tabpanel"
+            style={
+              {
+                "--project-calendar-height": `${layoutSizes.calendarHeight}px`,
+                "--project-category-width": `${categoryColumnShare}%`,
+                "--project-rail-width": `${projectRailColumnShare}%`,
+              } as CSSProperties
+            }
+          >
             <aside
-              className="project-spine project-workspace-pane relative flex h-80 min-h-0 min-w-0 flex-col overflow-hidden bg-surface md:h-auto"
+              className="project-spine project-workspace-pane relative flex h-80 min-h-0 min-w-0 flex-col overflow-hidden md:h-auto"
               data-collapsed={categoriesCollapsed || undefined}
             >
               <div className="border-b border-separator p-3">
@@ -3594,7 +3643,7 @@ export function ProjectsWorkspace({
               value={layoutSizes.categoryWidth}
             />
 
-            <section className="project-workspace-pane flex h-[28rem] min-h-0 min-w-0 flex-col overflow-hidden bg-surface md:h-auto">
+            <section className="project-workspace-pane flex h-[28rem] min-h-0 min-w-0 flex-col overflow-hidden md:h-auto">
               <div className="border-b border-separator p-3">
                 <div className="flex items-center justify-between gap-2 px-1">
                   <div>
@@ -3822,7 +3871,7 @@ export function ProjectsWorkspace({
               value={layoutSizes.projectRailWidth}
             />
 
-            <section className="project-workspace-pane flex min-h-[36rem] min-w-0 flex-col overflow-hidden bg-surface md:min-h-0">
+            <section className="project-workspace-pane flex min-h-[36rem] min-w-0 flex-col overflow-hidden md:min-h-0">
               {selectedProject ? (
                 (() => {
                   const progress = projectProgress(
@@ -4280,7 +4329,6 @@ export function ProjectsWorkspace({
                 <EmptyProjects onCreate={() => setProjectForm("new")} />
               )}
             </section>
-            </div>
           </div>
 
           {projectForm ? (
